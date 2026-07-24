@@ -657,6 +657,11 @@ class ProjectsApiTest extends ApiTestCase
             ->assertJsonPath('data.project.status', 'completed')
             ->assertJsonPath('data.project.archived_at', null);
 
+        $this->patchJson("/api/projects/{$projectId}", [
+            'name' => 'محاولة تعديل مشروع مكتمل',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('project');
+
         $this->patchJson("/api/projects/{$projectId}/activate")
             ->assertUnprocessable()
             ->assertJsonValidationErrors('project');
@@ -727,6 +732,11 @@ class ProjectsApiTest extends ApiTestCase
         $this->patchJson("/api/projects/{$cancellableProjectId}/cancel")
             ->assertOk()
             ->assertJsonPath('data.project.status', 'cancelled');
+
+        $this->patchJson("/api/projects/{$cancellableProjectId}", [
+            'name' => 'محاولة تعديل مشروع ملغي',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('project');
 
         $projectId = $this->createProjectForLifecycle(
             'مشروع بوحدة مباعة',

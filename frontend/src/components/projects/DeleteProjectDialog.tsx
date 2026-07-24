@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Project } from "@/types/project";
 
-type ArchiveAction = "archive" | "restore";
+type ArchiveAction = "archive" | "restore" | "activate" | "revert-to-draft" | "complete" | "cancel";
 
 type ArchiveProjectDialogProps = {
   action: ArchiveAction;
@@ -35,6 +35,13 @@ export function ArchiveProjectDialog({
   }
 
   const isRestore = action === "restore";
+  const actionLabels = isArabic ? {
+    archive: "أرشفة المشروع", restore: "استعادة المشروع", activate: "تفعيل المشروع",
+    "revert-to-draft": "إرجاع المشروع إلى مسودة", complete: "إكمال المشروع", cancel: "إلغاء المشروع",
+  } : {
+    archive: "Archive project", restore: "Restore project", activate: "Activate project",
+    "revert-to-draft": "Revert project to draft", complete: "Complete project", cancel: "Cancel project",
+  };
 
   const handleConfirm = async (): Promise<void> => {
     setError(null);
@@ -79,17 +86,13 @@ export function ArchiveProjectDialog({
         </div>
 
         <h2 className="mt-5 text-lg font-bold text-[var(--text-primary)]">
-          {isArabic
-            ? isRestore
-              ? "استعادة المشروع"
-              : "أرشفة المشروع"
-            : isRestore
-              ? "Restore project"
-              : "Archive project"}
+          {actionLabels[action]}
         </h2>
 
         <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-          {isArabic
+          {action === "activate" || action === "revert-to-draft" || action === "complete" || action === "cancel"
+            ? isArabic ? `هل أنت متأكد من تنفيذ إجراء «${actionLabels[action]}» للمشروع «${project.name}»؟` : `Are you sure you want to ${actionLabels[action].toLowerCase()} for “${project.name}”?`
+            : isArabic
             ? isRestore
               ? `هل أنت متأكد من استعادة المشروع «${project.name}»؟ سيعود متاحًا للتعديل.`
               : `هل أنت متأكد من أرشفة المشروع «${project.name}»؟ ستبقى بياناته محفوظة ويمكن استعادته لاحقًا.`
@@ -123,19 +126,13 @@ export function ArchiveProjectDialog({
           >
             {isProcessing
               ? isArabic
-                ? isRestore
-                  ? "جارٍ الاستعادة..."
-                  : "جارٍ الأرشفة..."
+                ? "جارٍ التنفيذ..."
                 : isRestore
                   ? "Restoring..."
                   : "Archiving..."
               : isArabic
-                ? isRestore
-                  ? "استعادة المشروع"
-                  : "أرشفة المشروع"
-                : isRestore
-                  ? "Restore project"
-                  : "Archive project"}
+                ? actionLabels[action]
+                : actionLabels[action]}
           </Button>
         </div>
       </div>

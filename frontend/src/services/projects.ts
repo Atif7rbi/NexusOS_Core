@@ -157,3 +157,22 @@ async function changeArchiveState(
 
   return result.data.project;
 }
+
+export type ProjectLifecycleAction =
+  | "activate"
+  | "revert-to-draft"
+  | "complete"
+  | "cancel";
+
+export async function executeProjectLifecycleAction(
+  token: string,
+  projectId: string,
+  action: ProjectLifecycleAction
+): Promise<Project> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/projects/${projectId}/${action}`,
+    { method: "PATCH", headers: getHeaders(token) }
+  );
+  if (!response.ok) throw await parseApiError(response);
+  return ((await response.json()) as ProjectResponse).data.project;
+}

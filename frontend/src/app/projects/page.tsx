@@ -26,7 +26,9 @@ import { useAuth } from "@/providers/AuthProvider";
 import {
   createProject,
   archiveProject,
+  executeProjectLifecycleAction,
   fetchProjects,
+  type ProjectLifecycleAction,
   restoreProject,
   updateProject,
 } from "@/services/projects";
@@ -86,7 +88,7 @@ export default function ProjectsPage() {
     useState<Project | null>(null);
 
   const [archiveAction, setArchiveAction] = useState<
-    "archive" | "restore"
+    "archive" | "restore" | ProjectLifecycleAction
   >("archive");
 
   const [isProcessingArchiveAction, setProcessingArchiveAction] =
@@ -387,8 +389,10 @@ export default function ProjectsPage() {
     try {
       if (archiveAction === "archive") {
         await archiveProject(token, projectForArchiveAction.id);
-      } else {
+      } else if (archiveAction === "restore") {
         await restoreProject(token, projectForArchiveAction.id);
+      } else {
+        await executeProjectLifecycleAction(token, projectForArchiveAction.id, archiveAction);
       }
 
       await loadProjects(
@@ -609,7 +613,7 @@ export default function ProjectsPage() {
                             ]
                           }
                           onEdit={
-                            project.archived_at
+                            !isProjectEditable(project)
                               ? undefined
                               : () => openEditModal(project)
                           }
@@ -620,6 +624,10 @@ export default function ProjectsPage() {
                                 ? "restore"
                                 : "archive"
                             );
+                          }}
+                          onLifecycleAction={(action) => {
+                            setProjectForArchiveAction(project);
+                            setArchiveAction(action);
                           }}
                         />
                       )
@@ -641,7 +649,7 @@ export default function ProjectsPage() {
                       statusLabels[project.status]
                     }
                     onEdit={
-                      project.archived_at
+                      !isProjectEditable(project)
                         ? undefined
                         : () => openEditModal(project)
                     }
@@ -652,6 +660,10 @@ export default function ProjectsPage() {
                           ? "restore"
                           : "archive"
                       );
+                    }}
+                    onLifecycleAction={(action) => {
+                      setProjectForArchiveAction(project);
+                      setArchiveAction(action);
                     }}
                   />
                 ))}
@@ -747,6 +759,7 @@ type ProjectRowProps = {
   statusLabel: string;
   onEdit?: () => void;
   onArchiveAction: () => void;
+  onLifecycleAction: (action: ProjectLifecycleAction) => void;
 };
 
 function ProjectRow({
@@ -756,6 +769,7 @@ function ProjectRow({
   statusLabel,
   onEdit,
   onArchiveAction,
+  onLifecycleAction,
 }: ProjectRowProps) {
   return (
     <tr className="transition-colors hover:bg-[var(--surface-soft)]">
@@ -840,6 +854,16 @@ function ProjectRow({
 
       <td className="px-5 py-4">
         <div className="flex justify-end gap-2">
+          {!project.archived_at && project.status === "draft" ? (
+            <LifecycleButton label="▶" title="Activate" onClick={() => onLifecycleAction("activate")} />
+          ) : null}
+          {!project.archived_at && project.status === "active" ? (
+            <>
+              <LifecycleButton label="◀" title="Revert to draft" onClick={() => onLifecycleAction("revert-to-draft")} />
+              <LifecycleButton label="✓" title="Complete" onClick={() => onLifecycleAction("complete")} />
+              <LifecycleButton label="×" title="Cancel" onClick={() => onLifecycleAction("cancel")} />
+            </>
+          ) : null}
           {onEdit ? (
             <button
               type="button"
@@ -880,6 +904,7 @@ type ProjectMobileCardProps = {
   statusLabel: string;
   onEdit?: () => void;
   onArchiveAction: () => void;
+  onLifecycleAction: (action: ProjectLifecycleAction) => void;
 };
 
 function ProjectMobileCard({
@@ -889,6 +914,7 @@ function ProjectMobileCard({
   statusLabel,
   onEdit,
   onArchiveAction,
+  onLifecycleAction,
 }: ProjectMobileCardProps) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
@@ -939,6 +965,12 @@ function ProjectMobileCard({
       </div>
 
       <div className="mt-4 flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+        {!project.archived_at && project.status === "draft" ? <LifecycleButton label={isArabic ? "تفعيل" : "Activate"} title="Activate" onClick={() => onLifecycleAction("activate")} /> : null}
+        {!project.archived_at && project.status === "active" ? <>
+          <LifecycleButton label={isArabic ? "مسودة" : "Draft"} title="Revert to draft" onClick={() => onLifecycleAction("revert-to-draft")} />
+          <LifecycleButton label={isArabic ? "إكمال" : "Complete"} title="Complete" onClick={() => onLifecycleAction("complete")} />
+          <LifecycleButton label={isArabic ? "إلغاء" : "Cancel"} title="Cancel" onClick={() => onLifecycleAction("cancel")} />
+        </> : null}
         {onEdit ? (
           <button
             type="button"
@@ -970,6 +1002,18 @@ function ProjectMobileCard({
         </button>
       </div>
     </article>
+  );
+}
+
+function LifecycleButton({ label, title, onClick }: { label: string; title: string; onClick: () => void }) {
+  return <button type="button" title={title} onClick={onClick} className="flex h-9 items-center justify-center rounded-xl border border-[var(--border)] px-3 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)]">{label}</button>;
+}
+
+function isProjectEditable(project: Project): boolean {
+  return (
+    project.archived_at === null &&
+    project.status !== "completed" &&
+    project.status !== "cancelled"
   );
 }
 
