@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  AlertTriangle,
+  Archive,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -10,19 +10,19 @@ import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Project } from "@/types/project";
 
-type DeleteProjectDialogProps = {
+type ArchiveProjectDialogProps = {
   project: Project | null;
-  isDeleting: boolean;
+  isArchiving: boolean;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
 };
 
-export function DeleteProjectDialog({
+export function ArchiveProjectDialog({
   project,
-  isDeleting,
+  isArchiving,
   onCancel,
   onConfirm,
-}: DeleteProjectDialogProps) {
+}: ArchiveProjectDialogProps) {
   const { isArabic } = useTranslation();
   const [error, setError] = useState<string | null>(null);
 
@@ -40,8 +40,8 @@ export function DeleteProjectDialog({
         caughtError instanceof Error
           ? caughtError.message
           : isArabic
-            ? "تعذر حذف المشروع. حاول مرة أخرى."
-            : "Unable to delete the project. Please try again."
+            ? "تعذرت أرشفة المشروع. حاول مرة أخرى."
+            : "Unable to archive the project. Please try again."
       );
     }
   };
@@ -64,20 +64,20 @@ export function DeleteProjectDialog({
           <X size={17} />
         </button>
 
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--danger-soft)] text-[var(--danger)]">
-          <AlertTriangle size={22} />
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-gold-soft)] text-[var(--brand-gold-strong)]">
+          <Archive size={22} />
         </div>
 
         <h2 className="mt-5 text-lg font-bold text-[var(--text-primary)]">
           {isArabic
-            ? "حذف المشروع"
-            : "Delete project"}
+            ? "أرشفة المشروع"
+            : "Archive project"}
         </h2>
 
         <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
           {isArabic
-            ? `هل أنت متأكد من حذف المشروع «${project.name}»؟ سيختفي من قوائم النظام.`
-            : `Are you sure you want to delete “${project.name}”? It will be removed from the system lists.`}
+            ? `هل أنت متأكد من أرشفة المشروع «${project.name}»؟ ستبقى بياناته محفوظة ويمكن استعادته لاحقًا.`
+            : `Are you sure you want to archive “${project.name}”? Its data will be preserved and can be restored later.`}
         </p>
 
         {error ? (
@@ -91,7 +91,7 @@ export function DeleteProjectDialog({
             type="button"
             variant="secondary"
             onClick={onCancel}
-            disabled={isDeleting}
+            disabled={isArchiving}
             className="!border-[var(--border)] !bg-[var(--surface)] !text-[var(--text-primary)] hover:!bg-[var(--surface-muted)]"
           >
             {isArabic ? "إلغاء" : "Cancel"}
@@ -99,17 +99,17 @@ export function DeleteProjectDialog({
 
           <Button
             type="button"
-            variant="danger"
+            variant="primary"
             onClick={() => void handleConfirm()}
-            disabled={isDeleting}
+            disabled={isArchiving}
           >
-            {isDeleting
+            {isArchiving
               ? isArabic
-                ? "جارٍ الحذف..."
-                : "Deleting..."
+                ? "جارٍ الأرشفة..."
+                : "Archiving..."
               : isArabic
-                ? "حذف المشروع"
-                : "Delete project"}
+                ? "أرشفة المشروع"
+                : "Archive project"}
           </Button>
         </div>
       </div>

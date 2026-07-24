@@ -21,7 +21,6 @@ import type {
   Project,
   ProjectFormPayload,
   ProjectManager,
-  ProjectStatus,
   ProjectType,
 } from "@/types/project";
 
@@ -40,7 +39,6 @@ type ProjectFormState = {
   name: string;
   description: string;
   project_type: ProjectType;
-  status: ProjectStatus;
   city: string;
   district: string;
   address_line: string;
@@ -56,7 +54,6 @@ const emptyForm: ProjectFormState = {
   name: "",
   description: "",
   project_type: "residential",
-  status: "draft",
   city: "",
   district: "",
   address_line: "",
@@ -80,15 +77,6 @@ const projectTypes: ProjectType[] = [
   "other",
 ];
 
-const projectStatuses: ProjectStatus[] = [
-  "draft",
-  "planning",
-  "active",
-  "completed",
-  "archived",
-  "cancelled",
-];
-
 function dateInputValue(
   value: string | null
 ): string {
@@ -106,7 +94,6 @@ function createInitialForm(
     name: project.name,
     description: project.description ?? "",
     project_type: project.project_type,
-    status: project.status,
     city: project.city,
     district: project.district ?? "",
     address_line: project.address_line ?? "",
@@ -177,7 +164,6 @@ export function ProjectFormModal({
         name: "اسم المشروع",
         namePlaceholder: "مثال: مشروع الياسمين السكني",
         type: "نوع المشروع",
-        status: "حالة المشروع",
         descriptionField: "وصف المشروع",
         city: "المدينة",
         district: "الحي",
@@ -215,7 +201,6 @@ export function ProjectFormModal({
         namePlaceholder:
           "Example: Al Yasmin Residential Project",
         type: "Project type",
-        status: "Project status",
         descriptionField: "Description",
         city: "City",
         district: "District",
@@ -266,27 +251,6 @@ export function ProjectFormModal({
           warehouse: "Warehouses",
           other: "Other",
         };
-
-  const statusLabels: Record<
-    ProjectStatus,
-    string
-  > = isArabic
-    ? {
-        draft: "مسودة",
-        planning: "تخطيط",
-        active: "نشط",
-        completed: "مكتمل",
-        archived: "مؤرشف",
-        cancelled: "ملغي",
-      }
-    : {
-        draft: "Draft",
-        planning: "Planning",
-        active: "Active",
-        completed: "Completed",
-        archived: "Archived",
-        cancelled: "Cancelled",
-      };
 
   const updateField = <
     Key extends keyof ProjectFormState,
@@ -346,7 +310,6 @@ export function ProjectFormModal({
       description:
         form.description.trim() || null,
       project_type: form.project_type,
-      status: form.status,
       country_code: "SA",
       city: form.city.trim(),
       district: form.district.trim() || null,
@@ -479,24 +442,6 @@ export function ProjectFormModal({
                 error={fieldErrors.project_type?.[0]}
               />
 
-              <SelectField
-                label={labels.status}
-                value={form.status}
-                onChange={(value) =>
-                  updateField(
-                    "status",
-                    value as ProjectStatus
-                  )
-                }
-                options={projectStatuses.map(
-                  (status) => ({
-                    value: status,
-                    label: statusLabels[status],
-                  })
-                )}
-                name="status"
-                error={fieldErrors.status?.[0]}
-              />
             </section>
 
             <section>

@@ -105,7 +105,7 @@ export async function updateProject(
   const response = await fetch(
     `${getApiBaseUrl()}/projects/${projectId}`,
     {
-      method: "PUT",
+      method: "PATCH",
       headers: getHeaders(token),
       body: JSON.stringify(payload),
     }
@@ -121,14 +121,14 @@ export async function updateProject(
   return result.data.project;
 }
 
-export async function deleteProject(
+export async function archiveProject(
   token: string,
   projectId: string
-): Promise<void> {
+): Promise<Project> {
   const response = await fetch(
-    `${getApiBaseUrl()}/projects/${projectId}`,
+    `${getApiBaseUrl()}/projects/${projectId}/archive`,
     {
-      method: "DELETE",
+      method: "PATCH",
       headers: getHeaders(token),
     }
   );
@@ -136,4 +136,9 @@ export async function deleteProject(
   if (!response.ok) {
     throw await parseApiError(response);
   }
+
+  const result =
+    (await response.json()) as ProjectResponse;
+
+  return result.data.project;
 }

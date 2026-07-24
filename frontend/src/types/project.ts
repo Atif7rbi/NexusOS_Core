@@ -64,7 +64,6 @@ export type ProjectFormPayload = {
   name: string;
   description?: string | null;
   project_type: ProjectType;
-  status?: ProjectStatus;
   country_code?: string;
   city: string;
   district?: string | null;

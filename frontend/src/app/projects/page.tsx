@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Archive,
   Building2,
   CalendarDays,
   Edit3,
@@ -8,7 +9,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Trash2,
 } from "lucide-react";
 import {
   useCallback,
@@ -16,7 +16,7 @@ import {
   useState,
 } from "react";
 
-import { DeleteProjectDialog } from "@/components/projects/DeleteProjectDialog";
+import { ArchiveProjectDialog } from "@/components/projects/DeleteProjectDialog";
 import { ProjectFormModal } from "@/components/projects/ProjectFormModal";
 import { Button } from "@/components/ui/Button";
 import { AppShell } from "@/components/layout/AppShell";
@@ -24,7 +24,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createProject,
-  deleteProject,
+  archiveProject,
   fetchProjects,
   updateProject,
 } from "@/services/projects";
@@ -80,10 +80,10 @@ export default function ProjectsPage() {
   const [isSubmitting, setSubmitting] =
     useState(false);
 
-  const [projectToDelete, setProjectToDelete] =
+  const [projectToArchive, setProjectToArchive] =
     useState<Project | null>(null);
 
-  const [isDeleting, setDeleting] =
+  const [isArchiving, setArchiving] =
     useState(false);
 
   const labels = isArabic
@@ -110,7 +110,7 @@ export default function ProjectsPage() {
         actions: "الإجراءات",
         noBudget: "غير محددة",
         edit: "تعديل",
-        delete: "حذف",
+        archive: "أرشفة",
         total: "إجمالي المشاريع",
         previous: "السابق",
         next: "التالي",
@@ -140,7 +140,7 @@ export default function ProjectsPage() {
         actions: "Actions",
         noBudget: "Not specified",
         edit: "Edit",
-        delete: "Delete",
+        archive: "Archive",
         total: "Total projects",
         previous: "Previous",
         next: "Next",
@@ -369,17 +369,17 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleDelete = async (): Promise<void> => {
-    if (!token || !projectToDelete) {
+  const handleArchive = async (): Promise<void> => {
+    if (!token || !projectToArchive) {
       return;
     }
 
-    setDeleting(true);
+    setArchiving(true);
 
     try {
-      await deleteProject(
+      await archiveProject(
         token,
-        projectToDelete.id
+        projectToArchive.id
       );
 
       await loadProjects(
@@ -388,9 +388,9 @@ export default function ProjectsPage() {
           : pagination.current_page
       );
 
-      setProjectToDelete(null);
+      setProjectToArchive(null);
     } finally {
-      setDeleting(false);
+      setArchiving(false);
     }
   };
 
@@ -602,8 +602,8 @@ export default function ProjectsPage() {
                           onEdit={() =>
                             openEditModal(project)
                           }
-                          onDelete={() =>
-                            setProjectToDelete(
+                          onArchive={() =>
+                            setProjectToArchive(
                               project
                             )
                           }
@@ -629,8 +629,8 @@ export default function ProjectsPage() {
                     onEdit={() =>
                       openEditModal(project)
                     }
-                    onDelete={() =>
-                      setProjectToDelete(project)
+                    onArchive={() =>
+                      setProjectToArchive(project)
                     }
                   />
                 ))}
@@ -699,15 +699,15 @@ export default function ProjectsPage() {
         />
       ) : null}
 
-      <DeleteProjectDialog
-        project={projectToDelete}
-        isDeleting={isDeleting}
+      <ArchiveProjectDialog
+        project={projectToArchive}
+        isArchiving={isArchiving}
         onCancel={() => {
-          if (!isDeleting) {
-            setProjectToDelete(null);
+          if (!isArchiving) {
+            setProjectToArchive(null);
           }
         }}
-        onConfirm={handleDelete}
+        onConfirm={handleArchive}
       />
     </AppShell>
   );
@@ -718,12 +718,12 @@ type ProjectRowProps = {
   labels: {
     noBudget: string;
     edit: string;
-    delete: string;
+    archive: string;
   };
   typeLabel: string;
   statusLabel: string;
   onEdit: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
 };
 
 function ProjectRow({
@@ -732,7 +732,7 @@ function ProjectRow({
   typeLabel,
   statusLabel,
   onEdit,
-  onDelete,
+  onArchive,
 }: ProjectRowProps) {
   return (
     <tr className="transition-colors hover:bg-[var(--surface-soft)]">
@@ -828,11 +828,11 @@ function ProjectRow({
 
           <button
             type="button"
-            onClick={onDelete}
-            title={labels.delete}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--danger)]/20 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+            onClick={onArchive}
+            title={labels.archive}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
           >
-            <Trash2 size={16} />
+            <Archive size={16} />
           </button>
         </div>
       </td>
@@ -846,7 +846,7 @@ type ProjectMobileCardProps = {
   typeLabel: string;
   statusLabel: string;
   onEdit: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
 };
 
 function ProjectMobileCard({
@@ -855,7 +855,7 @@ function ProjectMobileCard({
   typeLabel,
   statusLabel,
   onEdit,
-  onDelete,
+  onArchive,
 }: ProjectMobileCardProps) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
@@ -917,11 +917,11 @@ function ProjectMobileCard({
 
         <button
           type="button"
-          onClick={onDelete}
-          className="flex h-9 items-center gap-2 rounded-xl border border-[var(--danger)]/20 px-3 text-xs font-bold text-[var(--danger)]"
+          onClick={onArchive}
+          className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-xs font-bold text-[var(--text-secondary)]"
         >
-          <Trash2 size={15} />
-          {isArabic ? "حذف" : "Delete"}
+          <Archive size={15} />
+          {isArabic ? "أرشفة" : "Archive"}
         </button>
       </div>
     </article>
