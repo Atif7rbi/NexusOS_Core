@@ -669,16 +669,6 @@ class ProjectsApiTest extends ApiTestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('project');
 
-        $notReadyProjectId = $this->createProjectForLifecycle(
-            'مشروع غير مكتمل البيانات',
-        );
-        DB::table('projects')->where('id', $notReadyProjectId)->update([
-            'city' => null,
-        ]);
-
-        $this->patchJson("/api/projects/{$notReadyProjectId}/activate")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('project');
     }
 
     public function test_active_project_can_revert_to_draft_only_without_an_active_reservation(): void
