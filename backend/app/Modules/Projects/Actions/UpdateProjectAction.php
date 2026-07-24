@@ -3,6 +3,8 @@
 namespace App\Modules\Projects\Actions;
 
 use App\Modules\Projects\Exceptions\ArchivedProjectCannotBeUpdatedException;
+use App\Modules\Projects\Exceptions\FinalProjectCannotBeUpdatedException;
+use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use Illuminate\Support\Facades\DB;
 
@@ -29,6 +31,13 @@ class UpdateProjectAction
 
             if ($project->isArchived()) {
                 throw new ArchivedProjectCannotBeUpdatedException();
+            }
+
+            if (in_array($project->status, [
+                ProjectStatus::Completed,
+                ProjectStatus::Cancelled,
+            ], true)) {
+                throw new FinalProjectCannotBeUpdatedException();
             }
 
             unset(

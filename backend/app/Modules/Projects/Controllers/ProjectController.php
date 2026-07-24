@@ -12,6 +12,7 @@ use App\Modules\Projects\Actions\RevertProjectToDraftAction;
 use App\Modules\Projects\Actions\RestoreProjectAction;
 use App\Modules\Projects\Actions\UpdateProjectAction;
 use App\Modules\Projects\Exceptions\ArchivedProjectCannotBeUpdatedException;
+use App\Modules\Projects\Exceptions\FinalProjectCannotBeUpdatedException;
 use App\Modules\Projects\Exceptions\InvalidProjectStatusTransitionException;
 use App\Modules\Projects\Exceptions\ProjectAlreadyActiveException;
 use App\Modules\Projects\Exceptions\ProjectAlreadyArchivedException;
@@ -142,7 +143,10 @@ final class ProjectController extends Controller
                 actorId: $request->user()->id,
                 data: $request->validated(),
             )->load('projectManager:id,name,email');
-        } catch (ArchivedProjectCannotBeUpdatedException $exception) {
+        } catch (
+            ArchivedProjectCannotBeUpdatedException
+            | FinalProjectCannotBeUpdatedException $exception
+        ) {
             $this->throwProjectValidationException(
                 $exception->getMessage()
             );
