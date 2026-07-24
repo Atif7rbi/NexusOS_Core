@@ -10,16 +10,20 @@ import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Project } from "@/types/project";
 
+type ArchiveAction = "archive" | "restore";
+
 type ArchiveProjectDialogProps = {
+  action: ArchiveAction;
   project: Project | null;
-  isArchiving: boolean;
+  isProcessing: boolean;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
 };
 
 export function ArchiveProjectDialog({
+  action,
   project,
-  isArchiving,
+  isProcessing,
   onCancel,
   onConfirm,
 }: ArchiveProjectDialogProps) {
@@ -29,6 +33,8 @@ export function ArchiveProjectDialog({
   if (!project) {
     return null;
   }
+
+  const isRestore = action === "restore";
 
   const handleConfirm = async (): Promise<void> => {
     setError(null);
@@ -40,8 +46,12 @@ export function ArchiveProjectDialog({
         caughtError instanceof Error
           ? caughtError.message
           : isArabic
-            ? "تعذرت أرشفة المشروع. حاول مرة أخرى."
-            : "Unable to archive the project. Please try again."
+            ? isRestore
+              ? "تعذرت استعادة المشروع. حاول مرة أخرى."
+              : "تعذرت أرشفة المشروع. حاول مرة أخرى."
+            : isRestore
+              ? "Unable to restore the project. Please try again."
+              : "Unable to archive the project. Please try again."
       );
     }
   };
@@ -70,14 +80,22 @@ export function ArchiveProjectDialog({
 
         <h2 className="mt-5 text-lg font-bold text-[var(--text-primary)]">
           {isArabic
-            ? "أرشفة المشروع"
-            : "Archive project"}
+            ? isRestore
+              ? "استعادة المشروع"
+              : "أرشفة المشروع"
+            : isRestore
+              ? "Restore project"
+              : "Archive project"}
         </h2>
 
         <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
           {isArabic
-            ? `هل أنت متأكد من أرشفة المشروع «${project.name}»؟ ستبقى بياناته محفوظة ويمكن استعادته لاحقًا.`
-            : `Are you sure you want to archive “${project.name}”? Its data will be preserved and can be restored later.`}
+            ? isRestore
+              ? `هل أنت متأكد من استعادة المشروع «${project.name}»؟ سيعود متاحًا للتعديل.`
+              : `هل أنت متأكد من أرشفة المشروع «${project.name}»؟ ستبقى بياناته محفوظة ويمكن استعادته لاحقًا.`
+            : isRestore
+              ? `Are you sure you want to restore “${project.name}”? It will become available for editing.`
+              : `Are you sure you want to archive “${project.name}”? Its data will be preserved and can be restored later.`}
         </p>
 
         {error ? (
@@ -91,7 +109,7 @@ export function ArchiveProjectDialog({
             type="button"
             variant="secondary"
             onClick={onCancel}
-            disabled={isArchiving}
+            disabled={isProcessing}
             className="!border-[var(--border)] !bg-[var(--surface)] !text-[var(--text-primary)] hover:!bg-[var(--surface-muted)]"
           >
             {isArabic ? "إلغاء" : "Cancel"}
@@ -101,15 +119,23 @@ export function ArchiveProjectDialog({
             type="button"
             variant="primary"
             onClick={() => void handleConfirm()}
-            disabled={isArchiving}
+            disabled={isProcessing}
           >
-            {isArchiving
+            {isProcessing
               ? isArabic
-                ? "جارٍ الأرشفة..."
-                : "Archiving..."
+                ? isRestore
+                  ? "جارٍ الاستعادة..."
+                  : "جارٍ الأرشفة..."
+                : isRestore
+                  ? "Restoring..."
+                  : "Archiving..."
               : isArabic
-                ? "أرشفة المشروع"
-                : "Archive project"}
+                ? isRestore
+                  ? "استعادة المشروع"
+                  : "أرشفة المشروع"
+                : isRestore
+                  ? "Restore project"
+                  : "Archive project"}
           </Button>
         </div>
       </div>

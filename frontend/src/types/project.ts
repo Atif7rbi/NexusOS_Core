@@ -50,6 +50,7 @@ export type Project = {
   actual_end_date: string | null;
   project_manager_id: number | null;
   project_manager?: ProjectManager | null;
+  archived_at: string | null;
   data_origin: DataOrigin;
   external_reference: string | null;
   legacy_reference: string | null;

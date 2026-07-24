@@ -8,6 +8,7 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
 } from "lucide-react";
 import {
@@ -26,6 +27,7 @@ import {
   createProject,
   archiveProject,
   fetchProjects,
+  restoreProject,
   updateProject,
 } from "@/services/projects";
 import { fetchTenantUsers } from "@/services/users";
@@ -80,10 +82,14 @@ export default function ProjectsPage() {
   const [isSubmitting, setSubmitting] =
     useState(false);
 
-  const [projectToArchive, setProjectToArchive] =
+  const [projectForArchiveAction, setProjectForArchiveAction] =
     useState<Project | null>(null);
 
-  const [isArchiving, setArchiving] =
+  const [archiveAction, setArchiveAction] = useState<
+    "archive" | "restore"
+  >("archive");
+
+  const [isProcessingArchiveAction, setProcessingArchiveAction] =
     useState(false);
 
   const labels = isArabic
@@ -111,6 +117,7 @@ export default function ProjectsPage() {
         noBudget: "غير محددة",
         edit: "تعديل",
         archive: "أرشفة",
+        restore: "استعادة",
         total: "إجمالي المشاريع",
         previous: "السابق",
         next: "التالي",
@@ -141,6 +148,7 @@ export default function ProjectsPage() {
         noBudget: "Not specified",
         edit: "Edit",
         archive: "Archive",
+        restore: "Restore",
         total: "Total projects",
         previous: "Previous",
         next: "Next",
@@ -369,18 +377,19 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleArchive = async (): Promise<void> => {
-    if (!token || !projectToArchive) {
+  const handleArchiveAction = async (): Promise<void> => {
+    if (!token || !projectForArchiveAction) {
       return;
     }
 
-    setArchiving(true);
+    setProcessingArchiveAction(true);
 
     try {
-      await archiveProject(
-        token,
-        projectToArchive.id
-      );
+      if (archiveAction === "archive") {
+        await archiveProject(token, projectForArchiveAction.id);
+      } else {
+        await restoreProject(token, projectForArchiveAction.id);
+      }
 
       await loadProjects(
         projects.length === 1 && pagination.current_page > 1
@@ -388,9 +397,9 @@ export default function ProjectsPage() {
           : pagination.current_page
       );
 
-      setProjectToArchive(null);
+      setProjectForArchiveAction(null);
     } finally {
-      setArchiving(false);
+      setProcessingArchiveAction(false);
     }
   };
 
@@ -599,14 +608,19 @@ export default function ProjectsPage() {
                               project.status
                             ]
                           }
-                          onEdit={() =>
-                            openEditModal(project)
+                          onEdit={
+                            project.archived_at
+                              ? undefined
+                              : () => openEditModal(project)
                           }
-                          onArchive={() =>
-                            setProjectToArchive(
-                              project
-                            )
-                          }
+                          onArchiveAction={() => {
+                            setProjectForArchiveAction(project);
+                            setArchiveAction(
+                              project.archived_at
+                                ? "restore"
+                                : "archive"
+                            );
+                          }}
                         />
                       )
                     )}
@@ -626,12 +640,19 @@ export default function ProjectsPage() {
                     statusLabel={
                       statusLabels[project.status]
                     }
-                    onEdit={() =>
-                      openEditModal(project)
+                    onEdit={
+                      project.archived_at
+                        ? undefined
+                        : () => openEditModal(project)
                     }
-                    onArchive={() =>
-                      setProjectToArchive(project)
-                    }
+                    onArchiveAction={() => {
+                      setProjectForArchiveAction(project);
+                      setArchiveAction(
+                        project.archived_at
+                          ? "restore"
+                          : "archive"
+                      );
+                    }}
                   />
                 ))}
               </div>
@@ -700,14 +721,15 @@ export default function ProjectsPage() {
       ) : null}
 
       <ArchiveProjectDialog
-        project={projectToArchive}
-        isArchiving={isArchiving}
+        action={archiveAction}
+        project={projectForArchiveAction}
+        isProcessing={isProcessingArchiveAction}
         onCancel={() => {
-          if (!isArchiving) {
-            setProjectToArchive(null);
+          if (!isProcessingArchiveAction) {
+            setProjectForArchiveAction(null);
           }
         }}
-        onConfirm={handleArchive}
+        onConfirm={handleArchiveAction}
       />
     </AppShell>
   );
@@ -719,11 +741,12 @@ type ProjectRowProps = {
     noBudget: string;
     edit: string;
     archive: string;
+    restore: string;
   };
   typeLabel: string;
   statusLabel: string;
-  onEdit: () => void;
-  onArchive: () => void;
+  onEdit?: () => void;
+  onArchiveAction: () => void;
 };
 
 function ProjectRow({
@@ -732,7 +755,7 @@ function ProjectRow({
   typeLabel,
   statusLabel,
   onEdit,
-  onArchive,
+  onArchiveAction,
 }: ProjectRowProps) {
   return (
     <tr className="transition-colors hover:bg-[var(--surface-soft)]">
@@ -817,22 +840,32 @@ function ProjectRow({
 
       <td className="px-5 py-4">
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            title={labels.edit}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
-          >
-            <Edit3 size={16} />
-          </button>
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              title={labels.edit}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+            >
+              <Edit3 size={16} />
+            </button>
+          ) : null}
 
           <button
             type="button"
-            onClick={onArchive}
-            title={labels.archive}
+            onClick={onArchiveAction}
+            title={
+              project.archived_at
+                ? labels.restore
+                : labels.archive
+            }
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
           >
-            <Archive size={16} />
+            {project.archived_at ? (
+              <RotateCcw size={16} />
+            ) : (
+              <Archive size={16} />
+            )}
           </button>
         </div>
       </td>
@@ -845,8 +878,8 @@ type ProjectMobileCardProps = {
   isArabic: boolean;
   typeLabel: string;
   statusLabel: string;
-  onEdit: () => void;
-  onArchive: () => void;
+  onEdit?: () => void;
+  onArchiveAction: () => void;
 };
 
 function ProjectMobileCard({
@@ -855,7 +888,7 @@ function ProjectMobileCard({
   typeLabel,
   statusLabel,
   onEdit,
-  onArchive,
+  onArchiveAction,
 }: ProjectMobileCardProps) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
@@ -906,22 +939,34 @@ function ProjectMobileCard({
       </div>
 
       <div className="mt-4 flex justify-end gap-2 border-t border-[var(--border)] pt-4">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-xs font-bold text-[var(--text-secondary)]"
-        >
-          <Edit3 size={15} />
-          {isArabic ? "تعديل" : "Edit"}
-        </button>
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-xs font-bold text-[var(--text-secondary)]"
+          >
+            <Edit3 size={15} />
+            {isArabic ? "تعديل" : "Edit"}
+          </button>
+        ) : null}
 
         <button
           type="button"
-          onClick={onArchive}
+          onClick={onArchiveAction}
           className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-xs font-bold text-[var(--text-secondary)]"
         >
-          <Archive size={15} />
-          {isArabic ? "أرشفة" : "Archive"}
+          {project.archived_at ? (
+            <RotateCcw size={15} />
+          ) : (
+            <Archive size={15} />
+          )}
+          {isArabic
+            ? project.archived_at
+              ? "استعادة"
+              : "أرشفة"
+            : project.archived_at
+              ? "Restore"
+              : "Archive"}
         </button>
       </div>
     </article>

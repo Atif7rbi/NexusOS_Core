@@ -125,8 +125,23 @@ export async function archiveProject(
   token: string,
   projectId: string
 ): Promise<Project> {
+  return changeArchiveState(token, projectId, "archive");
+}
+
+export async function restoreProject(
+  token: string,
+  projectId: string
+): Promise<Project> {
+  return changeArchiveState(token, projectId, "restore");
+}
+
+async function changeArchiveState(
+  token: string,
+  projectId: string,
+  action: "archive" | "restore"
+): Promise<Project> {
   const response = await fetch(
-    `${getApiBaseUrl()}/projects/${projectId}/archive`,
+    `${getApiBaseUrl()}/projects/${projectId}/${action}`,
     {
       method: "PATCH",
       headers: getHeaders(token),
