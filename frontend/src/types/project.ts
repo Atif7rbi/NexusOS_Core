@@ -11,10 +11,8 @@ export type ProjectType =
 
 export type ProjectStatus =
   | "draft"
-  | "planning"
   | "active"
   | "completed"
-  | "archived"
   | "cancelled";
 
 export type DataOrigin =

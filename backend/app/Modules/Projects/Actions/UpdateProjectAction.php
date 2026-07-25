@@ -23,7 +23,6 @@ class UpdateProjectAction
             $actorId,
         ): Project {
             $project = Project::query()
-                ->withTrashed()
                 ->where('tenant_id', $tenantId)
                 ->whereKey($projectId)
                 ->lockForUpdate()

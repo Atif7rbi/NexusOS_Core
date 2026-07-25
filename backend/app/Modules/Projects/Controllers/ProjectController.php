@@ -21,12 +21,14 @@ use App\Modules\Projects\Exceptions\ProjectHasOutstandingCommitmentsException;
 use App\Modules\Projects\Exceptions\ProjectNotArchivedException;
 use App\Modules\Projects\Exceptions\ProjectNotOperationallyCompleteException;
 use App\Modules\Projects\Exceptions\ProjectNotOperationallyReadyException;
+use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Requests\StoreProjectRequest;
 use App\Modules\Projects\Requests\UpdateProjectRequest;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class ProjectController extends Controller
@@ -42,8 +44,18 @@ final class ProjectController extends Controller
             $request->user(),
         );
 
+        $filters = $request->validate([
+            'status' => [
+                'nullable',
+                'string',
+                Rule::in(array_map(
+                    fn (ProjectStatus $status) => $status->value,
+                    ProjectStatus::cases(),
+                )),
+            ],
+        ]);
+
         $projects = Project::query()
-            ->withTrashed()
             ->with('projectManager:id,name,email')
             ->where('tenant_id', $membership->tenant_id)
             ->when(
@@ -64,13 +76,14 @@ final class ProjectController extends Controller
                 }
             )
             ->when(
-                $request->filled('status'),
+                isset($filters['status']),
                 fn ($query) => $query->where(
                     'status',
-                    (string) $request->string('status')
+                    $filters['status']
                 )
             )
             ->latest()
+            ->orderByDesc('id')
             ->paginate(
                 perPage: min(
                     max((int) $request->integer('per_page', 15), 1),
@@ -113,7 +126,6 @@ final class ProjectController extends Controller
         );
 
         $projectRecord = Project::query()
-            ->withTrashed()
             ->where('tenant_id', $membership->tenant_id)
             ->whereKey($project)
             ->firstOrFail();

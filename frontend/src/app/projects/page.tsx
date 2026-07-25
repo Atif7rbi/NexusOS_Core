@@ -189,18 +189,14 @@ export default function ProjectsPage() {
   > = isArabic
     ? {
         draft: "مسودة",
-        planning: "تخطيط",
         active: "نشط",
         completed: "مكتمل",
-        archived: "مؤرشف",
         cancelled: "ملغي",
       }
     : {
         draft: "Draft",
-        planning: "Planning",
         active: "Active",
         completed: "Completed",
-        archived: "Archived",
         cancelled: "Cancelled",
       };
 
@@ -1030,14 +1026,10 @@ function StatusBadge({
   > = {
     draft:
       "bg-[var(--surface-muted)] text-[var(--text-secondary)]",
-    planning:
-      "bg-[var(--info-soft)] text-[var(--info)]",
     active:
       "bg-[var(--success-soft)] text-[var(--success)]",
     completed:
       "bg-[var(--brand-gold-soft)] text-[var(--brand-gold-strong)]",
-    archived:
-      "bg-[var(--surface-muted)] text-[var(--text-muted)]",
     cancelled:
       "bg-[var(--danger-soft)] text-[var(--danger)]",
   };

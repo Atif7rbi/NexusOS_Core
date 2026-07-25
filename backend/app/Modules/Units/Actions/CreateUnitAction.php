@@ -22,7 +22,6 @@ final class CreateUnitAction
             $data,
         ): Unit {
             Project::query()
-                ->withTrashed()
                 ->where('tenant_id', $tenantId)
                 ->whereKey($data['project_id'])
                 ->firstOrFail();

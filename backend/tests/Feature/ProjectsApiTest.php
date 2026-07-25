@@ -176,104 +176,6 @@ class ProjectsApiTest extends ApiTestCase
         ]);
     }
 
-    public function test_phase_two_backfill_preserves_soft_deleted_project_lifecycle_and_existing_archive_metadata(): void
-    {
-        $user = $this->createActiveUser();
-
-        Sanctum::actingAs($user);
-
-        $backfillProjectId = $this->postJson('/api/projects', [
-            'name' => 'مشروع محذوف منطقيًا',
-            'project_type' => 'residential',
-            'city' => 'الرياض',
-        ])->assertCreated()->json('data.project.id');
-
-        $existingArchiveProjectId = $this->postJson('/api/projects', [
-            'name' => 'مشروع بأرشفة موجودة',
-            'project_type' => 'commercial',
-            'city' => 'جدة',
-        ])->assertCreated()->json('data.project.id');
-
-        DB::table('projects')->where('id', $backfillProjectId)->update([
-            'status' => 'active',
-            'deleted_at' => '2026-07-20 08:30:00+00',
-        ]);
-
-        DB::table('projects')->where('id', $existingArchiveProjectId)->update([
-            'status' => 'planning',
-            'deleted_at' => '2026-07-20 08:30:00+00',
-            'archived_at' => '2026-07-19 12:00:00+00',
-        ]);
-
-        $migration = require database_path(
-            'migrations/2026_07_23_010000_backfill_project_soft_deletes_to_archive_metadata.php'
-        );
-
-        $migration->up();
-
-        $this->assertDatabaseHas('projects', [
-            'id' => $backfillProjectId,
-            'status' => 'active',
-            'archived_at' => '2026-07-20 08:30:00+00',
-            'archived_by' => null,
-        ]);
-
-        $this->assertDatabaseHas('projects', [
-            'id' => $existingArchiveProjectId,
-            'status' => 'planning',
-            'archived_at' => '2026-07-19 12:00:00+00',
-            'archived_by' => null,
-        ]);
-    }
-
-    public function test_phase_two_point_five_resolves_only_the_explicitly_approved_legacy_project(): void
-    {
-        $user = $this->createActiveUser();
-
-        Sanctum::actingAs($user);
-
-        $targetProjectId = $this->postJson('/api/projects', [
-            'name' => 'مشروع التسوية المعتمد',
-            'project_type' => 'residential',
-            'city' => 'الرياض',
-        ])->assertCreated()->json('data.project.id');
-
-        $unresolvedProjectId = $this->postJson('/api/projects', [
-            'name' => 'مشروع تخطيط غير محسوم',
-            'project_type' => 'commercial',
-            'city' => 'جدة',
-        ])->assertCreated()->json('data.project.id');
-
-        DB::table('projects')->where('id', $targetProjectId)->update([
-            'id' => '01kxkx9k9b6snmard931m307zm',
-            'project_number' => 'PRJ-2026-004',
-            'archived_at' => '2026-07-16 05:28:01+00',
-            'status' => 'planning',
-        ]);
-
-        DB::table('projects')->where('id', $unresolvedProjectId)->update([
-            'status' => 'planning',
-        ]);
-
-        $migration = require database_path(
-            'migrations/2026_07_23_020000_resolve_legacy_planning_project_to_draft.php'
-        );
-
-        $migration->up();
-
-        $this->assertDatabaseHas('projects', [
-            'id' => '01kxkx9k9b6snmard931m307zm',
-            'project_number' => 'PRJ-2026-004',
-            'status' => 'draft',
-            'archived_at' => '2026-07-16 05:28:01+00',
-        ]);
-
-        $this->assertDatabaseHas('projects', [
-            'id' => $unresolvedProjectId,
-            'status' => 'planning',
-        ]);
-    }
-
     public function test_phase_two_point_six_assigns_only_explicitly_approved_historical_projects(): void
     {
         $tenant = Tenant::factory()->create([
@@ -483,6 +385,62 @@ class ProjectsApiTest extends ApiTestCase
             );
     }
 
+    public function test_legacy_project_statuses_are_rejected_by_filters(): void
+    {
+        $user = $this->createActiveUser();
+
+        Sanctum::actingAs($user);
+
+        foreach (['planning', 'archived'] as $status) {
+            $this->getJson("/api/projects?status={$status}")
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('status');
+        }
+    }
+
+    public function test_project_legacy_soft_delete_column_has_been_removed(): void
+    {
+        $column = DB::selectOne("
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'projects'
+              AND column_name = 'deleted_at'
+        ");
+
+        $this->assertNull($column);
+    }
+
+    public function test_phase_five_migration_aborts_for_unarchived_legacy_soft_deletes(): void
+    {
+        $migration = require database_path(
+            'migrations/2026_07_25_080000_remove_project_legacy_soft_deletes_and_states.php'
+        );
+
+        $migration->down();
+
+        $user = $this->createActiveUser();
+
+        Sanctum::actingAs($user);
+
+        $projectId = $this->postJson('/api/projects', [
+            'name' => 'مشروع حذف منطقي غير مؤرشف',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+        ])->assertCreated()->json('data.project.id');
+
+        DB::table('projects')->where('id', $projectId)->update([
+            'deleted_at' => '2026-07-25 08:00:00+00',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            'Cannot remove deleted_at while unarchived soft-deleted projects exist.'
+        );
+
+        $migration->up();
+    }
+
     public function test_authenticated_user_can_assign_and_remove_project_manager(): void
     {
         $user = $this->createActiveUser();
@@ -578,6 +536,10 @@ class ProjectsApiTest extends ApiTestCase
             'status' => 'draft',
         ]);
 
+        $this->getJson('/api/projects')
+            ->assertOk()
+            ->assertJsonPath('data.data.0.id', $projectId);
+
         $this->patchJson("/api/projects/{$projectId}", [
             'name' => 'محاولة تعديل مشروع مؤرشف',
         ])->assertUnprocessable()
@@ -601,17 +563,6 @@ class ProjectsApiTest extends ApiTestCase
         $this->patchJson("/api/projects/{$projectId}/restore")
             ->assertUnprocessable()
             ->assertJsonValidationErrors('project');
-
-        DB::table('projects')->where('id', $projectId)->update([
-            'deleted_at' => '2026-07-15 12:00:00+00',
-        ]);
-
-        $this->getJson("/api/projects/{$projectId}")
-            ->assertOk();
-
-        $this->patchJson("/api/projects/{$projectId}", [
-            'notes' => 'لا يؤثر الحذف المنطقي الإرثي على السلوك.',
-        ])->assertOk();
 
         $this->deleteJson("/api/projects/{$projectId}")
             ->assertMethodNotAllowed();

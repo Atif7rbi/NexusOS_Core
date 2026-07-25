@@ -10,12 +10,10 @@ use App\Modules\Shared\Enums\DataOrigin;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Project extends Model
 {
     use HasUlids;
-    use SoftDeletes;
 
     protected $fillable = [
         'tenant_id',

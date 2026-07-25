@@ -49,10 +49,8 @@ const projectStatusLabels: Record<
   }
 > = {
   draft: { ar: "مسودة", en: "Draft" },
-  planning: { ar: "تخطيط", en: "Planning" },
   active: { ar: "نشط", en: "Active" },
   completed: { ar: "مكتمل", en: "Completed" },
-  archived: { ar: "مؤرشف", en: "Archived" },
   cancelled: { ar: "ملغي", en: "Cancelled" },
 };
 
@@ -60,17 +58,11 @@ const statusClasses: Record<ProjectStatus, string> = {
   draft:
     "bg-[var(--surface-muted)] text-[var(--text-secondary)]",
 
-  planning:
-    "bg-[var(--info-soft)] text-[var(--info)]",
-
   active:
     "bg-[var(--success-soft)] text-[var(--success)]",
 
   completed:
     "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
-
-  archived:
-    "bg-[var(--surface-muted)] text-[var(--text-muted)]",
 
   cancelled:
     "bg-[var(--danger-soft)] text-[var(--danger)]",
