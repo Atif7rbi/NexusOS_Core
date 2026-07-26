@@ -7,6 +7,7 @@ namespace App\Modules\Reservations\Actions;
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Exceptions\ReservationNotActiveException;
 use App\Modules\Reservations\Models\Reservation;
+use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Models\Unit;
 use Illuminate\Support\Facades\DB;
 
@@ -23,7 +24,10 @@ final class CancelReservationAction
                 throw new ReservationNotActiveException();
             }
 
-            Unit::query()->whereKey($reservation->unit_id)->lockForUpdate()->firstOrFail();
+            $unit = Unit::query()
+                ->whereKey($reservation->unit_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $reservation->forceFill([
                 'status' => ReservationStatus::Cancelled,
@@ -32,6 +36,10 @@ final class CancelReservationAction
                 'cancelled_by' => $actorId,
                 'updated_by' => $actorId,
             ])->save();
+
+            $unit->update([
+                'status' => UnitStatus::Available,
+            ]);
 
             return $reservation;
         });

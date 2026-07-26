@@ -92,7 +92,7 @@ final class UnitsApiTest extends ApiTestCase
             'project_id' => '01J00000000000000000000000',
             'unit_number' => '',
             'unit_type' => 'invalid',
-            'status' => 'reserved',
+            'status' => 'invalid',
             'selling_price' => -1,
             'bedrooms' => -1,
             'bathrooms' => -1,

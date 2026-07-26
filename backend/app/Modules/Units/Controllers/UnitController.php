@@ -116,6 +116,10 @@ final class UnitController extends Controller
                 [UnitStatus::Available->value]
             )
             ->selectRaw(
+                'count(*) filter (where status = ?) as reserved',
+                [UnitStatus::Reserved->value]
+            )
+            ->selectRaw(
                 'count(*) filter (where status = ?) as sold',
                 [UnitStatus::Sold->value]
             )
@@ -127,6 +131,7 @@ final class UnitController extends Controller
                 'summary' => [
                     'total' => (int) $summary->total,
                     'available' => (int) $summary->available,
+                    'reserved' => (int) $summary->reserved,
                     'sold' => (int) $summary->sold,
                 ],
             ],

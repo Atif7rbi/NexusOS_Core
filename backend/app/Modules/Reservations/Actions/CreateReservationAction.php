@@ -68,6 +68,10 @@ final class CreateReservationAction
                 'updated_by' => $actorId,
             ]);
 
+            $unit->update([
+                'status' => UnitStatus::Reserved,
+            ]);
+
             return $reservation;
         });
     }

@@ -8,7 +8,7 @@ export type UnitType =
   | "land"
   | "other";
 
-export type UnitStatus = "available" | "sold";
+export type UnitStatus = "available" | "reserved" | "sold";
 
 export type UnitProject = {
   id: string;
@@ -54,6 +54,7 @@ export type UnitPagination = PaginatedData<Unit>;
 export type UnitSummary = {
   total: number;
   available: number;
+  reserved: number;
   sold: number;
 };
 

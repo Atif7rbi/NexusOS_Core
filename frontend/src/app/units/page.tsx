@@ -60,6 +60,7 @@ type ArchiveAction = "archive" | "restore";
 const emptySummary: UnitSummary = {
   total: 0,
   available: 0,
+  reserved: 0,
   sold: 0,
 };
 
@@ -70,6 +71,12 @@ const typeLabels: Record<UnitType, string> = {
   shop: "محل",
   land: "أرض",
   other: "أخرى",
+};
+
+const statusLabels: Record<UnitStatus, string> = {
+  available: "متاحة",
+  reserved: "محجوزة",
+  sold: "مباعة",
 };
 
 export default function UnitsPage() {
@@ -339,6 +346,12 @@ export default function UnitsPage() {
             tone="success"
           />
           <SummaryCard
+            title="الوحدات المحجوزة"
+            value={summary.reserved}
+            icon={Building2}
+            tone="info"
+          />
+          <SummaryCard
             title="الوحدات المباعة"
             value={summary.sold}
             icon={Building2}
@@ -416,6 +429,7 @@ export default function UnitsPage() {
               >
                 <option value="all">كل الحالات</option>
                 <option value="available">متاحة</option>
+                <option value="reserved">محجوزة</option>
                 <option value="sold">مباعة</option>
               </select>
 
@@ -564,7 +578,7 @@ export default function UnitsPage() {
                             : "rounded-full bg-[var(--info-soft)] px-3 py-1 text-xs font-bold text-[var(--info)]"
                         }
                       >
-                        {unit.status === "available" ? "متاحة" : "مباعة"}
+                        {statusLabels[unit.status]}
                       </span>
                     </td>
                     <td className="px-3 py-4">
