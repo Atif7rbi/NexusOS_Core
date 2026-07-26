@@ -6,6 +6,7 @@ namespace App\Modules\Reservations\Actions;
 
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Models\Reservation;
+use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Models\Unit;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,10 @@ final class ExpireReservationAction
         DB::transaction(function () use ($reservationId, $expiredAt): void {
             $reservation = Reservation::query()->whereKey($reservationId)->lockForUpdate()->firstOrFail();
 
-            Unit::query()->whereKey($reservation->unit_id)->lockForUpdate()->firstOrFail();
+            $unit = Unit::query()
+                ->whereKey($reservation->unit_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $isFuture = $reservation->expires_at->greaterThan($expiredAt);
 
@@ -32,6 +36,10 @@ final class ExpireReservationAction
             }
 
             $reservation->forceFill(['status' => ReservationStatus::Expired])->save();
+
+            $unit->update([
+                'status' => UnitStatus::Available,
+            ]);
         });
     }
 }

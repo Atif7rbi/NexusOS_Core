@@ -43,6 +43,7 @@ export function UnitDetailsModal({
         notes: "ملاحظات",
         archived: "مؤرشفة",
         available: "متاحة",
+        reserved: "محجوزة",
         sold: "مباعة",
         loading: "جارٍ تحميل التفاصيل...",
         failed: "تعذر تحميل تفاصيل الوحدة.",
@@ -62,6 +63,7 @@ export function UnitDetailsModal({
         notes: "Notes",
         archived: "Archived",
         available: "Available",
+        reserved: "Reserved",
         sold: "Sold",
         loading: "Loading details...",
         failed: "Unable to load unit details.",
@@ -82,6 +84,14 @@ export function UnitDetailsModal({
     ? `${unit.project.project_number} — ${unit.project.name}`
     : "—";
 
+  const statusLabel = unit
+    ? {
+        available: labels.available,
+        reserved: labels.reserved,
+        sold: labels.sold,
+      }[unit.status]
+    : "";
+
   const details = unit
     ? [
         {
@@ -92,8 +102,7 @@ export function UnitDetailsModal({
         { label: labels.type, value: typeLabel },
         {
           label: labels.status,
-          value:
-            unit.status === "available" ? labels.available : labels.sold,
+          value: statusLabel,
         },
         {
           label: labels.price,
@@ -149,9 +158,7 @@ export function UnitDetailsModal({
               </div>
               <div className="flex gap-2">
                 <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-xs font-bold text-[var(--success)]">
-                  {unit.status === "available"
-                    ? labels.available
-                    : labels.sold}
+                  {statusLabel}
                 </span>
                 {unit.archived_at ? (
                   <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-bold text-[var(--text-secondary)]">

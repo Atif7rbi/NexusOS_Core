@@ -285,6 +285,77 @@ final class ReservationsApiTest extends ApiTestCase
             ]);
     }
 
+    public function test_creating_reservation_marks_unit_as_reserved(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+
+        $unitId = $this->createAvailableUnit();
+
+        $this->postJson('/api/reservations', [
+            'unit_id' => $unitId,
+            'customer_id' => $this->createCustomer(),
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('units', [
+            'id' => $unitId,
+            'status' => 'reserved',
+        ]);
+    }
+
+    public function test_cancelling_reservation_releases_unit_back_to_available(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+
+        $reservationId = $this->createReservation();
+
+        $unitId = Reservation::query()
+            ->whereKey($reservationId)
+            ->value('unit_id');
+
+        $this->patchJson("/api/reservations/{$reservationId}/cancel")
+            ->assertOk();
+
+        $this->assertDatabaseHas('units', [
+            'id' => $unitId,
+            'status' => 'available',
+        ]);
+    }
+
+    public function test_expiring_reservation_releases_unit_back_to_available(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+
+        $unitId = $this->createAvailableUnit();
+
+        $reservationId = $this->postJson('/api/reservations', [
+            'unit_id' => $unitId,
+            'customer_id' => $this->createCustomer(),
+            'expires_at' => '2026-07-22 10:01:00',
+        ])->assertCreated()
+            ->json('data.reservation.id');
+
+        (new ExpireReservations)->expireAt(
+            app(\App\Modules\Reservations\Actions\ExpireReservationAction::class),
+            Carbon::parse(
+                '2026-07-22 10:02:00',
+                config('app.timezone'),
+            ),
+        );
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationId,
+            'status' => 'expired',
+        ]);
+
+        $this->assertDatabaseHas('units', [
+            'id' => $unitId,
+            'status' => 'available',
+        ]);
+    }
+
     private function createReservation(): string
     {
         return (string) $this->postJson('/api/reservations', [

@@ -127,6 +127,7 @@ export function UnitFormModal({
         required: "المشروع ورقم الوحدة وسعر البيع مطلوبة.",
         failed: "تعذر حفظ الوحدة.",
         available: "متاحة",
+        reserved: "محجوزة",
         sold: "مباعة",
         apartment: "شقة",
         villa: "فيلا",
@@ -157,6 +158,7 @@ export function UnitFormModal({
         required: "Project, unit number, and selling price are required.",
         failed: "Unable to save unit.",
         available: "Available",
+        reserved: "Reserved",
         sold: "Sold",
         apartment: "Apartment",
         villa: "Villa",
@@ -313,6 +315,7 @@ export function UnitFormModal({
             }
             options={[
               { value: "available", label: labels.available },
+              { value: "reserved", label: labels.reserved },
               { value: "sold", label: labels.sold },
             ]}
           />
