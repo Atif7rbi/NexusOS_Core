@@ -65,8 +65,30 @@ export function useFormValidation() {
         isApiRequestError(error) &&
         Object.keys(error.fieldErrors).length > 0
       ) {
+        const form = formRef.current;
+
+        const hiddenMessages = Object.entries(
+          error.fieldErrors
+        )
+          .filter(([name]) => {
+            if (!form) {
+              return true;
+            }
+
+            return (
+              form.elements.namedItem(name) === null
+            );
+          })
+          .flatMap(([, messages]) => messages);
+
         setFieldErrors(error.fieldErrors);
-        setFormError(null);
+
+        setFormError(
+          hiddenMessages.length > 0
+            ? hiddenMessages.join(" ")
+            : null
+        );
+
         focusFirstInvalidField(error.fieldErrors);
         return;
       }
