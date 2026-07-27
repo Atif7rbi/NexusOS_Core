@@ -38,6 +38,11 @@ final class CreateContractAction
 
             if (Contract::query()
                 ->where('reservation_id', $reservation->id)
+                ->whereIn('status', [
+                    ContractStatus::Draft,
+                    ContractStatus::Active,
+                    ContractStatus::Completed,
+                ])
                 ->exists()) {
                 throw new ContractAlreadyExistsException();
             }

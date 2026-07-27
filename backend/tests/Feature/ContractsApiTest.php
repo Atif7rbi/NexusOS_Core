@@ -97,6 +97,80 @@ final class ContractsApiTest extends ApiTestCase
         ])->assertUnprocessable()->assertJsonValidationErrors(['reservation_id']);
     }
 
+    public function test_a_replacement_contract_can_be_created_after_the_draft_contract_was_cancelled(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $reservationId = $this->createReservation();
+
+        $firstId = $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertCreated()->json('data.contract.id');
+        $this->patchJson("/api/contracts/{$firstId}/cancel")->assertOk();
+
+        $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '460000.00',
+        ])->assertCreated()
+            ->assertJsonPath('data.contract.status', 'draft')
+            ->assertJsonPath('data.contract.total_amount', '460000.00');
+
+        $this->assertDatabaseHas('contracts', ['id' => $firstId, 'status' => 'cancelled']);
+    }
+
+    public function test_two_draft_contracts_cannot_coexist_for_the_same_reservation(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $reservationId = $this->createReservation();
+
+        $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertCreated();
+
+        $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reservation_id']);
+    }
+
+    public function test_contract_creation_is_blocked_while_an_active_contract_exists_for_the_reservation(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $reservationId = $this->createReservation();
+        $contractId = $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertCreated()->json('data.contract.id');
+        $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
+
+        $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reservation_id']);
+    }
+
+    public function test_contract_creation_is_blocked_while_a_completed_contract_exists_for_the_reservation(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $reservationId = $this->createReservation();
+        $contractId = $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertCreated()->json('data.contract.id');
+        $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
+        $this->patchJson("/api/contracts/{$contractId}/complete")->assertOk();
+
+        $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reservation_id']);
+    }
+
     public function test_contracts_are_tenant_scoped_on_creation_and_access(): void
     {
         $tenantAUser = $this->createActiveUser();
