@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Modules\Contracts\Controllers\ContractController;
 use App\Modules\Customers\Controllers\CustomerController;
 use App\Modules\Projects\Controllers\ProjectController;
 use App\Modules\Reservations\Controllers\ReservationController;
@@ -66,6 +67,14 @@ Route::middleware([
     Route::get('/reservations/{reservation}', [ReservationController::class, 'show'])->name('reservations.show');
     Route::patch('/reservations/{reservation}', [ReservationController::class, 'update'])->name('reservations.update');
     Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
+
+    Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
+    Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
+    Route::get('/contracts/{contract}', [ContractController::class, 'show'])->name('contracts.show');
+    Route::patch('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
+    Route::patch('/contracts/{contract}/activate', [ContractController::class, 'activate'])->name('contracts.activate');
+    Route::patch('/contracts/{contract}/complete', [ContractController::class, 'complete'])->name('contracts.complete');
+    Route::patch('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
 
     Route::post(
         '/units',
