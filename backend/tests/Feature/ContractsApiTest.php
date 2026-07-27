@@ -329,6 +329,44 @@ final class ContractsApiTest extends ApiTestCase
             ->assertUnprocessable()->assertJsonValidationErrors(['contract']);
     }
 
+    public function test_active_cancellation_rejects_reservation_not_in_converted_state_and_rolls_back(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $contractId = $this->createContract();
+        $reservation = Contract::query()->findOrFail($contractId)->reservation;
+        $unitId = $reservation->unit_id;
+        $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
+
+        // Corrupt the reservation state directly, bypassing the domain actions.
+        Reservation::query()->whereKey($reservation->id)->update(['status' => 'active']);
+
+        $this->patchJson("/api/contracts/{$contractId}/cancel")
+            ->assertUnprocessable()->assertJsonValidationErrors(['contract']);
+
+        // Nothing else was mutated: contract remains active, unit remains sold.
+        $this->assertDatabaseHas('contracts', ['id' => $contractId, 'status' => 'active']);
+        $this->assertDatabaseHas('units', ['id' => $unitId, 'status' => 'sold']);
+    }
+
+    public function test_active_cancellation_rejects_unit_not_in_sold_state_and_rolls_back(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $contractId = $this->createContract();
+        $unitId = Contract::query()->findOrFail($contractId)->reservation->unit_id;
+        $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
+
+        // Corrupt the unit state directly, bypassing the domain actions.
+        Unit::query()->whereKey($unitId)->update(['status' => 'available']);
+
+        $this->patchJson("/api/contracts/{$contractId}/cancel")
+            ->assertUnprocessable()->assertJsonValidationErrors(['contract']);
+
+        // Contract must remain active; the transaction rolled back entirely.
+        $this->assertDatabaseHas('contracts', ['id' => $contractId, 'status' => 'active']);
+    }
+
     public function test_cancelled_contract_cannot_be_cancelled_again(): void
     {
         $user = $this->createActiveUser();
@@ -360,6 +398,36 @@ final class ContractsApiTest extends ApiTestCase
             ->assertJsonPath('data.summary.active', 1);
 
         $this->assertNotNull($draftId);
+    }
+
+    public function test_contract_show_exposes_unit_and_customer_nested_under_reservation(): void
+    {
+        $user = $this->createActiveUser();
+        Sanctum::actingAs($user);
+        $reservationId = $this->createReservation();
+        $reservation = Reservation::query()->findOrFail($reservationId);
+        $contractId = $this->postJson('/api/contracts', [
+            'reservation_id' => $reservationId,
+            'total_amount' => '450000.00',
+        ])->assertCreated()->json('data.contract.id');
+
+        $this->getJson("/api/contracts/{$contractId}")
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'contract' => [
+                        'id', 'status', 'total_amount',
+                        'reservation' => [
+                            'id', 'status',
+                            'unit' => ['id', 'project_id', 'unit_number', 'status'],
+                            'customer' => ['id', 'name', 'status'],
+                        ],
+                    ],
+                ],
+            ])
+            ->assertJsonPath('data.contract.reservation.id', $reservationId)
+            ->assertJsonPath('data.contract.reservation.unit.id', $reservation->unit_id)
+            ->assertJsonPath('data.contract.reservation.customer.id', $reservation->customer_id);
     }
 
     public function test_validation_rejects_zero_or_negative_total_amount(): void

@@ -11,7 +11,7 @@ final class ContractUnitStateException extends RuntimeException
     public function __construct()
     {
         parent::__construct(
-            'The linked unit is not in the required status for this action.'
+            'The linked unit is not in the expected status for this operation.'
         );
     }
 }

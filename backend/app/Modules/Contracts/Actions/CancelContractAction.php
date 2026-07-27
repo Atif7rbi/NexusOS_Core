@@ -6,7 +6,10 @@ namespace App\Modules\Contracts\Actions;
 
 use App\Modules\Contracts\Enums\ContractStatus;
 use App\Modules\Contracts\Exceptions\ContractCannotBeCancelledException;
+use App\Modules\Contracts\Exceptions\ContractReservationStateException;
+use App\Modules\Contracts\Exceptions\ContractUnitStateException;
 use App\Modules\Contracts\Models\Contract;
+use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Models\Reservation;
 use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Models\Unit;
@@ -41,11 +44,19 @@ final class CancelContractAction
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                if ($reservation->status !== ReservationStatus::Converted) {
+                    throw new ContractReservationStateException();
+                }
+
                 $unit = Unit::query()
                     ->where('tenant_id', $tenantId)
                     ->whereKey($reservation->unit_id)
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                if ($unit->status !== UnitStatus::Sold) {
+                    throw new ContractUnitStateException();
+                }
 
                 // Reservation remains 'converted'; only the unit is released.
                 $unit->update([

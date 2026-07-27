@@ -11,7 +11,7 @@ final class ContractReservationStateException extends RuntimeException
     public function __construct()
     {
         parent::__construct(
-            'The linked reservation is not in the required status for this action.'
+            'The linked reservation is not in the expected status for this operation.'
         );
     }
 }

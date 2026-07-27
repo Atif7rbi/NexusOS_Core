@@ -171,7 +171,7 @@ final class ContractController extends Controller
         $membership = $this->resolveActiveMembership->handle($request->user());
         try {
             $record = $action->execute((string) $membership->tenant_id, $contract, $request->user()->id);
-        } catch (ContractCannotBeCancelledException $exception) {
+        } catch (ContractCannotBeCancelledException|ContractReservationStateException|ContractUnitStateException $exception) {
             $this->throwValidationException('contract', $exception->getMessage());
         }
 

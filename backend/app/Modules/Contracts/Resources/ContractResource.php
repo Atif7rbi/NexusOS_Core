@@ -26,21 +26,26 @@ final class ContractResource extends JsonResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'reservation' => $this->whenLoaded('reservation', function () {
+                $reservation = $this->reservation;
+
                 return [
-                    'id' => $this->reservation->id,
-                    'status' => $this->reservation->status->value,
-                    'unit' => $this->whenLoaded(
-                        'reservation',
-                        fn () => $this->reservation->relationLoaded('unit')
-                            ? $this->reservation->unit
-                            : null,
-                    ),
-                    'customer' => $this->whenLoaded(
-                        'reservation',
-                        fn () => $this->reservation->relationLoaded('customer')
-                            ? $this->reservation->customer
-                            : null,
-                    ),
+                    'id' => $reservation->id,
+                    'status' => $reservation->status->value,
+                    'unit' => $reservation->relationLoaded('unit') && $reservation->unit !== null
+                        ? [
+                            'id' => $reservation->unit->id,
+                            'project_id' => $reservation->unit->project_id,
+                            'unit_number' => $reservation->unit->unit_number,
+                            'status' => $reservation->unit->status->value,
+                        ]
+                        : null,
+                    'customer' => $reservation->relationLoaded('customer') && $reservation->customer !== null
+                        ? [
+                            'id' => $reservation->customer->id,
+                            'name' => $reservation->customer->name,
+                            'status' => $reservation->customer->status->value,
+                        ]
+                        : null,
                 ];
             }),
         ];
