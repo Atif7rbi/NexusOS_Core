@@ -18,6 +18,7 @@ import type { Project } from "@/types/project";
 import type {
   Unit,
   UnitFormPayload,
+  ManuallyAssignableUnitStatus,
   UnitStatus,
   UnitType,
 } from "@/types/unit";
@@ -211,7 +212,9 @@ export function UnitFormModal({
         project_id: form.project_id,
         unit_number: form.unit_number.trim(),
         unit_type: form.unit_type,
-        status: form.status,
+        ...(unit?.status === "reserved"
+          ? {}
+          : { status: form.status as ManuallyAssignableUnitStatus }),
         selling_price: Number(form.selling_price),
         area: form.area === "" ? null : Number(form.area),
         floor: form.floor === "" ? null : Number(form.floor),
@@ -305,20 +308,34 @@ export function UnitFormModal({
               label: typeLabels[type],
             }))}
           />
-          <Select
-            label={labels.status}
-            name="status"
-            value={form.status}
-            error={fieldErrors.status?.[0]}
-            onChange={(event) =>
-              updateField("status", event.target.value as UnitStatus)
-            }
-            options={[
-              { value: "available", label: labels.available },
-              { value: "reserved", label: labels.reserved },
-              { value: "sold", label: labels.sold },
-            ]}
-          />
+          {unit?.status === "reserved" ? (
+            <Input
+              label={labels.status}
+              name="status"
+              value={labels.reserved}
+              hint={
+                isArabic
+                  ? "هذه الحالة تُدار تلقائيًا بواسطة الحجز النشط."
+                  : "This status is managed automatically by the active reservation."
+              }
+              disabled
+              readOnly
+            />
+          ) : (
+            <Select
+              label={labels.status}
+              name="status"
+              value={form.status}
+              error={fieldErrors.status?.[0]}
+              onChange={(event) =>
+                updateField("status", event.target.value as UnitStatus)
+              }
+              options={[
+                { value: "available", label: labels.available },
+                { value: "sold", label: labels.sold },
+              ]}
+            />
+          )}
           <Input
             label={labels.price}
             name="selling_price"

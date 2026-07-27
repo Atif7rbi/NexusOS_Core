@@ -45,7 +45,10 @@ final class StoreUnitRequest extends FormRequest
 
             'status' => [
                 'sometimes',
-                Rule::enum(UnitStatus::class),
+                Rule::in([
+                    UnitStatus::Available->value,
+                    UnitStatus::Sold->value,
+                ]),
             ],
 
             'selling_price' => [
@@ -80,6 +83,13 @@ final class StoreUnitRequest extends FormRequest
                 'nullable',
                 'string',
             ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'status.in' => 'لا يمكن تعيين حالة الوحدة إلى محجوزة يدويًا.',
         ];
     }
 }

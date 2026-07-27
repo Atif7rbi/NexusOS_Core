@@ -109,6 +109,53 @@ final class UnitsApiTest extends ApiTestCase
             ]);
     }
 
+    public function test_reserved_status_cannot_be_set_manually_when_creating_or_updating_a_unit(): void
+    {
+        $user = $this->createActiveUser();
+
+        Sanctum::actingAs($user);
+
+        $projectId = $this->createProject();
+
+        $this->postJson('/api/units', [
+            'project_id' => $projectId,
+            'unit_number' => 'R-101',
+            'unit_type' => 'apartment',
+            'status' => 'reserved',
+            'selling_price' => 500000,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status']);
+
+        $this->assertDatabaseMissing('units', [
+            'project_id' => $projectId,
+            'unit_number' => 'R-101',
+        ]);
+
+        $unitId = $this->postJson('/api/units', [
+            'project_id' => $projectId,
+            'unit_number' => 'R-102',
+            'unit_type' => 'apartment',
+            'status' => 'available',
+            'selling_price' => 500000,
+        ])
+            ->assertCreated()
+            ->json('data.unit.id');
+
+        $this->patchJson("/api/units/{$unitId}", [
+            'status' => 'reserved',
+            'selling_price' => 750000,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status']);
+
+        $this->assertDatabaseHas('units', [
+            'id' => $unitId,
+            'status' => 'available',
+            'selling_price' => 500000,
+        ]);
+    }
+
     public function test_unit_number_is_unique_within_its_project_only(): void
     {
         $user = $this->createActiveUser();
