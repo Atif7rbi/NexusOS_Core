@@ -30,7 +30,7 @@ Business Operating System
 
 Current Phase
 
-Core Backend Development
+Core Backend Domains — Contracts v1 Approved, Frontend Catch-up Pending
 
 Overall Status
 
@@ -102,14 +102,35 @@ Includes:
 
 ---
 
+# Completed Backend Domains (as of 28 July 2026, main @ 5cb2cdd)
+
+The following domains have reached Frozen/Completed status with passing automated tests:
+
+- **Identity & Tenant**: stateless auth, tenant membership, System Owner role.
+- **Project**: full lifecycle (draft/active/completed/cancelled/archived), tenant-scoped.
+- **Customer**: tenant-scoped CRUD, archive/restore.
+- **Unit**: full lifecycle incl. `reserved` and `sold` states.
+- **Reservation**: full lifecycle incl. `converted` state (added to support Contracts).
+- **Contracts (Sales)**: Contracts Backend v1 — full lifecycle (draft/active/completed/cancelled),
+  created only from Reservations, contract ownership policy (one open contract per
+  reservation; cancelled contracts are historical and don't block a replacement),
+  atomic transactions with row locks across Contract/Reservation/Unit, 30 passing tests.
+  **API only — no Contracts frontend yet.**
+
+Backend test suite: 122 tests passing (1 environment-specific failure unrelated to
+business logic — a hardcoded database-name assertion tied to a specific server).
+
+---
+
 # Active Work
 
-The following activities are currently in progress.
+The following activities are currently in progress or immediately next.
 
-- Backend domain implementation
-- Database refinement
-- Business domain specifications
-- Engineering documentation
+- Contracts frontend (UI for creating, viewing, and managing contract lifecycle actions).
+- Broader project-wide code review (frontend + static analysis) requested by Product Owner,
+  not yet started at time of writing.
+- Keeping this documentation set synchronized with backend reality (this update itself is
+  part of that effort — see `99_Project_Decision_Log.md` policy).
 
 Progress should be reflected in this document whenever significant milestones are completed.
 
@@ -119,12 +140,11 @@ Progress should be reflected in this document whenever significant milestones ar
 
 Planned future work includes:
 
-- Business domain completion
-- Application layer implementation
-- API implementation
-- Frontend integration
-- Production preparation
-- System validation
+- Contracts frontend implementation.
+- Payments / Installments (explicitly out of scope for Contracts v1).
+- Documents module (contract documents/attachments).
+- Accounting, Expense, Revenue, Reporting, Notification, Audit domains (all still Planned).
+- Production preparation and system validation once remaining core domains stabilize.
 
 The order may evolve according to project priorities.
 
@@ -132,9 +152,8 @@ The order may evolve according to project priorities.
 
 # Completed Domains
 
-Completed domains should be listed here once they satisfy all completion criteria.
-
-At the current stage, architectural preparation is complete while business domains continue to progress independently.
+See "Completed Backend Domains" above for the authoritative, up-to-date list. Cross-reference
+`09_Domain_Status.md` for the full domain-by-domain status table.
 
 ---
 

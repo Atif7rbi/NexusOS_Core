@@ -62,20 +62,23 @@ Historical documentation is retained for reference only.
 
 # Domain Overview
 
+> تم تحديث هذا الجدول بتاريخ 28 يوليو 2026 ليعكس الحالة الفعلية على `main` (commit `5cb2cdd` وما قبله). التعريفات والسياسات أعلاه لم تتغيّر.
+
 | Domain | Status | Notes |
 |---------|--------|-------|
-| Identity | Planned | Authentication and user identity management. |
-| RBAC | Planned | Roles, permissions, and authorization. |
-| Tenant | Planned | Tenant lifecycle and organization management. |
+| Identity | Completed | Stateless authentication, System Owner role, tenant membership. |
+| RBAC | In Progress | Basic role/membership checks exist (Tenant, System Owner); no full permission matrix yet. |
+| Tenant | Completed | Tenants and tenant-user membership tables and enforcement in place. |
 | Tenant License | Planned | Subscription and licensing lifecycle. |
 | Plan | Planned | Subscription plans and commercial offerings. |
 | Module | Planned | System module catalog and availability. |
 | Tenant Module | Planned | Tenant-specific module activation. |
-| User | Planned | User profile management. |
-| Project | Planned | Project lifecycle management. |
-| Customer | Planned | Customer relationship management. |
-| Unit | Planned | Real estate unit management. |
-| Sales | Planned | Sales process and contract lifecycle. |
+| User | Completed | Tenant user CRUD (`api/users`) implemented and tested. |
+| Project | Frozen | Full lifecycle (draft/active/completed/cancelled/archived), tenant-scoped, tested. |
+| Customer | Completed | Tenant-scoped API, archive/restore, tested (`v1 frozen` per module docs). |
+| Unit | Frozen | Full lifecycle incl. `reserved` and `sold` states added for Reservations/Contracts integration. |
+| Reservation | Frozen | Full lifecycle (`active`/`converted`/`cancelled`/`expired`); `converted` added to support Contracts activation. |
+| Sales / Contracts | **Frozen (Contracts Backend v1 approved)** | Full lifecycle (draft/active/completed/cancelled), created only from Reservations, ownership policy (one open contract per reservation, cancelled contracts are historical), 30 passing tests. Frontend not yet implemented. |
 | Accounting | Planned | Financial operations and bookkeeping. |
 | Payment | Planned | Payment registration and reconciliation. |
 | Expense | Planned | Expense tracking and approval. |

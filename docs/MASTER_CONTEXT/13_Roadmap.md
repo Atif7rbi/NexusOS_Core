@@ -92,6 +92,13 @@ Status
 
 In Progress
 
+Notes (updated 28 July 2026)
+
+Completed within this phase: Project, Customer, Unit, Reservation, and Contracts (Sales)
+domains — each with business rules, validation, and passing automated tests. Remaining
+within this phase: Accounting, Payment, Expense, Revenue, Document, Notification, Audit,
+Reporting domains (all still Planned; see `09_Domain_Status.md`).
+
 Objectives
 
 - Business domain implementation.
@@ -127,7 +134,14 @@ Presentation Layer
 
 Status
 
-Planned
+In Progress (largely delivered for completed domains)
+
+Notes (updated 28 July 2026)
+
+HTTP API, Sanctum-based authentication, tenant-scoped authorization, request validation
+(Form Requests), and JSON response formatting are already implemented and tested for
+Project, Customer, Unit, Reservation, and Contracts. This phase will continue as new
+domains (Accounting, Payment, etc.) are implemented.
 
 Objectives
 
@@ -145,7 +159,12 @@ Frontend Integration
 
 Status
 
-Planned
+In Progress
+
+Notes (updated 28 July 2026)
+
+Frontend workflows already exist for Dashboard, Projects, Customers, Units, and
+Reservations. Contracts has no frontend yet — this is the next planned frontend work.
 
 Objectives
 
