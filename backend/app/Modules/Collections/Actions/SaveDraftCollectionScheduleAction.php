@@ -85,15 +85,43 @@ final class SaveDraftCollectionScheduleAction
                 $existingById[$collection->id] = $collection;
             }
 
-            $keptIds = [];
-            $resultRows = [];
-
+            $submittedExistingIds = [];
             foreach ($lines as $line) {
                 if ($line->id !== null) {
                     if (! isset($existingById[$line->id])) {
                         throw new CollectionNotFoundException();
                     }
 
+                    $submittedExistingIds[] = $line->id;
+                }
+            }
+
+            // A submitted schedule is declarative: omitted Draft rows are not
+            // part of the final state. Remove them before creating replacement
+            // rows, so an omitted row's active sequence becomes immediately
+            // available within this transaction.
+            foreach ($existingById as $id => $collection) {
+                if (! in_array($id, $submittedExistingIds, true)) {
+                    $collection->delete();
+                }
+            }
+
+            // PostgreSQL enforces the partial active-sequence index per write,
+            // rather than at commit time. Move retained rows through unique
+            // temporary positive sequences before assigning their requested
+            // final sequences; this supports swaps and full replacements
+            // without a transient index collision.
+            $temporarySequence = $this->nextTemporarySequence($existingById, $lines);
+            foreach ($submittedExistingIds as $id) {
+                $existingById[$id]->forceFill([
+                    'sequence' => $temporarySequence++,
+                ])->save();
+            }
+
+            $resultRows = [];
+
+            foreach ($lines as $line) {
+                if ($line->id !== null) {
                     $collection = $existingById[$line->id];
                     $collection->forceFill([
                         'sequence' => $line->sequence,
@@ -104,7 +132,6 @@ final class SaveDraftCollectionScheduleAction
                         'updated_by' => $actorId,
                     ])->save();
 
-                    $keptIds[] = $collection->id;
                     $resultRows[] = $collection;
 
                     continue;
@@ -125,16 +152,7 @@ final class SaveDraftCollectionScheduleAction
                     'updated_by' => null,
                 ])->save();
 
-                $keptIds[] = $collection->id;
                 $resultRows[] = $collection;
-            }
-
-            // Section 23: Draft rows may be hard-deleted. Any active row not
-            // referenced by an incoming line is removed.
-            foreach ($existingById as $id => $collection) {
-                if (! in_array($id, $keptIds, true)) {
-                    $collection->delete();
-                }
             }
 
             usort($resultRows, static fn (Collection $a, Collection $b): int => $a->sequence <=> $b->sequence);
@@ -156,5 +174,23 @@ final class SaveDraftCollectionScheduleAction
     private function auditRecorder(): CollectionAuditRecorderInterface
     {
         return $this->auditRecorder ?? new LogCollectionAuditRecorder();
+    }
+
+    /**
+     * @param  array<string, Collection>  $existingById
+     * @param  array<int, \App\Modules\Collections\DTOs\CollectionLineData>  $lines
+     */
+    private function nextTemporarySequence(array $existingById, array $lines): int
+    {
+        $sequences = array_map(
+            static fn (Collection $collection): int => $collection->sequence,
+            $existingById,
+        );
+
+        foreach ($lines as $line) {
+            $sequences[] = $line->sequence;
+        }
+
+        return max([...$sequences, 0]) + 1;
     }
 }
