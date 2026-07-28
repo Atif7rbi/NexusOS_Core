@@ -99,6 +99,51 @@ final class CollectionsActionsTest extends ApiTestCase
         $this->assertSame('1000.00', number_format((float) $total, 2, '.', ''));
     }
 
+    public function test_save_draft_can_replace_and_resequence_multiple_existing_rows_without_index_collisions(): void
+    {
+        $context = $this->createCollectionContractContext();
+        $initial = (new SaveDraftCollectionScheduleAction())->execute(
+            $context['tenant_id'],
+            $context['contract_id'],
+            $context['user_id'],
+            [
+                $this->collectionLine(null, 1, '200.00', '2026-08-01', 'الأول'),
+                $this->collectionLine(null, 2, '300.00', '2026-09-01', 'الثاني'),
+                $this->collectionLine(null, 3, '500.00', '2026-10-01', 'الثالث'),
+            ],
+        );
+
+        $firstId = $initial->collections[0]->id;
+        $secondId = $initial->collections[1]->id;
+        $thirdId = $initial->collections[2]->id;
+
+        $result = (new SaveDraftCollectionScheduleAction())->execute(
+            $context['tenant_id'],
+            $context['contract_id'],
+            $context['user_id'],
+            [
+                $this->collectionLine($thirdId, 1, '500.00', '2026-08-01', 'الثالث بعد الترتيب'),
+                $this->collectionLine(null, 2, '250.00', '2026-09-01', 'بديل الثاني'),
+                $this->collectionLine(null, 3, '250.00', '2026-10-01', 'بديل الأول'),
+            ],
+        );
+
+        $this->assertCount(3, $result->collections);
+        $this->assertDatabaseMissing('collections', ['id' => $firstId]);
+        $this->assertDatabaseMissing('collections', ['id' => $secondId]);
+        $this->assertDatabaseHas('collections', [
+            'id' => $thirdId,
+            'sequence' => 1,
+            'title' => 'الثالث بعد الترتيب',
+        ]);
+        $this->assertSame([1, 2, 3], Collection::query()
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('contract_id', $context['contract_id'])
+            ->orderBy('sequence')
+            ->pluck('sequence')
+            ->all());
+    }
+
     public function test_amendment_cancels_history_and_creates_a_valid_replacement_schedule(): void
     {
         $context = $this->createCollectionContractContext();
