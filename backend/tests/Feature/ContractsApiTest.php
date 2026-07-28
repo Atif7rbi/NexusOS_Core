@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Modules\Contracts\Models\Contract;
+use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Reservations\Models\Reservation;
@@ -47,10 +49,15 @@ final class ContractsApiTest extends ApiTestCase
             ->assertJsonPath('data.contract.reservation_id', $reservationId)
             ->assertJsonPath('data.contract.total_amount', '450000.00');
 
+        $tenantId = (string) TenantUser::query()
+            ->where('user_id', $user->id)
+            ->value('tenant_id');
+
         $this->assertDatabaseHas('contracts', [
             'reservation_id' => $reservationId,
             'status' => 'draft',
             'total_amount' => 450000.00,
+            'currency' => Tenant::query()->findOrFail($tenantId)->currency,
         ]);
     }
 
