@@ -10,6 +10,7 @@ use App\Modules\Contracts\Exceptions\ContractReservationNotActiveException;
 use App\Modules\Contracts\Models\Contract;
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Models\Reservation;
+use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 
 final class CreateContractAction
@@ -26,6 +27,11 @@ final class CreateContractAction
             $reservationId,
             $totalAmount
         ): Contract {
+            $tenant = Tenant::query()
+                ->whereKey($tenantId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $reservation = Reservation::query()
                 ->where('tenant_id', $tenantId)
                 ->whereKey($reservationId)
@@ -47,7 +53,7 @@ final class CreateContractAction
                 throw new ContractAlreadyExistsException();
             }
 
-            return Contract::query()->create([
+            $contract = new Contract([
                 'tenant_id' => $tenantId,
                 'reservation_id' => $reservation->id,
                 'status' => ContractStatus::Draft,
@@ -55,6 +61,11 @@ final class CreateContractAction
                 'created_by' => $actorId,
                 'updated_by' => $actorId,
             ]);
+
+            $contract->currency = $tenant->currency;
+            $contract->save();
+
+            return $contract;
         });
     }
 }
