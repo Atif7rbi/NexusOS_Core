@@ -7,11 +7,20 @@ use App\Modules\Collections\Actions\FinalizeCollectionScheduleAction;
 use App\Modules\Collections\DTOs\CollectionLineData;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\DB;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+
+$schema = getenv('COLLECTIONS_CONCURRENCY_SCHEMA');
+if (is_string($schema) && preg_match('/\A[a-z_][a-z0-9_]*\z/', $schema) === 1) {
+    $connectionName = config('database.default');
+    config(["database.connections.{$connectionName}.search_path" => $schema]);
+    DB::purge($connectionName);
+    DB::reconnect($connectionName);
+}
 
 try {
     $payload = json_decode(
