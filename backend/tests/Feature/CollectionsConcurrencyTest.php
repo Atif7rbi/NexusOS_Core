@@ -7,8 +7,9 @@ namespace Tests\Feature;
 use App\Modules\Collections\Actions\FinalizeCollectionScheduleAction;
 use App\Modules\Collections\Actions\SaveDraftCollectionScheduleAction;
 use App\Modules\Collections\Enums\CollectionStatus;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
 use Tests\Support\CreatesCollectionScheduleFixtures;
 use Tests\TestCase;
@@ -17,7 +18,58 @@ final class CollectionsConcurrencyTest extends TestCase
 {
     use CreatesActiveMembership;
     use CreatesCollectionScheduleFixtures;
-    use DatabaseMigrations;
+
+    /** @var array<string, mixed> */
+    private ?array $originalConnectionConfiguration = null;
+
+    private ?string $connectionName = null;
+
+    private ?string $schema = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Collection concurrency coverage requires PostgreSQL row locking.');
+        }
+
+        $this->connectionName = DB::getDefaultConnection();
+        $this->originalConnectionConfiguration = config("database.connections.{$this->connectionName}");
+        $this->schema = 'collections_concurrency_'.strtolower(Str::random(16));
+
+        DB::statement("CREATE SCHEMA {$this->schema}");
+
+        $isolatedConnection = $this->originalConnectionConfiguration;
+        $isolatedConnection['search_path'] = $this->schema;
+
+        config(["database.connections.{$this->connectionName}" => $isolatedConnection]);
+        DB::purge($this->connectionName);
+        DB::reconnect($this->connectionName);
+
+        Artisan::call('migrate', [
+            '--database' => $this->connectionName,
+            '--force' => true,
+        ]);
+    }
+
+    protected function tearDown(): void
+    {
+        try {
+            if ($this->connectionName !== null && $this->originalConnectionConfiguration !== null) {
+                DB::disconnect($this->connectionName);
+                config(["database.connections.{$this->connectionName}" => $this->originalConnectionConfiguration]);
+                DB::purge($this->connectionName);
+                DB::reconnect($this->connectionName);
+            }
+
+            if ($this->schema !== null) {
+                DB::statement("DROP SCHEMA IF EXISTS {$this->schema} CASCADE");
+            }
+        } finally {
+            parent::tearDown();
+        }
+    }
 
     public function test_two_finalization_attempts_leave_one_valid_scheduled_schedule(): void
     {
@@ -155,6 +207,7 @@ final class CollectionsConcurrencyTest extends TestCase
             'DB_PASSWORD' => $connection['password'] ?? null,
             'DB_SSLMODE' => $connection['sslmode'] ?? null,
             'DB_TIMEZONE' => $connection['timezone'] ?? null,
+            'COLLECTIONS_CONCURRENCY_SCHEMA' => $this->schema,
         ], static fn (mixed $value): bool => $value !== null);
 
         foreach ($payloads as $payload) {
