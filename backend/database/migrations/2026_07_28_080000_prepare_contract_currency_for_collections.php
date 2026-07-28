@@ -74,7 +74,7 @@ return new class extends Migration
             BEFORE UPDATE OF currency
             ON contracts
             FOR EACH ROW
-            EXECUTE FUNCTION prevent_contract_currency_change();
+            EXECUTE PROCEDURE prevent_contract_currency_change();
         SQL);
 
         DB::statement(
