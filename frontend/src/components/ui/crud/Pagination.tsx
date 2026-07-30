@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { formatInteger } from "@/lib/number-format";
 
 type PaginationProps = {
   page: number;
@@ -39,7 +40,7 @@ export function Pagination({
       </Button>
 
       <p className="text-sm font-semibold text-[var(--text-secondary)]">
-        {pageLabel} {page} {ofLabel} {lastPage}
+        {pageLabel} {formatInteger(page)} {ofLabel} {formatInteger(lastPage)}
       </p>
 
       <Button

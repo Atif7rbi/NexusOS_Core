@@ -46,6 +46,7 @@ import {
   invalidateFrontendResources,
   useResourceInvalidation,
 } from "@/hooks/useResourceInvalidation";
+import { formatInteger } from "@/lib/number-format";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createContract,
@@ -461,7 +462,7 @@ export default function ContractsPage() {
         <CrudSection className="p-4 sm:p-5">
           <div className="mb-5 flex items-center justify-between">
             <p className="text-sm font-bold text-[var(--text-primary)]">
-              النتائج: {total}
+              النتائج: {formatInteger(total)}
             </p>
           </div>
 

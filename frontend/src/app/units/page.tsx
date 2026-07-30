@@ -37,6 +37,11 @@ import {
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
 import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
+import {
+  formatDecimal,
+  formatInteger,
+  formatMoney,
+} from "@/lib/number-format";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
 import {
@@ -482,7 +487,7 @@ export default function UnitsPage() {
         <CrudSection className="p-4 sm:p-5">
           <div className="mb-5 flex items-center justify-between">
             <p className="text-sm font-bold text-[var(--text-primary)]">
-              النتائج: {total}
+              النتائج: {formatInteger(total)}
             </p>
           </div>
 
@@ -556,18 +561,16 @@ export default function UnitsPage() {
                       {unit.project?.name ?? "—"}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">
-                      {unit.floor ?? "—"}
+                      {unit.floor === null ? "—" : formatInteger(unit.floor)}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">
-                      {unit.area ?? "—"}
+                      {unit.area === null ? "—" : formatDecimal(unit.area)}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">
                       {typeLabels[unit.unit_type]}
                     </td>
                     <td className="px-3 py-4 text-sm font-semibold text-[var(--text-primary)]">
-                      {new Intl.NumberFormat("en-US", {
-                        maximumFractionDigits: 2,
-                      }).format(Number(unit.selling_price))}{" "}
+                      {formatMoney(unit.selling_price)}{" "}
                       {unit.project?.currency ?? ""}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">

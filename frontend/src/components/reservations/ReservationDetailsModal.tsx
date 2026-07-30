@@ -8,6 +8,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@/components/ui/Modal";
+import { formatDateTime } from "@/lib/date-format";
 import type {
   Reservation,
   ReservationStatus,
@@ -45,12 +46,18 @@ export function ReservationDetailsModal({
         },
         { label: "العميل", value: reservation.customer?.name ?? "—" },
         { label: "الحالة", value: statusLabels[reservation.status] },
-        { label: "تاريخ الحجز", value: formatDate(reservation.reserved_at) },
-        { label: "تاريخ الانتهاء", value: formatDate(reservation.expires_at) },
+        {
+          label: "تاريخ الحجز",
+          value: formatDateTime(reservation.reserved_at),
+        },
+        {
+          label: "تاريخ الانتهاء",
+          value: formatDateTime(reservation.expires_at),
+        },
         {
           label: "تاريخ الإلغاء",
           value: reservation.cancelled_at
-            ? formatDate(reservation.cancelled_at)
+            ? formatDateTime(reservation.cancelled_at)
             : "—",
         },
       ]
@@ -153,11 +160,4 @@ function DetailText({
       </p>
     </div>
   );
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("ar-SA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

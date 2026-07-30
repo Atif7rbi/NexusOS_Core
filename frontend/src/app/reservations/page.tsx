@@ -40,6 +40,8 @@ import {
   invalidateFrontendResources,
   useResourceInvalidation,
 } from "@/hooks/useResourceInvalidation";
+import { formatDateTime } from "@/lib/date-format";
+import { formatInteger } from "@/lib/number-format";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
 import { fetchCustomers } from "@/services/customers";
@@ -434,7 +436,9 @@ export default function ReservationsPage() {
 
         <CrudSection className="p-4 sm:p-5">
           <div className="mb-5 flex items-center justify-between">
-            <p className="text-sm font-bold text-[var(--text-primary)]">النتائج: {total}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">
+              النتائج: {formatInteger(total)}
+            </p>
           </div>
 
           {isLoading ? (
@@ -472,8 +476,8 @@ export default function ReservationsPage() {
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{reservation.unit?.project ? `${reservation.unit.project.project_number} — ${reservation.unit.project.name}` : "—"}</td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{reservation.customer?.name ?? "—"}</td>
                     <td className="px-3 py-4"><span className={`rounded-full px-3 py-1 text-xs font-bold ${statusClasses[reservation.status]}`}>{statusLabels[reservation.status]}</span></td>
-                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDate(reservation.reserved_at)}</td>
-                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDate(reservation.expires_at)}</td>
+                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDateTime(reservation.reserved_at)}</td>
+                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDateTime(reservation.expires_at)}</td>
                     <td className="max-w-56 px-3 py-4 text-sm text-[var(--text-secondary)]"><span className="line-clamp-2">{reservation.notes || "—"}</span></td>
                     <td className="px-3 py-4">
                       <button
@@ -616,11 +620,4 @@ export default function ReservationsPage() {
       </ConfirmationDialog>
     </AppShell>
   );
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("ar-SA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

@@ -3,6 +3,11 @@ import type {
   ContractLifecycleAction,
   ContractStatus,
 } from "@/types/contract";
+import {
+  formatDate,
+  formatDateTime,
+} from "@/lib/date-format";
+import { formatMoney } from "@/lib/number-format";
 
 export const contractStatusLabels: Record<ContractStatus, string> = {
   draft: "مسودة",
@@ -64,18 +69,12 @@ export function shortContractId(value: string): string {
 }
 
 export function formatContractAmount(value: string): string {
-  return new Intl.NumberFormat("ar-SA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(value));
+  return formatMoney(value);
 }
 
 export function formatContractDate(
   value: string,
   includeTime = false
 ): string {
-  return new Intl.DateTimeFormat("ar-SA", {
-    dateStyle: "medium",
-    ...(includeTime ? { timeStyle: "short" as const } : {}),
-  }).format(new Date(value));
+  return includeTime ? formatDateTime(value) : formatDate(value);
 }
