@@ -1,7 +1,18 @@
 "use client";
 
-import { FilePenLine, FileSignature } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  Check,
+  FilePenLine,
+  FileSignature,
+  Search,
+} from "lucide-react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 import { Button } from "@/components/ui/Button";
 import { FormErrorBanner } from "@/components/ui/FormErrorBanner";
@@ -12,7 +23,6 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@/components/ui/Modal";
-import { Select } from "@/components/ui/Select";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import type {
   Contract,
@@ -41,15 +51,24 @@ function isValidAmount(value: string): boolean {
   return !/^0+(?:\.0{1,2})?$/.test(value);
 }
 
-function reservationLabel(reservation: Reservation): string {
+function reservationSearchText(reservation: Reservation): string {
   const project = reservation.unit?.project;
-  const projectName = project
-    ? `${project.project_number} — ${project.name}`
-    : "مشروع غير متاح";
-  const unitNumber = reservation.unit?.unit_number ?? "—";
-  const customerName = reservation.customer?.name ?? "—";
 
-  return `${projectName} | الوحدة ${unitNumber} | ${customerName}`;
+  return [
+    reservation.customer?.name,
+    project?.name,
+    project?.project_number,
+    reservation.unit?.unit_number,
+    reservation.id,
+    shortReservationId(reservation.id),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("ar");
+}
+
+function shortReservationId(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
 }
 
 export function ContractFormModal({
@@ -71,6 +90,8 @@ export function ContractFormModal({
     contract?.total_amount ?? ""
   );
   const [reservationSearch, setReservationSearch] = useState("");
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const {
     formRef,
     fieldErrors,
@@ -80,17 +101,68 @@ export function ContractFormModal({
     setValidationError,
   } = useFormValidation();
 
+  const latestReservations = useMemo(
+    () =>
+      [...reservations].sort(
+        (first, second) =>
+          new Date(second.created_at).getTime() -
+          new Date(first.created_at).getTime()
+      ),
+    [reservations]
+  );
+
   const filteredReservations = useMemo(() => {
     const search = reservationSearch.trim().toLocaleLowerCase("ar");
 
     if (!search) {
-      return reservations;
+      return latestReservations;
     }
 
-    return reservations.filter((reservation) =>
-      reservationLabel(reservation).toLocaleLowerCase("ar").includes(search)
+    return latestReservations.filter((reservation) =>
+      reservationSearchText(reservation).includes(search)
     );
-  }, [reservationSearch, reservations]);
+  }, [latestReservations, reservationSearch]);
+
+  const selectReservation = (reservation: Reservation): void => {
+    clearValidation();
+    setReservationId(reservation.id);
+    searchInputRef.current?.focus();
+  };
+
+  const handleSearchKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>
+  ): void => {
+    if (filteredReservations.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveSuggestionIndex(
+        (current) => (current + 1) % filteredReservations.length
+      );
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveSuggestionIndex(
+        (current) =>
+          (current - 1 + filteredReservations.length) %
+          filteredReservations.length
+      );
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      selectReservation(
+        filteredReservations[
+          Math.min(activeSuggestionIndex, filteredReservations.length - 1)
+        ]
+      );
+    }
+  };
 
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
@@ -186,47 +258,122 @@ export function ContractFormModal({
           <>
             <FormErrorBanner message={reservationLoadError} />
 
-            <Input
-              label="البحث في الحجوزات النشطة"
-              name="reservation_search"
-              type="search"
-              value={reservationSearch}
-              placeholder="اسم العميل أو المشروع أو رقم الوحدة"
-              disabled={isLoadingReservations}
-              onChange={(event) => setReservationSearch(event.target.value)}
-            />
+            <div className="space-y-2">
+              <label
+                htmlFor="contract-reservation-search"
+                className="block text-sm font-semibold text-[var(--text-secondary)]"
+              >
+                الحجز النشط
+              </label>
+              <div className="relative">
+                <Search
+                  size={17}
+                  className="pointer-events-none absolute start-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                />
+                <input
+                  ref={searchInputRef}
+                  id="contract-reservation-search"
+                  name="reservation_search"
+                  type="search"
+                  autoFocus
+                  autoComplete="off"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-controls="contract-reservation-suggestions"
+                  aria-expanded={
+                    !isLoadingReservations && filteredReservations.length > 0
+                  }
+                  value={reservationSearch}
+                  placeholder="العميل، المشروع، الوحدة أو مرجع الحجز"
+                  onChange={(event) => {
+                    setReservationSearch(event.target.value);
+                    setActiveSuggestionIndex(0);
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                  className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] ps-11 pe-4 text-sm text-[var(--text-primary)] outline-none shadow-[var(--shadow-sm)] focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                />
+              </div>
 
-            <Select
-              label="الحجز النشط"
-              name="reservation_id"
-              value={reservationId}
-              error={fieldErrors.reservation_id?.[0]}
-              disabled={isLoadingReservations}
-              onChange={(event) => {
-                clearValidation();
-                setReservationId(event.target.value);
-              }}
-              options={[
-                {
-                  value: "",
-                  label: isLoadingReservations
-                    ? "جارٍ تحميل الحجوزات..."
-                    : "اختر حجزًا",
-                },
-                ...filteredReservations.map((reservation) => ({
-                  value: reservation.id,
-                  label: reservationLabel(reservation),
-                })),
-              ]}
-            />
+              <input
+                type="hidden"
+                name="reservation_id"
+                value={reservationId}
+              />
 
-            {!isLoadingReservations &&
-            !reservationLoadError &&
-            reservations.length === 0 ? (
-              <p className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--text-secondary)]">
-                لا توجد حجوزات نشطة متاحة للعرض حاليًا.
-              </p>
-            ) : null}
+              {fieldErrors.reservation_id?.[0] ? (
+                <p className="text-xs font-semibold text-[var(--danger)]">
+                  {fieldErrors.reservation_id[0]}
+                </p>
+              ) : null}
+
+              <div
+                id="contract-reservation-suggestions"
+                role="listbox"
+                aria-label="الحجوزات النشطة"
+                className="max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+              >
+                {isLoadingReservations ? (
+                  <p className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
+                    جارٍ تحميل الحجوزات النشطة...
+                  </p>
+                ) : reservations.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
+                    لا توجد حجوزات نشطة متاحة لإنشاء عقد.
+                  </p>
+                ) : filteredReservations.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
+                    لا توجد حجوزات مطابقة لعبارة البحث.
+                  </p>
+                ) : (
+                  filteredReservations.map((reservation, index) => {
+                    const isSelected = reservation.id === reservationId;
+                    const project = reservation.unit?.project;
+
+                    return (
+                      <button
+                        key={reservation.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectReservation(reservation)}
+                        className={[
+                          "flex w-full items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3 text-start last:border-0",
+                          index === activeSuggestionIndex
+                            ? "bg-[var(--surface-soft)]"
+                            : "hover:bg-[var(--surface-soft)]",
+                          isSelected
+                            ? "ring-1 ring-inset ring-[var(--brand-gold)]"
+                            : "",
+                        ].join(" ")}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-[var(--text-primary)]">
+                            {reservation.customer?.name ?? "عميل غير متاح"}
+                          </span>
+                          <span className="mt-1 block truncate text-xs text-[var(--text-secondary)]">
+                            {project
+                              ? `${project.project_number} — ${project.name}`
+                              : "مشروع غير متاح"}
+                            {" · "}
+                            الوحدة {reservation.unit?.unit_number ?? "—"}
+                          </span>
+                          <span className="mt-1 block font-mono text-[11px] text-[var(--text-muted)]">
+                            مرجع الحجز: {shortReservationId(reservation.id)}
+                          </span>
+                        </span>
+                        {isSelected ? (
+                          <Check
+                            size={18}
+                            className="mt-1 shrink-0 text-[var(--success)]"
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </>
         ) : null}
 
