@@ -22,6 +22,7 @@ import { ReservationDetailsModal } from "@/components/reservations/ReservationDe
 import { ReservationUpdateModal } from "@/components/reservations/ReservationUpdateModal";
 import { Button } from "@/components/ui/Button";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { SuccessBanner } from "@/components/ui/SuccessBanner";
 import {
   CrudPageHeader,
   CrudPageLayout,
@@ -74,12 +75,14 @@ const emptySummary: ReservationSummary = {
 
 const statusLabels: Record<ReservationStatus, string> = {
   active: "نشط",
+  converted: "محول إلى عقد",
   cancelled: "ملغي",
   expired: "منتهي",
 };
 
 const statusClasses: Record<ReservationStatus, string> = {
   active: "bg-[var(--success-soft)] text-[var(--success)]",
+  converted: "bg-[var(--info-soft)] text-[var(--info)]",
   cancelled: "bg-[var(--danger-soft)] text-[var(--danger)]",
   expired: "bg-[var(--surface-muted)] text-[var(--text-secondary)]",
 };
@@ -112,6 +115,7 @@ export default function ReservationsPage() {
   const [cancellationReason, setCancellationReason] = useState("");
   const [isCancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadReservations = useCallback(
     async (targetPage = page): Promise<void> => {
@@ -268,6 +272,7 @@ export default function ReservationsPage() {
         "contracts",
       ]);
       setFormOpen(false);
+      setSuccessMessage("تم إنشاء الحجز بنجاح.");
     } finally {
       setSubmitting(false);
     }
@@ -314,6 +319,7 @@ export default function ReservationsPage() {
         "contracts",
       ]);
       setEditReservation(null);
+      setSuccessMessage("تم تحديث الحجز بنجاح.");
     } finally {
       setSubmitting(false);
     }
@@ -342,6 +348,7 @@ export default function ReservationsPage() {
       ]);
       setCancelReservationItem(null);
       setCancellationReason("");
+      setSuccessMessage("تم إلغاء الحجز بنجاح.");
     } catch (caughtError) {
       setCancelError(
         caughtError instanceof Error
@@ -371,6 +378,13 @@ export default function ReservationsPage() {
             </Button>
           }
         />
+
+        {successMessage ? (
+          <SuccessBanner
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard title="إجمالي الحجوزات" value={summary.total} icon={CalendarCheck2} />

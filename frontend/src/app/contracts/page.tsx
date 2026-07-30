@@ -10,7 +10,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -29,6 +28,7 @@ import {
 import { ContractsTable } from "@/components/contracts/ContractsTable";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
+import { SuccessBanner } from "@/components/ui/SuccessBanner";
 import {
   CrudPageHeader,
   CrudPageLayout,
@@ -344,20 +344,10 @@ export default function ContractsPage() {
         />
 
         {successMessage ? (
-          <div
-            role="status"
-            className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-4 py-3 text-sm font-semibold text-[var(--success)]"
-          >
-            <span>{successMessage}</span>
-            <button
-              type="button"
-              onClick={() => setSuccessMessage(null)}
-              aria-label="إغلاق رسالة النجاح"
-              className="rounded-lg p-1 hover:bg-black/5"
-            >
-              <X size={17} />
-            </button>
-          </div>
+          <SuccessBanner
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
         ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

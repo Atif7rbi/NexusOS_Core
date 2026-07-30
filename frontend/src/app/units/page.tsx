@@ -22,6 +22,7 @@ import { UnitDetailsModal } from "@/components/units/UnitDetailsModal";
 import { UnitFormModal } from "@/components/units/UnitFormModal";
 import { Button } from "@/components/ui/Button";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { SuccessBanner } from "@/components/ui/SuccessBanner";
 import {
   CrudPageHeader,
   CrudPageLayout,
@@ -112,6 +113,7 @@ export default function UnitsPage() {
   const [action, setAction] = useState<ArchiveAction>("archive");
   const [isProcessing, setProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadUnits = useCallback(
     async (targetPage = page): Promise<void> => {
@@ -260,15 +262,22 @@ export default function UnitsPage() {
     setSubmitting(true);
 
     try {
-      if (formUnit) {
+      const isUpdating = formUnit !== null;
+
+      if (isUpdating) {
         await updateUnit(token, formUnit.id, payload);
       } else {
         await createUnit(token, payload);
       }
 
-      await loadUnits(formUnit ? page : 1);
+      await loadUnits(isUpdating ? page : 1);
       setFormOpen(false);
       setFormUnit(null);
+      setSuccessMessage(
+        isUpdating
+          ? "تم تحديث الوحدة بنجاح."
+          : "تم إنشاء الوحدة بنجاح."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -291,6 +300,11 @@ export default function UnitsPage() {
 
       await loadUnits();
       setActionUnit(null);
+      setSuccessMessage(
+        action === "archive"
+          ? "تمت أرشفة الوحدة بنجاح."
+          : "تمت استعادة الوحدة بنجاح."
+      );
     } catch (caughtError) {
       setActionError(
         caughtError instanceof Error
@@ -340,6 +354,13 @@ export default function UnitsPage() {
             </Button>
           }
         />
+
+        {successMessage ? (
+          <SuccessBanner
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard

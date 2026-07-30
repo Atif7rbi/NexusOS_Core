@@ -23,6 +23,7 @@ type ReservationDetailsModalProps = {
 
 const statusLabels: Record<ReservationStatus, string> = {
   active: "نشط",
+  converted: "محول إلى عقد",
   cancelled: "ملغي",
   expired: "منتهي",
 };
