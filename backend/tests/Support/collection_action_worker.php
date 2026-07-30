@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Collections\Actions\AmendCollectionScheduleAction;
 use App\Modules\Collections\Actions\FinalizeCollectionScheduleAction;
+use App\Modules\Collections\Contracts\CollectionAuditRecorderInterface;
 use App\Modules\Collections\DTOs\CollectionLineData;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
@@ -41,16 +42,35 @@ try {
         $payload['lines'] ?? [],
     );
 
+    $auditRecorder = null;
+    if ($payload['action'] === 'amend' && is_string($payload['audit_log_path'] ?? null)) {
+        $auditRecorder = new class($payload['audit_log_path']) implements CollectionAuditRecorderInterface
+        {
+            public function __construct(private readonly string $path) {}
+
+            public function record(
+                string $tenantId,
+                string $contractId,
+                string $event,
+                int|string $actorId,
+                array $context = [],
+            ): void {
+                file_put_contents($this->path, "{$event}\n", FILE_APPEND | LOCK_EX);
+            }
+        };
+    }
+
     match ($payload['action']) {
-        'finalize' => (new FinalizeCollectionScheduleAction())->execute(
+        'finalize' => (new FinalizeCollectionScheduleAction)->execute(
             $payload['tenant_id'],
             $payload['contract_id'],
             $payload['actor_id'],
         ),
-        'amend' => (new AmendCollectionScheduleAction())->execute(
+        'amend' => (new AmendCollectionScheduleAction(auditRecorder: $auditRecorder))->execute(
             $payload['tenant_id'],
             $payload['contract_id'],
             $payload['actor_id'],
+            $payload['expected_active_collection_ids'],
             $lines,
             $payload['cancellation_reason'],
         ),
