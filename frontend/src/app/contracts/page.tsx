@@ -42,6 +42,10 @@ import {
 } from "@/components/ui/crud/ListState";
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
+import {
+  invalidateFrontendResources,
+  useResourceInvalidation,
+} from "@/hooks/useResourceInvalidation";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createContract,
@@ -149,6 +153,8 @@ export default function ContractsPage() {
 
     return () => window.clearTimeout(timeout);
   }, [loadContracts, page, search]);
+
+  useResourceInvalidation("contracts", () => loadContracts(page));
 
   const hasFilters = Boolean(search || statusFilter !== "all");
 
@@ -297,6 +303,12 @@ export default function ContractsPage() {
         lifecycleSelection.contract.id,
         lifecycleSelection.action
       );
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setLifecycleSelection(null);
       setSuccessMessage(copy.successMessage);
       await loadContracts(page);

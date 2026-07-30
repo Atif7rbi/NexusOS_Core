@@ -36,6 +36,10 @@ import {
 } from "@/components/ui/crud/ListState";
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
+import {
+  invalidateFrontendResources,
+  useResourceInvalidation,
+} from "@/hooks/useResourceInvalidation";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
 import { fetchCustomers } from "@/services/customers";
@@ -175,6 +179,8 @@ export default function ReservationsPage() {
     };
   }, [token]);
 
+  useResourceInvalidation("reservations", () => loadReservations());
+
   const changeFilter = (callback: () => void): void => {
     callback();
     setPage(1);
@@ -253,6 +259,12 @@ export default function ReservationsPage() {
     try {
       await createReservation(token, payload);
       await loadReservations(1);
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setFormOpen(false);
     } finally {
       setSubmitting(false);
@@ -293,6 +305,12 @@ export default function ReservationsPage() {
     try {
       await updateReservation(token, editReservation.id, payload);
       await loadReservations();
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setEditReservation(null);
     } finally {
       setSubmitting(false);
@@ -314,6 +332,12 @@ export default function ReservationsPage() {
     try {
       await cancelReservation(token, cancelReservationItem.id, payload);
       await loadReservations();
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setCancelReservationItem(null);
       setCancellationReason("");
     } catch (caughtError) {

@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/crud/ListState";
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
+import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
 import {
@@ -188,6 +189,8 @@ export default function UnitsPage() {
       cancelled = true;
     };
   }, [token]);
+
+  useResourceInvalidation("units", () => loadUnits());
 
   const changeFilter = (callback: () => void): void => {
     callback();
