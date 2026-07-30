@@ -1,0 +1,235 @@
+"use client";
+
+import {
+  FileSignature,
+  ListOrdered,
+} from "lucide-react";
+import { useState } from "react";
+
+import {
+  contractStatusLabels,
+  formatContractAmount,
+  formatContractDate,
+  shortContractId,
+} from "@/components/contracts/contract-presenters";
+import { Button } from "@/components/ui/Button";
+import {
+  Modal,
+  ModalFooter,
+  ModalHeader,
+} from "@/components/ui/Modal";
+import type {
+  Contract,
+} from "@/types/contract";
+import type { Reservation } from "@/types/reservation";
+
+type ContractDetailsModalProps = {
+  contract: Contract | null;
+  reservation: Reservation | null;
+  isLoading: boolean;
+  error: string | null;
+  onClose: () => void;
+};
+
+export function ContractDetailsModal({
+  contract,
+  reservation,
+  isLoading,
+  error,
+  onClose,
+}: ContractDetailsModalProps) {
+  const [activeTab, setActiveTab] = useState<"details" | "collections">(
+    "details"
+  );
+  const isOpen = Boolean(contract || isLoading || error);
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      closeLabel="إغلاق"
+      maxWidthClassName="max-w-3xl"
+      className="flex max-h-[94vh] flex-col"
+    >
+      <ModalHeader
+        icon={
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-gold-soft)] text-[var(--brand-gold-strong)]">
+            <FileSignature size={21} />
+          </span>
+        }
+        title="تفاصيل العقد"
+        description={
+          contract ? `العقد ${shortContractId(contract.id)}` : undefined
+        }
+        closeLabel="إغلاق"
+        onClose={onClose}
+      />
+
+      <nav
+        aria-label="أقسام العقد"
+        className="flex gap-2 border-b border-[var(--border)] px-5 pt-4 sm:px-7"
+      >
+        <TabButton
+          isActive={activeTab === "details"}
+          onClick={() => setActiveTab("details")}
+        >
+          تفاصيل العقد
+        </TabButton>
+        <TabButton
+          isActive={activeTab === "collections"}
+          onClick={() => setActiveTab("collections")}
+        >
+          جدول التحصيل
+        </TabButton>
+      </nav>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-7">
+        {isLoading ? (
+          <p className="py-12 text-center text-sm text-[var(--text-secondary)]">
+            جارٍ تحميل تفاصيل العقد...
+          </p>
+        ) : error || !contract ? (
+          <p className="py-12 text-center text-sm font-semibold text-[var(--danger)]">
+            {error ?? "تعذر تحميل تفاصيل العقد."}
+          </p>
+        ) : activeTab === "details" ? (
+          <ContractDetails contract={contract} reservation={reservation} />
+        ) : (
+          <CollectionScheduleNavigation />
+        )}
+      </div>
+
+      <ModalFooter>
+        <Button type="button" variant="secondary" onClick={onClose}>
+          إغلاق
+        </Button>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
+function ContractDetails({
+  contract,
+  reservation,
+}: {
+  contract: Contract;
+  reservation: Reservation | null;
+}) {
+  const project = reservation?.unit?.project;
+  const details = [
+    {
+      label: "المشروع",
+      value: project
+        ? `${project.project_number} — ${project.name}`
+        : "—",
+    },
+    {
+      label: "الوحدة",
+      value: reservation?.unit?.unit_number ?? "—",
+    },
+    {
+      label: "العميل",
+      value: reservation?.customer?.name ?? "—",
+    },
+    {
+      label: "الحجز",
+      value: reservation
+        ? shortContractId(reservation.id)
+        : shortContractId(contract.reservation_id),
+    },
+    {
+      label: "قيمة العقد",
+      value: formatContractAmount(contract.total_amount),
+    },
+    {
+      label: "الحالة",
+      value: contractStatusLabels[contract.status],
+    },
+    {
+      label: "تاريخ الإنشاء",
+      value: formatContractDate(contract.created_at, true),
+    },
+    {
+      label: "آخر تحديث",
+      value: formatContractDate(contract.updated_at, true),
+    },
+  ];
+
+  return (
+    <>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xl font-bold text-[var(--text-primary)]">
+            {reservation?.customer?.name ?? "عقد بيع"}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            الوحدة {reservation?.unit?.unit_number ?? "—"}
+          </p>
+        </div>
+        <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-bold text-[var(--text-secondary)]">
+          {contractStatusLabels[contract.status]}
+        </span>
+      </div>
+
+      <dl className="grid gap-4 sm:grid-cols-2">
+        {details.map((detail) => (
+          <div
+            key={detail.label}
+            className="rounded-xl bg-[var(--surface-soft)] p-4"
+          >
+            <dt className="text-xs font-semibold text-[var(--text-secondary)]">
+              {detail.label}
+            </dt>
+            <dd className="mt-1 break-words text-sm font-bold text-[var(--text-primary)]">
+              {detail.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </>
+  );
+}
+
+function CollectionScheduleNavigation() {
+  return (
+    <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] px-6 text-center">
+      <div>
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-gold-soft)] text-[var(--brand-gold-strong)]">
+          <ListOrdered size={22} />
+        </span>
+        <h3 className="mt-5 text-base font-bold text-[var(--text-primary)]">
+          جدول التحصيل
+        </h3>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-[var(--text-secondary)]">
+          هذا القسم مخصص للتنقل إلى جدول تحصيل العقد. إدارة جدول التحصيل
+          ليست ضمن نطاق واجهة العقود الحالية.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TabButton({
+  isActive,
+  onClick,
+  children,
+}: {
+  isActive: boolean;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "border-b-2 px-3 py-3 text-sm font-bold transition-colors",
+        isActive
+          ? "border-[var(--brand-gold)] text-[var(--brand-gold-strong)]"
+          : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
