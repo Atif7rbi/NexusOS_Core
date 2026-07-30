@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Modules\Collections\Controllers\CollectionScheduleController;
 use App\Modules\Contracts\Controllers\ContractController;
 use App\Modules\Customers\Controllers\CustomerController;
 use App\Modules\Projects\Controllers\ProjectController;
@@ -75,6 +76,33 @@ Route::middleware([
     Route::patch('/contracts/{contract}/activate', [ContractController::class, 'activate'])->name('contracts.activate');
     Route::patch('/contracts/{contract}/complete', [ContractController::class, 'complete'])->name('contracts.complete');
     Route::patch('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
+
+    Route::get(
+        '/contracts/{contract}/collection-schedule',
+        [CollectionScheduleController::class, 'show'],
+    )->middleware('collections.contract')
+        ->name('contracts.collection-schedule.show');
+    Route::post(
+        '/contracts/{contract}/collection-schedule/draft',
+        [CollectionScheduleController::class, 'saveDraft'],
+    )->middleware([
+        'collections.contract',
+        'collections.authorize:save_draft',
+    ])->name('contracts.collection-schedule.draft');
+    Route::post(
+        '/contracts/{contract}/collection-schedule/finalize',
+        [CollectionScheduleController::class, 'finalize'],
+    )->middleware([
+        'collections.contract',
+        'collections.authorize:finalize',
+    ])->name('contracts.collection-schedule.finalize');
+    Route::post(
+        '/contracts/{contract}/collection-schedule/amend',
+        [CollectionScheduleController::class, 'amend'],
+    )->middleware([
+        'collections.contract',
+        'collections.authorize:amend',
+    ])->name('contracts.collection-schedule.amend');
 
     Route::post(
         '/units',
