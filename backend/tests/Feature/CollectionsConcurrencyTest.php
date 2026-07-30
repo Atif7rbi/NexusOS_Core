@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Modules\Collections\Actions\FinalizeCollectionScheduleAction;
 use App\Modules\Collections\Actions\SaveDraftCollectionScheduleAction;
 use App\Modules\Collections\Enums\CollectionStatus;
+use App\Modules\Collections\Exceptions\CollectionScheduleChangedSinceLoadedException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,6 +26,9 @@ final class CollectionsConcurrencyTest extends TestCase
     private ?string $connectionName = null;
 
     private ?string $schema = null;
+
+    /** @var array<int, string> */
+    private array $temporaryAuditFiles = [];
 
     protected function setUp(): void
     {
@@ -56,6 +60,12 @@ final class CollectionsConcurrencyTest extends TestCase
     protected function tearDown(): void
     {
         try {
+            foreach ($this->temporaryAuditFiles as $temporaryAuditFile) {
+                if (is_file($temporaryAuditFile)) {
+                    unlink($temporaryAuditFile);
+                }
+            }
+
             if ($this->connectionName !== null && $this->originalConnectionConfiguration !== null) {
                 DB::disconnect($this->connectionName);
                 config(["database.connections.{$this->connectionName}" => $this->originalConnectionConfiguration]);
@@ -85,22 +95,62 @@ final class CollectionsConcurrencyTest extends TestCase
         $this->assertValidScheduledAggregate($context);
     }
 
-    public function test_two_amendment_attempts_serialize_and_leave_a_valid_schedule(): void
+    public function test_two_amendment_attempts_from_one_generation_allow_exactly_one_success(): void
     {
         $context = $this->createCollectionContractContext();
         $this->saveDraft($context);
-        (new FinalizeCollectionScheduleAction())->execute(
+        (new FinalizeCollectionScheduleAction)->execute(
             $context['tenant_id'],
             $context['contract_id'],
             $context['user_id'],
         );
+        $expectedIds = $this->activeCollectionIds($context);
+        $auditLogPath = tempnam(sys_get_temp_dir(), 'collections-amend-audit-');
+        if (! is_string($auditLogPath)) {
+            $this->fail('Unable to create the temporary Collection audit log.');
+        }
+        $this->temporaryAuditFiles[] = $auditLogPath;
 
         $results = $this->runWorkers([
-            $this->amendPayload($context, '400.00', '600.00', 'التعديل الأول'),
-            $this->amendPayload($context, '300.00', '700.00', 'التعديل الثاني'),
+            $this->amendPayload(
+                $context,
+                $expectedIds,
+                '400.00',
+                '600.00',
+                'التعديل الأول',
+                $auditLogPath,
+            ),
+            $this->amendPayload(
+                $context,
+                $expectedIds,
+                '300.00',
+                '700.00',
+                'التعديل الثاني',
+                $auditLogPath,
+            ),
         ]);
 
-        $this->assertSame(2, $this->successCount($results));
+        $this->assertSame(1, $this->successCount($results));
+        $failures = array_values(array_filter(
+            $results,
+            static fn (array $result): bool => $result['result']['ok'] === false,
+        ));
+        $this->assertCount(1, $failures);
+        $this->assertSame(
+            CollectionScheduleChangedSinceLoadedException::class,
+            $failures[0]['result']['class'],
+        );
+        $this->assertSame(4, DB::table('collections')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('contract_id', $context['contract_id'])
+            ->count());
+        $auditEvents = file(
+            $auditLogPath,
+            FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES,
+        );
+        $this->assertIsArray($auditEvents);
+        $this->assertCount(1, $auditEvents);
+        $this->assertSame('collection_schedule_amended', $auditEvents[0]);
         $this->assertValidScheduledAggregate($context);
     }
 
@@ -111,7 +161,13 @@ final class CollectionsConcurrencyTest extends TestCase
 
         $results = $this->runWorkers([
             $this->finalizePayload($context),
-            $this->amendPayload($context, '450.00', '550.00', 'تعديل متزامن'),
+            $this->amendPayload(
+                $context,
+                [(string) Str::ulid()],
+                '450.00',
+                '550.00',
+                'تعديل متزامن',
+            ),
         ]);
 
         $finalization = array_values(array_filter(
@@ -121,15 +177,21 @@ final class CollectionsConcurrencyTest extends TestCase
 
         $this->assertCount(1, $finalization);
         $this->assertTrue($finalization[0]['result']['ok']);
+        $amendment = array_values(array_filter(
+            $results,
+            static fn (array $result): bool => $result['action'] === 'amend',
+        ));
+        $this->assertCount(1, $amendment);
+        $this->assertFalse($amendment[0]['result']['ok']);
         $this->assertValidScheduledAggregate($context);
     }
 
     /**
-     * @param array{tenant_id: string, contract_id: string, user_id: int} $context
+     * @param  array{tenant_id: string, contract_id: string, user_id: int}  $context
      */
     private function saveDraft(array $context): void
     {
-        (new SaveDraftCollectionScheduleAction())->execute(
+        (new SaveDraftCollectionScheduleAction)->execute(
             $context['tenant_id'],
             $context['contract_id'],
             $context['user_id'],
@@ -141,7 +203,7 @@ final class CollectionsConcurrencyTest extends TestCase
     }
 
     /**
-     * @param array{tenant_id: string, contract_id: string, user_id: int} $context
+     * @param  array{tenant_id: string, contract_id: string, user_id: int}  $context
      * @return array<string, mixed>
      */
     private function finalizePayload(array $context): array
@@ -155,20 +217,24 @@ final class CollectionsConcurrencyTest extends TestCase
     }
 
     /**
-     * @param array{tenant_id: string, contract_id: string, user_id: int} $context
+     * @param  array{tenant_id: string, contract_id: string, user_id: int}  $context
      * @return array<string, mixed>
      */
     private function amendPayload(
         array $context,
+        array $expectedActiveCollectionIds,
         string $firstAmount,
         string $secondAmount,
         string $reason,
+        ?string $auditLogPath = null,
     ): array {
         return [
             'action' => 'amend',
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
             'actor_id' => $context['user_id'],
+            'expected_active_collection_ids' => $expectedActiveCollectionIds,
+            'audit_log_path' => $auditLogPath,
             'cancellation_reason' => $reason,
             'lines' => [
                 [
@@ -188,7 +254,23 @@ final class CollectionsConcurrencyTest extends TestCase
     }
 
     /**
-     * @param array<int, array<string, mixed>> $payloads
+     * @param  array{tenant_id: string, contract_id: string, user_id: int}  $context
+     * @return array<int, string>
+     */
+    private function activeCollectionIds(array $context): array
+    {
+        return DB::table('collections')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('contract_id', $context['contract_id'])
+            ->where('status', CollectionStatus::Scheduled->value)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $payloads
      * @return array<int, array{action: string, result: array<string, mixed>, exit_code: int}>
      */
     private function runWorkers(array $payloads): array
@@ -257,7 +339,7 @@ final class CollectionsConcurrencyTest extends TestCase
     }
 
     /**
-     * @param array<int, array{action: string, result: array<string, mixed>, exit_code: int}> $results
+     * @param  array<int, array{action: string, result: array<string, mixed>, exit_code: int}>  $results
      */
     private function successCount(array $results): int
     {
@@ -268,7 +350,7 @@ final class CollectionsConcurrencyTest extends TestCase
     }
 
     /**
-     * @param array{tenant_id: string, contract_id: string, user_id: int} $context
+     * @param  array{tenant_id: string, contract_id: string, user_id: int}  $context
      */
     private function assertValidScheduledAggregate(array $context): void
     {

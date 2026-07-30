@@ -21,7 +21,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
     public function test_save_draft_audit_failure_rolls_back_creates_updates_deletes_and_resequencing(): void
     {
         $context = $this->createCollectionContractContext();
-        $save = new SaveDraftCollectionScheduleAction();
+        $save = new SaveDraftCollectionScheduleAction;
         $initial = $save->execute(
             $context['tenant_id'],
             $context['contract_id'],
@@ -34,7 +34,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
 
         $first = $initial->collections[0];
         $second = $initial->collections[1];
-        $audit = new ThrowingCollectionAuditRecorder();
+        $audit = new ThrowingCollectionAuditRecorder;
 
         try {
             (new SaveDraftCollectionScheduleAction(auditRecorder: $audit))->execute(
@@ -71,7 +71,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
     {
         $context = $this->createCollectionContractContext();
 
-        (new SaveDraftCollectionScheduleAction())->execute(
+        (new SaveDraftCollectionScheduleAction)->execute(
             $context['tenant_id'],
             $context['contract_id'],
             $context['user_id'],
@@ -81,7 +81,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
         $this->expectException(ScheduleTotalMismatchException::class);
 
         try {
-            (new FinalizeCollectionScheduleAction())->execute(
+            (new FinalizeCollectionScheduleAction)->execute(
                 $context['tenant_id'],
                 $context['contract_id'],
                 $context['user_id'],
@@ -111,10 +111,11 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
         $this->expectException(ScheduleTotalMismatchException::class);
 
         try {
-            (new AmendCollectionScheduleAction())->execute(
+            (new AmendCollectionScheduleAction)->execute(
                 $context['tenant_id'],
                 $context['contract_id'],
                 $context['user_id'],
+                $originalIds,
                 [
                     $this->collectionLine(null, 1, '200.00', '2026-08-01'),
                     $this->collectionLine(null, 2, '700.00', '2026-09-01'),
@@ -136,7 +137,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
     public function test_finalization_audit_failure_rolls_back_every_state_change(): void
     {
         $context = $this->createCollectionContractContext();
-        (new SaveDraftCollectionScheduleAction())->execute(
+        (new SaveDraftCollectionScheduleAction)->execute(
             $context['tenant_id'],
             $context['contract_id'],
             $context['user_id'],
@@ -146,7 +147,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
             ],
         );
 
-        $audit = new ThrowingCollectionAuditRecorder();
+        $audit = new ThrowingCollectionAuditRecorder;
 
         try {
             (new FinalizeCollectionScheduleAction(auditRecorder: $audit))->execute(
@@ -173,11 +174,11 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
     }
 
     /**
-     * @param array{tenant_id: string, contract_id: string, user_id: int} $context
+     * @param  array{tenant_id: string, contract_id: string, user_id: int}  $context
      */
     private function saveAndFinalize(array $context): void
     {
-        (new SaveDraftCollectionScheduleAction())->execute(
+        (new SaveDraftCollectionScheduleAction)->execute(
             $context['tenant_id'],
             $context['contract_id'],
             $context['user_id'],
@@ -187,7 +188,7 @@ final class CollectionsTransactionRollbackTest extends ApiTestCase
             ],
         );
 
-        (new FinalizeCollectionScheduleAction())->execute(
+        (new FinalizeCollectionScheduleAction)->execute(
             $context['tenant_id'],
             $context['contract_id'],
             $context['user_id'],

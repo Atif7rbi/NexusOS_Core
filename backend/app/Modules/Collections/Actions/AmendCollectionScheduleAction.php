@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Collections\Actions;
 
 use App\Modules\Collections\Contracts\CollectionAuditRecorderInterface;
+use App\Modules\Collections\DTOs\CollectionLineData;
 use App\Modules\Collections\DTOs\CollectionScheduleResult;
 use App\Modules\Collections\Enums\CollectionStatus;
+use App\Modules\Collections\Exceptions\CollectionScheduleChangedSinceLoadedException;
 use App\Modules\Collections\Exceptions\InvalidCancellationReasonException;
 use App\Modules\Collections\Models\Collection;
 use App\Modules\Collections\Policies\AmendmentEligibilityPolicy;
@@ -14,6 +16,7 @@ use App\Modules\Collections\Support\DerivedScheduleStateResolver;
 use App\Modules\Collections\Support\LogCollectionAuditRecorder;
 use App\Modules\Collections\Validation\CollectionLineValidator;
 use App\Modules\Collections\Validation\CollectionScheduleValidator;
+use App\Modules\Collections\Validation\ExpectedActiveCollectionIdsValidator;
 use App\Modules\Contracts\Models\Contract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -26,9 +29,10 @@ use Illuminate\Support\Str;
  * operations follows the specification exactly:
  *
  * Lock Contract -> Lock Collections -> Validate lifecycle -> Validate
- * amendment eligibility -> Cancel replaced rows -> Create replacements
- * directly as scheduled -> Validate sequence -> Validate due-date order ->
- * Validate final total -> Write audit -> Commit.
+ * amendment eligibility -> Compare the expected active generation -> Cancel
+ * replaced rows -> Create replacements directly as scheduled -> Validate
+ * sequence -> Validate due-date order -> Validate final total -> Write audit
+ * -> Commit.
  *
  * Because the cross-row validations run after the cancel-and-replace
  * writes (as specified), a validation failure rolls back the entire
@@ -37,36 +41,43 @@ use Illuminate\Support\Str;
 final class AmendCollectionScheduleAction
 {
     public function __construct(
-        private readonly AmendmentEligibilityPolicy $eligibilityPolicy = new AmendmentEligibilityPolicy(),
-        private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver(),
-        private readonly CollectionLineValidator $lineValidator = new CollectionLineValidator(),
-        private readonly CollectionScheduleValidator $scheduleValidator = new CollectionScheduleValidator(),
+        private readonly AmendmentEligibilityPolicy $eligibilityPolicy = new AmendmentEligibilityPolicy,
+        private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
+        private readonly CollectionLineValidator $lineValidator = new CollectionLineValidator,
+        private readonly CollectionScheduleValidator $scheduleValidator = new CollectionScheduleValidator,
+        private readonly ExpectedActiveCollectionIdsValidator $expectedIdsValidator = new ExpectedActiveCollectionIdsValidator,
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param  array<int, \App\Modules\Collections\DTOs\CollectionLineData>  $replacementLines
+     * @param  array<int, string>  $expectedActiveCollectionIds
+     * @param  array<int, CollectionLineData>  $replacementLines
      */
     public function execute(
         string $tenantId,
         string $contractId,
         int|string $actorId,
+        array $expectedActiveCollectionIds,
         array $replacementLines,
         string $cancellationReason,
     ): CollectionScheduleResult {
-        $this->assertCancellationReason($cancellationReason);
+        $normalizedCancellationReason = trim($cancellationReason);
+        $this->assertCancellationReason($normalizedCancellationReason);
 
         foreach ($replacementLines as $line) {
             $this->lineValidator->validate($line);
         }
 
+        $canonicalExpectedIds = $this->expectedIdsValidator
+            ->validateAndCanonicalize($expectedActiveCollectionIds);
+
         return DB::transaction(function () use (
             $tenantId,
             $contractId,
             $actorId,
+            $canonicalExpectedIds,
             $replacementLines,
-            $cancellationReason,
+            $normalizedCancellationReason,
         ): CollectionScheduleResult {
             $contract = Contract::query()
                 ->where('tenant_id', $tenantId)
@@ -87,6 +98,16 @@ final class AmendCollectionScheduleAction
             $this->eligibilityPolicy->assert($contract, $currentState);
 
             $replacedCollections = $this->stateResolver->activeOnly($allCollections);
+            $canonicalCurrentIds = array_map(
+                static fn (Collection $collection): string => strtoupper((string) $collection->getKey()),
+                $replacedCollections,
+            );
+            sort($canonicalCurrentIds, SORT_STRING);
+
+            if ($canonicalExpectedIds !== $canonicalCurrentIds) {
+                throw new CollectionScheduleChangedSinceLoadedException;
+            }
+
             $cancelledAt = now();
 
             foreach ($replacedCollections as $collection) {
@@ -94,7 +115,7 @@ final class AmendCollectionScheduleAction
                     'status' => CollectionStatus::Cancelled,
                     'cancelled_at' => $cancelledAt,
                     'cancelled_by' => $actorId,
-                    'cancellation_reason' => $cancellationReason,
+                    'cancellation_reason' => $normalizedCancellationReason,
                     'updated_by' => $actorId,
                 ])->save();
             }
@@ -103,7 +124,7 @@ final class AmendCollectionScheduleAction
             $replacements = [];
 
             foreach ($replacementLines as $line) {
-                $collection = new Collection();
+                $collection = new Collection;
                 $collection->id = (string) Str::ulid();
                 $collection->forceFill([
                     'tenant_id' => $tenantId,
@@ -136,7 +157,7 @@ final class AmendCollectionScheduleAction
                 [
                     'cancelled_count' => count($replacedCollections),
                     'replacement_count' => count($replacements),
-                    'cancellation_reason' => $cancellationReason,
+                    'cancellation_reason' => $normalizedCancellationReason,
                 ],
             );
 
@@ -149,17 +170,15 @@ final class AmendCollectionScheduleAction
         });
     }
 
-    private function assertCancellationReason(string $reason): void
+    private function assertCancellationReason(string $normalizedReason): void
     {
-        $trimmed = trim($reason);
-
-        if ($trimmed === '' || mb_strlen($reason) > 500) {
-            throw new InvalidCancellationReasonException();
+        if ($normalizedReason === '' || mb_strlen($normalizedReason) > 500) {
+            throw new InvalidCancellationReasonException;
         }
     }
 
     private function auditRecorder(): CollectionAuditRecorderInterface
     {
-        return $this->auditRecorder ?? new LogCollectionAuditRecorder();
+        return $this->auditRecorder ?? new LogCollectionAuditRecorder;
     }
 }
