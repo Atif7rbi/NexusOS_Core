@@ -26,7 +26,7 @@ final class SaveDraftCollectionScheduleRequest extends CollectionScheduleRequest
     private function lineRules(bool $allowId): array
     {
         return [
-            'lines' => ['required', 'array', 'list'],
+            'lines' => ['present', 'array', 'list'],
             'lines.*' => ['required', 'array'],
             'lines.*.id' => $allowId
                 ? ['nullable', 'string', 'ulid', 'distinct:strict']
@@ -70,7 +70,7 @@ final class SaveDraftCollectionScheduleRequest extends CollectionScheduleRequest
     public function messages(): array
     {
         return [
-            'lines.required' => 'collections:unexpected_request_fields',
+            'lines.present' => 'collections:unexpected_request_fields',
             'lines.array' => 'collections:unexpected_request_fields',
             'lines.list' => 'collections:unexpected_request_fields',
             'lines.*.array' => 'collections:unexpected_request_fields',
