@@ -22,6 +22,7 @@ import { UnitDetailsModal } from "@/components/units/UnitDetailsModal";
 import { UnitFormModal } from "@/components/units/UnitFormModal";
 import { Button } from "@/components/ui/Button";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { SuccessBanner } from "@/components/ui/SuccessBanner";
 import {
   CrudPageHeader,
   CrudPageLayout,
@@ -36,6 +37,12 @@ import {
 } from "@/components/ui/crud/ListState";
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
+import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
+import {
+  formatDecimal,
+  formatInteger,
+  formatMoney,
+} from "@/lib/number-format";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
 import {
@@ -106,6 +113,7 @@ export default function UnitsPage() {
   const [action, setAction] = useState<ArchiveAction>("archive");
   const [isProcessing, setProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadUnits = useCallback(
     async (targetPage = page): Promise<void> => {
@@ -189,6 +197,8 @@ export default function UnitsPage() {
     };
   }, [token]);
 
+  useResourceInvalidation("units", () => loadUnits());
+
   const changeFilter = (callback: () => void): void => {
     callback();
     setPage(1);
@@ -252,15 +262,22 @@ export default function UnitsPage() {
     setSubmitting(true);
 
     try {
-      if (formUnit) {
+      const isUpdating = formUnit !== null;
+
+      if (isUpdating) {
         await updateUnit(token, formUnit.id, payload);
       } else {
         await createUnit(token, payload);
       }
 
-      await loadUnits(formUnit ? page : 1);
+      await loadUnits(isUpdating ? page : 1);
       setFormOpen(false);
       setFormUnit(null);
+      setSuccessMessage(
+        isUpdating
+          ? "تم تحديث الوحدة بنجاح."
+          : "تم إنشاء الوحدة بنجاح."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -283,6 +300,11 @@ export default function UnitsPage() {
 
       await loadUnits();
       setActionUnit(null);
+      setSuccessMessage(
+        action === "archive"
+          ? "تمت أرشفة الوحدة بنجاح."
+          : "تمت استعادة الوحدة بنجاح."
+      );
     } catch (caughtError) {
       setActionError(
         caughtError instanceof Error
@@ -332,6 +354,13 @@ export default function UnitsPage() {
             </Button>
           }
         />
+
+        {successMessage ? (
+          <SuccessBanner
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
@@ -479,7 +508,7 @@ export default function UnitsPage() {
         <CrudSection className="p-4 sm:p-5">
           <div className="mb-5 flex items-center justify-between">
             <p className="text-sm font-bold text-[var(--text-primary)]">
-              النتائج: {total}
+              النتائج: {formatInteger(total)}
             </p>
           </div>
 
@@ -553,18 +582,16 @@ export default function UnitsPage() {
                       {unit.project?.name ?? "—"}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">
-                      {unit.floor ?? "—"}
+                      {unit.floor === null ? "—" : formatInteger(unit.floor)}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">
-                      {unit.area ?? "—"}
+                      {unit.area === null ? "—" : formatDecimal(unit.area)}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">
                       {typeLabels[unit.unit_type]}
                     </td>
                     <td className="px-3 py-4 text-sm font-semibold text-[var(--text-primary)]">
-                      {new Intl.NumberFormat("en-US", {
-                        maximumFractionDigits: 2,
-                      }).format(Number(unit.selling_price))}{" "}
+                      {formatMoney(unit.selling_price)}{" "}
                       {unit.project?.currency ?? ""}
                     </td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">

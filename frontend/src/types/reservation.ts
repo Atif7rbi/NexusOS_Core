@@ -1,7 +1,11 @@
 import type { Customer } from "@/types/customer";
 import type { Unit } from "@/types/unit";
 
-export type ReservationStatus = "active" | "cancelled" | "expired";
+export type ReservationStatus =
+  | "active"
+  | "converted"
+  | "cancelled"
+  | "expired";
 
 export type Reservation = {
   id: string;

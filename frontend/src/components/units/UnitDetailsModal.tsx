@@ -9,6 +9,11 @@ import {
   ModalHeader,
 } from "@/components/ui/Modal";
 import { useTranslation } from "@/hooks/useTranslation";
+import {
+  formatDecimal,
+  formatInteger,
+  formatMoney,
+} from "@/lib/number-format";
 import type { Unit } from "@/types/unit";
 
 type UnitDetailsModalProps = {
@@ -106,14 +111,26 @@ export function UnitDetailsModal({
         },
         {
           label: labels.price,
-          value: `${new Intl.NumberFormat("en-US", {
-            maximumFractionDigits: 2,
-          }).format(Number(unit.selling_price))} ${unit.project?.currency ?? ""}`,
+          value: `${formatMoney(unit.selling_price)} ${unit.project?.currency ?? ""}`,
         },
-        { label: labels.area, value: unit.area ?? "—" },
-        { label: labels.floor, value: unit.floor ?? "—" },
-        { label: labels.bedrooms, value: unit.bedrooms ?? "—" },
-        { label: labels.bathrooms, value: unit.bathrooms ?? "—" },
+        {
+          label: labels.area,
+          value: unit.area === null ? "—" : formatDecimal(unit.area),
+        },
+        {
+          label: labels.floor,
+          value: unit.floor === null ? "—" : formatInteger(unit.floor),
+        },
+        {
+          label: labels.bedrooms,
+          value:
+            unit.bedrooms === null ? "—" : formatInteger(unit.bedrooms),
+        },
+        {
+          label: labels.bathrooms,
+          value:
+            unit.bathrooms === null ? "—" : formatInteger(unit.bathrooms),
+        },
       ]
     : [];
 

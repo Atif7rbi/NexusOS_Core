@@ -22,6 +22,7 @@ import { ReservationDetailsModal } from "@/components/reservations/ReservationDe
 import { ReservationUpdateModal } from "@/components/reservations/ReservationUpdateModal";
 import { Button } from "@/components/ui/Button";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { SuccessBanner } from "@/components/ui/SuccessBanner";
 import {
   CrudPageHeader,
   CrudPageLayout,
@@ -36,6 +37,12 @@ import {
 } from "@/components/ui/crud/ListState";
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
+import {
+  invalidateFrontendResources,
+  useResourceInvalidation,
+} from "@/hooks/useResourceInvalidation";
+import { formatDateTime } from "@/lib/date-format";
+import { formatInteger } from "@/lib/number-format";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
 import { fetchCustomers } from "@/services/customers";
@@ -68,12 +75,14 @@ const emptySummary: ReservationSummary = {
 
 const statusLabels: Record<ReservationStatus, string> = {
   active: "نشط",
+  converted: "محول إلى عقد",
   cancelled: "ملغي",
   expired: "منتهي",
 };
 
 const statusClasses: Record<ReservationStatus, string> = {
   active: "bg-[var(--success-soft)] text-[var(--success)]",
+  converted: "bg-[var(--info-soft)] text-[var(--info)]",
   cancelled: "bg-[var(--danger-soft)] text-[var(--danger)]",
   expired: "bg-[var(--surface-muted)] text-[var(--text-secondary)]",
 };
@@ -106,6 +115,7 @@ export default function ReservationsPage() {
   const [cancellationReason, setCancellationReason] = useState("");
   const [isCancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadReservations = useCallback(
     async (targetPage = page): Promise<void> => {
@@ -174,6 +184,8 @@ export default function ReservationsPage() {
       cancelled = true;
     };
   }, [token]);
+
+  useResourceInvalidation("reservations", () => loadReservations());
 
   const changeFilter = (callback: () => void): void => {
     callback();
@@ -253,7 +265,14 @@ export default function ReservationsPage() {
     try {
       await createReservation(token, payload);
       await loadReservations(1);
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setFormOpen(false);
+      setSuccessMessage("تم إنشاء الحجز بنجاح.");
     } finally {
       setSubmitting(false);
     }
@@ -293,7 +312,14 @@ export default function ReservationsPage() {
     try {
       await updateReservation(token, editReservation.id, payload);
       await loadReservations();
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setEditReservation(null);
+      setSuccessMessage("تم تحديث الحجز بنجاح.");
     } finally {
       setSubmitting(false);
     }
@@ -314,8 +340,15 @@ export default function ReservationsPage() {
     try {
       await cancelReservation(token, cancelReservationItem.id, payload);
       await loadReservations();
+      invalidateFrontendResources([
+        "projects",
+        "units",
+        "reservations",
+        "contracts",
+      ]);
       setCancelReservationItem(null);
       setCancellationReason("");
+      setSuccessMessage("تم إلغاء الحجز بنجاح.");
     } catch (caughtError) {
       setCancelError(
         caughtError instanceof Error
@@ -345,6 +378,13 @@ export default function ReservationsPage() {
             </Button>
           }
         />
+
+        {successMessage ? (
+          <SuccessBanner
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard title="إجمالي الحجوزات" value={summary.total} icon={CalendarCheck2} />
@@ -410,7 +450,9 @@ export default function ReservationsPage() {
 
         <CrudSection className="p-4 sm:p-5">
           <div className="mb-5 flex items-center justify-between">
-            <p className="text-sm font-bold text-[var(--text-primary)]">النتائج: {total}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">
+              النتائج: {formatInteger(total)}
+            </p>
           </div>
 
           {isLoading ? (
@@ -448,8 +490,8 @@ export default function ReservationsPage() {
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{reservation.unit?.project ? `${reservation.unit.project.project_number} — ${reservation.unit.project.name}` : "—"}</td>
                     <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{reservation.customer?.name ?? "—"}</td>
                     <td className="px-3 py-4"><span className={`rounded-full px-3 py-1 text-xs font-bold ${statusClasses[reservation.status]}`}>{statusLabels[reservation.status]}</span></td>
-                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDate(reservation.reserved_at)}</td>
-                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDate(reservation.expires_at)}</td>
+                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDateTime(reservation.reserved_at)}</td>
+                    <td className="px-3 py-4 text-sm text-[var(--text-secondary)]">{formatDateTime(reservation.expires_at)}</td>
                     <td className="max-w-56 px-3 py-4 text-sm text-[var(--text-secondary)]"><span className="line-clamp-2">{reservation.notes || "—"}</span></td>
                     <td className="px-3 py-4">
                       <button
@@ -592,11 +634,4 @@ export default function ReservationsPage() {
       </ConfirmationDialog>
     </AppShell>
   );
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("ar-SA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

@@ -22,6 +22,7 @@ import { ProjectFormModal } from "@/components/projects/ProjectFormModal";
 import { Button } from "@/components/ui/Button";
 import { AppShell } from "@/components/layout/AppShell";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createProject,
@@ -328,6 +329,8 @@ export default function ProjectsPage() {
     statusFilter,
     labels.loadError,
   ]);
+
+  useResourceInvalidation("projects", () => loadProjects());
 
   const openCreateModal = (): void => {
     setFormProject(null);

@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
 
+import { formatInteger } from "@/lib/number-format";
+
 type SummaryCardTone = "gold" | "success" | "info";
 
 type SummaryCardProps = {
@@ -29,7 +31,7 @@ export function SummaryCard({
             {title}
           </p>
           <p className="mt-3 text-3xl font-bold text-[var(--text-primary)]">
-            {value}
+            {typeof value === "number" ? formatInteger(value) : value}
           </p>
         </div>
 
