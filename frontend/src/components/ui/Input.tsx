@@ -2,6 +2,7 @@ import type {
   InputHTMLAttributes,
   ReactNode,
 } from "react";
+import { useId } from "react";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -19,9 +20,20 @@ export function Input({
   trailing,
   className = "",
   id,
+  "aria-describedby": ariaDescribedBy,
   ...props
 }: InputProps) {
-  const inputId = id ?? props.name;
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? generatedId;
+  const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
+  const describedBy = [
+    ariaDescribedBy,
+    hint && !error ? hintId : null,
+    error ? errorId : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="space-y-2">
@@ -40,8 +52,10 @@ export function Input({
         )}
 
         <input
+          {...props}
           id={inputId}
           aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy || undefined}
           className={[
             "motion-ui h-12 w-full",
             "rounded-[var(--radius-md)]",
@@ -63,7 +77,6 @@ export function Input({
             trailing ? "pe-12" : "",
             className,
           ].join(" ")}
-          {...props}
         />
 
         {trailing && (
@@ -74,13 +87,19 @@ export function Input({
       </div>
 
       {hint && !error && (
-        <p className="text-xs text-[var(--text-secondary)]">
+        <p
+          id={hintId}
+          className="text-xs text-[var(--text-secondary)]"
+        >
           {hint}
         </p>
       )}
 
       {error && (
-        <p className="text-xs font-semibold text-[var(--danger)]">
+        <p
+          id={errorId}
+          className="text-xs font-semibold text-[var(--danger)]"
+        >
           {error}
         </p>
       )}

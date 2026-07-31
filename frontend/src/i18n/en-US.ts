@@ -116,6 +116,157 @@ export const enUS: TranslationDictionary = {
   "dashboard.noUrgentAlertsDescription":
     "Nothing requires your attention right now",
 
+  "collection.absent.title": "No collection schedule",
+  "collection.absent.description":
+    "No collection schedule has been created for this contract yet.",
+  "collection.absent.create": "Create collection schedule",
+  "collection.draft.title": "Draft collection schedule",
+  "collection.draft.badge": "Draft",
+  "collection.draft.edit": "Edit draft",
+  "collection.draft.save": "Save draft",
+  "collection.draft.saving": "Saving...",
+  "collection.draft.editorTitle": "Edit draft collection schedule",
+  "collection.draft.editorDescription":
+    "Enter the schedule items and save the draft. A draft total may be partial.",
+  "collection.finalize.button": "Finalize collection schedule",
+  "collection.finalize.dialog.title":
+    "Finalize collection schedule",
+  "collection.finalize.dialog.description":
+    "The collection schedule will move from Draft to Scheduled. It cannot return to Draft; later financial changes must use an amendment.",
+  "collection.finalize.dialog.confirm": "Finalize schedule",
+  "collection.finalize.dialog.confirming": "Finalizing...",
+  "collection.finalize.dialog.cancel": "Cancel",
+  "collection.finalize.dialog.close": "Close",
+  "collection.finalize.dialog.lineCount":
+    "Collection item count",
+  "collection.finalize.totalsMismatch":
+    "The collection schedule total does not equal the contract value.",
+  "collection.amend.button": "Amend collection schedule",
+  "collection.amend.proceed": "Continue to confirmation",
+  "collection.amend.cancel": "Cancel",
+  "collection.amend.back": "Back",
+  "collection.amend.reason.label":
+    "Reason for replacing the collection schedule",
+  "collection.amend.totalsMismatch":
+    "The replacement schedule total must equal the contract value.",
+  "collection.amend.editorTitle":
+    "Create a replacement collection schedule",
+  "collection.amend.editorDescription":
+    "Create a complete replacement for the current approved schedule. The current schedule will not change before confirmation.",
+  "collection.amend.replacementNotice":
+    "These items are a new local copy without server IDs. On confirmation, the current schedule will be cancelled and new replacement items will be created.",
+  "collection.amend.discardDescription":
+    "All local replacement schedule changes and the replacement reason will be lost. The current collection schedule has not changed.",
+  "collection.amend.dialog.title":
+    "Confirm collection schedule replacement",
+  "collection.amend.dialog.description":
+    "The current approved collection schedule will be cancelled in full and replaced. Its items will remain in history. This financial action cannot be reversed automatically.",
+  "collection.amend.dialog.confirm": "Execute amendment",
+  "collection.amend.dialog.confirming": "Amending...",
+  "collection.amend.dialog.cancel": "Back",
+  "collection.amend.dialog.close": "Close",
+  "collection.amend.dialog.current":
+    "Current collection schedule",
+  "collection.amend.dialog.proposed":
+    "Proposed replacement schedule",
+  "collection.amend.dialog.reason": "Replacement reason",
+  "collection.scheduled.title": "Approved collection schedule",
+  "collection.scheduled.badge": "Approved",
+  "collection.cancelled.title": "Cancelled collection schedule",
+  "collection.cancelled.badge": "Cancelled",
+  "collection.cancelled.notice":
+    "The collection schedule for this contract is cancelled. Its history can be viewed below.",
+  "collection.history.title":
+    "Cancelled collection items history",
+  "collection.history.show": "Show history",
+  "collection.history.hide": "Hide history",
+  "collection.history.loading": "Loading history...",
+  "collection.history.loadError":
+    "Unable to load the collection history.",
+  "collection.history.retry": "Try again",
+  "collection.history.empty.title": "No history",
+  "collection.history.empty.description":
+    "There are no cancelled collection items for this contract.",
+  "collection.history.cancelledBy": "Cancelled by",
+  "collection.history.reason": "Cancellation reason",
+  "collection.history.cancelledAt": "Cancelled at",
+  "collection.line.sequence": "#",
+  "collection.line.title": "Collection item",
+  "collection.line.amount": "Amount",
+  "collection.line.dueDate": "Due date",
+  "collection.line.notes": "Notes",
+  "collection.line.delete": "Delete line",
+  "collection.line.addLine": "Add line",
+  "collection.line.moveUp": "Move line up",
+  "collection.line.moveDown": "Move line down",
+  "collection.summary.activeTotal": "Collection schedule total",
+  "collection.summary.contractTotal": "Contract value",
+  "collection.summary.lineCount": "Item count",
+  "collection.summary.scheduledAt": "Approved at",
+  "collection.summary.scheduledBy": "Approved by",
+  "collection.loading": "Loading collection schedule...",
+  "collection.loadError": "Unable to load the collection schedule.",
+  "collection.retry": "Try again",
+  "collection.genericError": "Unable to complete the operation.",
+  "collection.discard.title": "Discard changes?",
+  "collection.discard.description":
+    "All unsaved collection schedule changes will be lost.",
+  "collection.discard.confirm": "Discard changes",
+  "collection.discard.cancel": "Continue editing",
+  "collection.discard.close": "Close",
+  "collection.validation.titleRequired":
+    "The collection item is required.",
+  "collection.validation.titleTooLong":
+    "The collection item must not exceed 150 characters.",
+  "collection.validation.amountInvalid":
+    "Enter a positive amount with no more than two decimal places.",
+  "collection.validation.dateInvalid":
+    "Enter a valid due date.",
+  "collection.validation.sequenceDuplicate":
+    "Sequence numbers must be unique.",
+  "collection.validation.dueDateOrder":
+    "Due dates must be non-decreasing by sequence.",
+  "collection.validation.reasonRequired":
+    "A reason for replacing the collection schedule is required.",
+  "collection.validation.reasonTooLong":
+    "The replacement reason must not exceed 500 characters.",
+  "collection.error.draftNotEligible":
+    "The draft collection schedule cannot be edited in the contract's current state.",
+  "collection.error.notDraft":
+    "The collection schedule is not in Draft state.",
+  "collection.error.finalizeNotEligible":
+    "The collection schedule cannot be finalized in the contract's current state.",
+  "collection.error.amendNotEligible":
+    "The collection schedule cannot be amended in the contract's current state.",
+  "collection.error.noActiveSchedule":
+    "There is no active collection schedule to amend.",
+  "collection.error.scheduleChanged":
+    "The collection schedule changed since it was loaded. Refreshing the data...",
+  "collection.error.integrity":
+    "The collection schedule cannot be displayed because its data is inconsistent. Contact support.",
+  "collection.error.invalidGeneration":
+    "The amendment could not be completed because of a technical error. Reload the page.",
+  "collection.error.totalMismatch":
+    "The collection schedule total does not equal the contract value.",
+  "collection.error.duplicateSequence":
+    "Sequence numbers are duplicated. Review the lines and try again.",
+  "collection.error.dueDateOrder":
+    "Due dates must be non-decreasing by sequence.",
+  "collection.error.blankTitle":
+    "A collection item title is blank.",
+  "collection.error.invalidAmount":
+    "A collection item amount is invalid.",
+  "collection.error.decimalPrecision":
+    "Amounts must not exceed two decimal places.",
+  "collection.error.invalidReason":
+    "The cancellation reason is invalid or too long.",
+  "collection.error.notAuthorized":
+    "You are not authorized to perform this action.",
+  "collection.error.serviceUnavailable":
+    "The service is temporarily unavailable. Try again.",
+  "collection.error.invalidQuery":
+    "The request is invalid. Reload the page.",
+
   "pages.crm.title": "Leads",
   "pages.crm.description":
     "Track leads, sources and communication history",
