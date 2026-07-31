@@ -2,10 +2,10 @@
 
 import {
   FileSignature,
-  ListOrdered,
 } from "lucide-react";
 import { useState } from "react";
 
+import { CollectionScheduleTab } from "@/components/collections/CollectionScheduleTab";
 import {
   contractStatusLabels,
   formatContractAmount,
@@ -95,7 +95,10 @@ export function ContractDetailsModal({
         ) : activeTab === "details" ? (
           <ContractDetails contract={contract} reservation={reservation} />
         ) : (
-          <CollectionScheduleNavigation />
+          <CollectionScheduleTab
+            key={contract.id}
+            contract={contract}
+          />
         )}
       </div>
 
@@ -187,25 +190,6 @@ function ContractDetails({
         ))}
       </dl>
     </>
-  );
-}
-
-function CollectionScheduleNavigation() {
-  return (
-    <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] px-6 text-center">
-      <div>
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-gold-soft)] text-[var(--brand-gold-strong)]">
-          <ListOrdered size={22} />
-        </span>
-        <h3 className="mt-5 text-base font-bold text-[var(--text-primary)]">
-          جدول التحصيل
-        </h3>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-[var(--text-secondary)]">
-          هذا القسم مخصص للتنقل إلى جدول تحصيل العقد. إدارة جدول التحصيل
-          ليست ضمن نطاق واجهة العقود الحالية.
-        </p>
-      </div>
-    </div>
   );
 }
 

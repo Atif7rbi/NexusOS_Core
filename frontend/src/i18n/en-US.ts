@@ -116,6 +116,31 @@ export const enUS: TranslationDictionary = {
   "dashboard.noUrgentAlertsDescription":
     "Nothing requires your attention right now",
 
+  "collection.absent.title": "No collection schedule",
+  "collection.absent.description":
+    "No collection schedule has been created for this contract yet.",
+  "collection.draft.title": "Draft collection schedule",
+  "collection.draft.badge": "Draft",
+  "collection.scheduled.title": "Approved collection schedule",
+  "collection.scheduled.badge": "Approved",
+  "collection.cancelled.title": "Cancelled collection schedule",
+  "collection.cancelled.badge": "Cancelled",
+  "collection.cancelled.notice":
+    "The collection schedule for this contract is cancelled. Its history can be viewed below.",
+  "collection.line.sequence": "#",
+  "collection.line.title": "Collection item",
+  "collection.line.amount": "Amount",
+  "collection.line.dueDate": "Due date",
+  "collection.line.notes": "Notes",
+  "collection.summary.activeTotal": "Collection schedule total",
+  "collection.summary.contractTotal": "Contract value",
+  "collection.summary.lineCount": "Item count",
+  "collection.summary.scheduledAt": "Approved at",
+  "collection.summary.scheduledBy": "Approved by",
+  "collection.loading": "Loading collection schedule...",
+  "collection.loadError": "Unable to load the collection schedule.",
+  "collection.retry": "Try again",
+
   "pages.crm.title": "Leads",
   "pages.crm.description":
     "Track leads, sources and communication history",

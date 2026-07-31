@@ -109,6 +109,31 @@ export const arSA: TranslationDictionary = {
   "dashboard.noUrgentAlertsDescription":
     "لا توجد عمليات تحتاج تدخلك الآن",
 
+  "collection.absent.title": "لا يوجد جدول تحصيل",
+  "collection.absent.description":
+    "لم يتم إنشاء جدول تحصيل لهذا العقد بعد.",
+  "collection.draft.title": "مسودة جدول التحصيل",
+  "collection.draft.badge": "مسودة",
+  "collection.scheduled.title": "جدول التحصيل المعتمد",
+  "collection.scheduled.badge": "معتمد",
+  "collection.cancelled.title": "جدول التحصيل الملغى",
+  "collection.cancelled.badge": "ملغى",
+  "collection.cancelled.notice":
+    "جدول التحصيل المرتبط بهذا العقد ملغى. يمكن عرض السجل التاريخي أدناه.",
+  "collection.line.sequence": "#",
+  "collection.line.title": "بيان البند",
+  "collection.line.amount": "المبلغ",
+  "collection.line.dueDate": "تاريخ الاستحقاق",
+  "collection.line.notes": "ملاحظات",
+  "collection.summary.activeTotal": "إجمالي جدول التحصيل",
+  "collection.summary.contractTotal": "قيمة العقد",
+  "collection.summary.lineCount": "عدد البنود",
+  "collection.summary.scheduledAt": "تاريخ الاعتماد",
+  "collection.summary.scheduledBy": "اعتمد بواسطة",
+  "collection.loading": "جارٍ تحميل جدول التحصيل...",
+  "collection.loadError": "تعذر تحميل جدول التحصيل.",
+  "collection.retry": "إعادة المحاولة",
+
   "pages.crm.title": "إدارة العملاء المحتملين",
   "pages.crm.description":
     "متابعة العملاء المحتملين ومصادرهم وسجل التواصل",
