@@ -30,18 +30,32 @@ type ContractDetailsModalProps = {
   reservation: Reservation | null;
   isLoading: boolean;
   error: string | null;
+  initialTab?: "details" | "collections";
   onClose: () => void;
 };
 
 export function ContractDetailsModal({
+  ...props
+}: ContractDetailsModalProps) {
+  const resetKey = [
+    props.contract?.id ?? "pending",
+    props.initialTab ?? "details",
+    props.isLoading || props.error ? "open" : "settled",
+  ].join(":");
+
+  return <ContractDetailsModalContent key={resetKey} {...props} />;
+}
+
+function ContractDetailsModalContent({
   contract,
   reservation,
   isLoading,
   error,
+  initialTab = "details",
   onClose,
 }: ContractDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<"details" | "collections">(
-    "details"
+    initialTab
   );
   const [isCollectionDirty, setIsCollectionDirty] =
     useState(false);

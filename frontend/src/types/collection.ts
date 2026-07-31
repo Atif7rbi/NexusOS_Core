@@ -1,3 +1,7 @@
+import type { ContractStatus } from "@/types/contract";
+
+export type { ContractStatus };
+
 export type CollectionStatus =
   | "draft"
   | "scheduled"
@@ -108,4 +112,47 @@ export type AmendPayload = {
 
 export type CollectionScheduleQuery = {
   include_history?: boolean;
+};
+
+export type CollectionsIndexItem = {
+  contract_id: string;
+  contract_status: ContractStatus;
+  contract_total_amount: string;
+  currency: string;
+  customer_name: string | null;
+  unit_number: string | null;
+  project_name: string | null;
+  schedule_state: DerivedScheduleState;
+  schedule_active_total: string;
+};
+
+export type CollectionsIndexPagination = {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
+export type CollectionsIndexSummary = {
+  total_contracts: number;
+  scheduled_count: number;
+  draft_count: number;
+  absent_count: number;
+  cancelled_count: number;
+};
+
+export type CollectionsIndexResponse = {
+  data: {
+    items: CollectionsIndexItem[];
+    pagination: CollectionsIndexPagination;
+    summary: CollectionsIndexSummary;
+  };
+};
+
+export type CollectionsIndexQuery = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: ContractStatus | "";
+  schedule_state?: DerivedScheduleState | "";
 };
