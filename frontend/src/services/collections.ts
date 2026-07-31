@@ -5,11 +5,25 @@ import {
 import type {
   AmendPayload,
   CollectionCommandResponse,
+  CollectionsIndexQuery,
+  CollectionsIndexResponse,
   CollectionScheduleQuery,
   CollectionScheduleResource,
   GetCollectionScheduleResponse,
   SaveDraftPayload,
 } from "@/types/collection";
+
+export async function fetchCollectionsIndex(
+  token: string,
+  query: CollectionsIndexQuery
+): Promise<CollectionsIndexResponse> {
+  const queryString = createQueryString(query);
+  const path = queryString
+    ? `/collections?${queryString}`
+    : "/collections";
+
+  return requestJson<CollectionsIndexResponse>(path, { token });
+}
 
 function schedulePath(contractId: string): string {
   return `/contracts/${contractId}/collection-schedule`;

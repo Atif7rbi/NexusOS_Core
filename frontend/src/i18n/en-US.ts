@@ -267,6 +267,47 @@ export const enUS: TranslationDictionary = {
   "collection.error.invalidQuery":
     "The request is invalid. Reload the page.",
 
+  "collections.cards.totalContracts": "Total Contracts",
+  "collections.cards.scheduled": "Finalized Schedules",
+  "collections.cards.draft": "Drafts in Progress",
+  "collections.cards.absent": "No Schedule",
+  "collections.search.label": "Search",
+  "collections.search.placeholder":
+    "Search by customer or unit number...",
+  "collections.filter.status": "Contract Status",
+  "collections.filter.allStatuses": "All Statuses",
+  "collections.filter.scheduleState": "Schedule State",
+  "collections.filter.allScheduleStates": "All States",
+  "collections.refresh": "Refresh",
+  "collections.resetFilters": "Reset Filters",
+  "collections.loading": "Loading collection schedules...",
+  "collections.error": "Failed to load collection schedules.",
+  "collections.retry": "Retry",
+  "collections.empty.title": "No Contracts Found",
+  "collections.empty.description":
+    "No contracts have been created in this account yet.",
+  "collections.emptyFiltered.title": "No Matching Results",
+  "collections.emptyFiltered.description":
+    "No contracts matched the current search and filter criteria.",
+  "collections.table.customer": "Customer",
+  "collections.table.project": "Project",
+  "collections.table.unit": "Unit",
+  "collections.table.contractTotal": "Contract Value",
+  "collections.table.contractStatus": "Contract Status",
+  "collections.table.scheduleState": "Schedule State",
+  "collections.table.scheduleTotal": "Schedule Total",
+  "collections.table.actions": "Actions",
+  "collections.contractStatus.draft": "Draft",
+  "collections.contractStatus.active": "Active",
+  "collections.contractStatus.completed": "Completed",
+  "collections.contractStatus.cancelled": "Cancelled",
+  "collections.scheduleState.absent": "No Schedule",
+  "collections.scheduleState.draft": "Draft",
+  "collections.scheduleState.scheduled": "Finalized",
+  "collections.scheduleState.cancelled": "Cancelled",
+  "collections.actions.openContract": "Open Contract Details",
+  "collections.actions.openSchedule": "Collection Schedule",
+
   "pages.crm.title": "Leads",
   "pages.crm.description":
     "Track leads, sources and communication history",
@@ -293,7 +334,7 @@ export const enUS: TranslationDictionary = {
     "Track contractor statements and completion rates",
   "pages.collections.title": "Installments & Collections",
   "pages.collections.description":
-    "Track paid, remaining and overdue installments",
+    "Monitor Collection Schedule status across all contracts",
   "pages.expenses.title": "Expenses",
   "pages.expenses.description":
     "Record project, supplier and attachment expenses",
