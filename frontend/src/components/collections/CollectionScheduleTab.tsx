@@ -17,6 +17,7 @@ import {
 } from "@/components/collections/CollectionLineEditor";
 import { AmendDialog } from "@/components/collections/AmendDialog";
 import { FinalizeDialog } from "@/components/collections/FinalizeDialog";
+import type { CollectionHistoryState } from "@/components/collections/CollectionHistoryPanel";
 import {
   collectionAmountsEqual,
   CollectionScheduleView,
@@ -41,6 +42,7 @@ import {
 import type { Contract } from "@/types/contract";
 import type {
   AmendPayload,
+  CancelledCollection,
   CollectionLineInput,
   CollectionScheduleResource,
   SaveDraftPayload,
@@ -98,6 +100,13 @@ type CollectionScheduleTabState =
       error: string | null;
     };
 
+const initialHistoryState: CollectionHistoryState = {
+  status: "not_loaded",
+  isVisible: false,
+  rows: [],
+  error: null,
+};
+
 export function CollectionScheduleTab({
   contract,
   onDirtyChange,
@@ -110,6 +119,8 @@ export function CollectionScheduleTab({
     });
   const [showDiscardDialog, setShowDiscardDialog] =
     useState(false);
+  const [historyState, setHistoryState] =
+    useState<CollectionHistoryState>(initialHistoryState);
 
   const retryLoad = useCallback(async (): Promise<void> => {
     setState({ phase: "loading" });
@@ -128,6 +139,7 @@ export function CollectionScheduleTab({
         contract.id
       );
 
+      setHistoryState(initialHistoryState);
       setState({ phase: "read", resource });
     } catch (error) {
       setState({
@@ -151,6 +163,7 @@ export function CollectionScheduleTab({
     void fetchCollectionSchedule(token, contract.id).then(
       (resource) => {
         if (isCurrent) {
+          setHistoryState(initialHistoryState);
           setState({ phase: "read", resource });
         }
       },
@@ -170,6 +183,63 @@ export function CollectionScheduleTab({
       isCurrent = false;
     };
   }, [contract.id, t, token]);
+
+  const cancelledScheduleId =
+    state.phase === "read" &&
+    state.resource.schedule.derived_state === "cancelled"
+      ? state.resource.contract.id
+      : null;
+
+  useEffect(() => {
+    if (
+      !token ||
+      !cancelledScheduleId ||
+      historyState.status !== "not_loaded"
+    ) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    void fetchCollectionSchedule(token, cancelledScheduleId, {
+      include_history: true,
+    }).then(
+      (resource) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setState({ phase: "read", resource });
+        setHistoryState({
+          status: "valid",
+          isVisible: true,
+          rows: getCancelledHistory(resource),
+          error: null,
+        });
+      },
+      (error: unknown) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setHistoryState({
+          status: "error",
+          isVisible: true,
+          rows: [],
+          error: getCollectionErrorMessage(error, t),
+        });
+      }
+    );
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    cancelledScheduleId,
+    historyState.status,
+    t,
+    token,
+  ]);
 
   useEffect(() => {
     if (
@@ -519,6 +589,11 @@ export function CollectionScheduleTab({
         onFinalize={enterFinalizeConfirmation}
         onAmend={enterAmendEditor}
         actionsDisabled={state.actionsDisabled}
+        history={{
+          state: historyState,
+          onToggle: toggleHistory,
+          onRetry: () => void loadHistory(),
+        }}
       />
     </div>
   );
@@ -544,6 +619,64 @@ export function CollectionScheduleTab({
       isSaving: false,
       error: null,
     });
+  }
+
+  function toggleHistory(): void {
+    if (state.phase !== "read") {
+      return;
+    }
+
+    if (historyState.status === "valid") {
+      setHistoryState({
+        ...historyState,
+        isVisible: !historyState.isVisible,
+      });
+      return;
+    }
+
+    if (historyState.status !== "loading") {
+      void loadHistory();
+    }
+  }
+
+  async function loadHistory(): Promise<void> {
+    if (
+      state.phase !== "read" ||
+      !token ||
+      historyState.status === "loading"
+    ) {
+      return;
+    }
+
+    setHistoryState({
+      status: "loading",
+      isVisible: true,
+      rows: [],
+      error: null,
+    });
+
+    try {
+      const resource = await fetchCollectionSchedule(
+        token,
+        contract.id,
+        { include_history: true }
+      );
+
+      setState({ phase: "read", resource });
+      setHistoryState({
+        status: "valid",
+        isVisible: true,
+        rows: getCancelledHistory(resource),
+        error: null,
+      });
+    } catch (error) {
+      setHistoryState({
+        status: "error",
+        isVisible: true,
+        rows: [],
+        error: getCollectionErrorMessage(error, t),
+      });
+    }
   }
 
   function updateDraftLine(
@@ -1090,6 +1223,7 @@ export function CollectionScheduleTab({
       }
 
       onDirtyChange?.(false);
+      setHistoryState(initialHistoryState);
       setState({ phase: "read", resource });
     } catch (error) {
       if (
@@ -1221,6 +1355,14 @@ function getCollectionErrorMessage(
   const key = error.code ? errorKeys[error.code] : undefined;
 
   return key ? t(key) : error.message;
+}
+
+function getCancelledHistory(
+  resource: CollectionScheduleResource
+): CancelledCollection[] {
+  return Array.isArray(resource.schedule.cancelled_history)
+    ? resource.schedule.cancelled_history
+    : [];
 }
 
 function calculateCollectionTotal(

@@ -170,6 +170,21 @@ export const arSA: TranslationDictionary = {
   "collection.cancelled.badge": "ملغى",
   "collection.cancelled.notice":
     "جدول التحصيل المرتبط بهذا العقد ملغى. يمكن عرض السجل التاريخي أدناه.",
+  "collection.history.title":
+    "السجل التاريخي للبنود الملغاة",
+  "collection.history.show": "عرض السجل التاريخي",
+  "collection.history.hide": "إخفاء السجل التاريخي",
+  "collection.history.loading":
+    "جارٍ تحميل السجل التاريخي...",
+  "collection.history.loadError":
+    "تعذر تحميل السجل التاريخي.",
+  "collection.history.retry": "إعادة المحاولة",
+  "collection.history.empty.title": "لا يوجد سجل تاريخي",
+  "collection.history.empty.description":
+    "لا توجد بنود تحصيل ملغاة لهذا العقد.",
+  "collection.history.cancelledBy": "ألغي بواسطة",
+  "collection.history.reason": "سبب الإلغاء",
+  "collection.history.cancelledAt": "تاريخ الإلغاء",
   "collection.line.sequence": "#",
   "collection.line.title": "بيان البند",
   "collection.line.amount": "المبلغ",

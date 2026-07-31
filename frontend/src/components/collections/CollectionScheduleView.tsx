@@ -21,6 +21,10 @@ import type {
   ActiveCollection,
   CollectionScheduleResource,
 } from "@/types/collection";
+import {
+  CollectionHistoryPanel,
+  type CollectionHistoryState,
+} from "@/components/collections/CollectionHistoryPanel";
 
 type CollectionScheduleViewProps = {
   resource: CollectionScheduleResource;
@@ -29,6 +33,11 @@ type CollectionScheduleViewProps = {
   onFinalize?: () => void;
   onAmend?: () => void;
   actionsDisabled?: boolean;
+  history?: {
+    state: CollectionHistoryState;
+    onToggle: () => void;
+    onRetry: () => void;
+  };
 };
 
 export function CollectionScheduleView({
@@ -38,6 +47,7 @@ export function CollectionScheduleView({
   onFinalize,
   onAmend,
   actionsDisabled = false,
+  history,
 }: CollectionScheduleViewProps) {
   const { t } = useTranslation();
   const { contract, schedule } = resource;
@@ -85,6 +95,15 @@ export function CollectionScheduleView({
         <div className="rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-soft)] px-4 py-4 text-sm font-semibold leading-7 text-[var(--danger)]">
           {t("collection.cancelled.notice")}
         </div>
+        {history ? (
+          <CollectionHistoryPanel
+            state={history.state}
+            currency={contract.currency}
+            alwaysVisible
+            onToggle={history.onToggle}
+            onRetry={history.onRetry}
+          />
+        ) : null}
       </div>
     );
   }
@@ -191,6 +210,15 @@ export function CollectionScheduleView({
         currency={contract.currency}
         showSchedulingMetadata={isScheduled}
       />
+
+      {isScheduled && history ? (
+        <CollectionHistoryPanel
+          state={history.state}
+          currency={contract.currency}
+          onToggle={history.onToggle}
+          onRetry={history.onRetry}
+        />
+      ) : null}
     </div>
   );
 }

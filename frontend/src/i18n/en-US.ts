@@ -176,6 +176,20 @@ export const enUS: TranslationDictionary = {
   "collection.cancelled.badge": "Cancelled",
   "collection.cancelled.notice":
     "The collection schedule for this contract is cancelled. Its history can be viewed below.",
+  "collection.history.title":
+    "Cancelled collection items history",
+  "collection.history.show": "Show history",
+  "collection.history.hide": "Hide history",
+  "collection.history.loading": "Loading history...",
+  "collection.history.loadError":
+    "Unable to load the collection history.",
+  "collection.history.retry": "Try again",
+  "collection.history.empty.title": "No history",
+  "collection.history.empty.description":
+    "There are no cancelled collection items for this contract.",
+  "collection.history.cancelledBy": "Cancelled by",
+  "collection.history.reason": "Cancellation reason",
+  "collection.history.cancelledAt": "Cancelled at",
   "collection.line.sequence": "#",
   "collection.line.title": "Collection item",
   "collection.line.amount": "Amount",
