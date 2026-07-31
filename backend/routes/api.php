@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SystemSettingController;
 use App\Modules\Collections\Controllers\CollectionScheduleController;
+use App\Modules\Collections\Controllers\CollectionsIndexController;
 use App\Modules\Contracts\Controllers\ContractController;
 use App\Modules\Customers\Controllers\CustomerController;
 use App\Modules\Projects\Controllers\ProjectController;
@@ -76,6 +77,9 @@ Route::middleware([
     Route::patch('/contracts/{contract}/activate', [ContractController::class, 'activate'])->name('contracts.activate');
     Route::patch('/contracts/{contract}/complete', [ContractController::class, 'complete'])->name('contracts.complete');
     Route::patch('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
+
+    Route::get('/collections', CollectionsIndexController::class)
+        ->name('collections.index');
 
     Route::get(
         '/contracts/{contract}/collection-schedule',
