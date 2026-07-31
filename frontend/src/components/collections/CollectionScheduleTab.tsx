@@ -15,6 +15,7 @@ import {
   isValidCalendarDate,
   type CollectionLineErrors,
 } from "@/components/collections/CollectionLineEditor";
+import { AmendDialog } from "@/components/collections/AmendDialog";
 import { FinalizeDialog } from "@/components/collections/FinalizeDialog";
 import {
   collectionAmountsEqual,
@@ -23,6 +24,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { FormErrorBanner } from "@/components/ui/FormErrorBanner";
+import { Input } from "@/components/ui/Input";
 import {
   ListErrorState,
   ListLoadingState,
@@ -31,12 +33,14 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { isApiRequestError } from "@/lib/api-error";
 import { useAuth } from "@/providers/AuthProvider";
 import {
+  amendCollectionSchedule,
   fetchCollectionSchedule,
   finalizeCollectionSchedule,
   saveDraftCollectionSchedule,
 } from "@/services/collections";
 import type { Contract } from "@/types/contract";
 import type {
+  AmendPayload,
   CollectionLineInput,
   CollectionScheduleResource,
   SaveDraftPayload,
@@ -69,6 +73,27 @@ type CollectionScheduleTabState =
   | {
       phase: "finalize-confirm";
       resource: CollectionScheduleResource;
+      isProcessing: boolean;
+      error: string | null;
+    }
+  | {
+      phase: "amend-edit";
+      resource: CollectionScheduleResource;
+      lines: CollectionLineInput[];
+      baseline: CollectionLineInput[];
+      generationToken: string[];
+      cancellationReason: string;
+      isPending: boolean;
+      error: string | null;
+    }
+  | {
+      phase: "amend-confirm";
+      resource: CollectionScheduleResource;
+      lines: CollectionLineInput[];
+      baseline: CollectionLineInput[];
+      generationToken: string[];
+      cancellationReason: string;
+      proposedTotal: string;
       isProcessing: boolean;
       error: string | null;
     };
@@ -147,13 +172,20 @@ export function CollectionScheduleTab({
   }, [contract.id, t, token]);
 
   useEffect(() => {
-    if (state.phase !== "draft-edit") {
+    if (
+      state.phase !== "draft-edit" &&
+      state.phase !== "amend-edit" &&
+      state.phase !== "amend-confirm"
+    ) {
       return;
     }
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (
-        !collectionLinesEqual(state.lines, state.baseline)
+        !collectionLinesEqual(state.lines, state.baseline) ||
+        ((state.phase === "amend-edit" ||
+          state.phase === "amend-confirm") &&
+          state.cancellationReason !== "")
       ) {
         event.preventDefault();
       }
@@ -181,6 +213,48 @@ export function CollectionScheduleTab({
     }
 
     return validateDraftLines(state.lines, t);
+  }, [state, t]);
+
+  const amendValidation = useMemo(() => {
+    if (state.phase !== "amend-edit") {
+      return {
+        errors: {} as CollectionLineErrors,
+        isValid: false,
+        proposedTotal: "0.00",
+        totalMatches: false,
+        reasonError: null as string | null,
+      };
+    }
+
+    const lineValidation = validateDraftLines(
+      state.lines,
+      t
+    );
+    const proposedTotal = calculateCollectionTotal(
+      state.lines
+    );
+    const trimmedReason =
+      state.cancellationReason.trim();
+    const reasonError =
+      trimmedReason.length === 0
+        ? t("collection.validation.reasonRequired")
+        : trimmedReason.length > 500
+          ? t("collection.validation.reasonTooLong")
+          : null;
+
+    return {
+      ...lineValidation,
+      isValid:
+        lineValidation.isValid &&
+        state.lines.length > 0 &&
+        reasonError === null,
+      proposedTotal,
+      totalMatches: collectionAmountsEqual(
+        proposedTotal,
+        state.resource.contract.total_amount
+      ),
+      reasonError,
+    };
   }, [state, t]);
 
   if (!token) {
@@ -312,6 +386,129 @@ export function CollectionScheduleTab({
     );
   }
 
+  if (state.phase === "amend-edit") {
+    const dirty =
+      !collectionLinesEqual(
+        state.lines,
+        state.baseline
+      ) || state.cancellationReason !== "";
+    const canProceed =
+      dirty &&
+      amendValidation.isValid &&
+      amendValidation.totalMatches &&
+      !state.isPending;
+
+    return (
+      <>
+        <div className="space-y-5">
+          <div>
+            <h3 className="text-lg font-bold text-[var(--text-primary)]">
+              {t("collection.amend.editorTitle")}
+            </h3>
+            <p className="mt-1 text-sm leading-7 text-[var(--text-secondary)]">
+              {t("collection.amend.editorDescription")}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-[var(--info)]/20 bg-[var(--info-soft)] px-4 py-3 text-sm font-semibold leading-7 text-[var(--info)]">
+            {t("collection.amend.replacementNotice")}
+          </div>
+
+          <CollectionLineEditor
+            lines={state.lines}
+            errors={amendValidation.errors}
+            disabled={state.isPending}
+            onChange={(key, field, value) =>
+              updateAmendLine(key, field, value)
+            }
+            onAdd={addAmendLine}
+            onDelete={deleteAmendLine}
+            onMove={moveAmendLine}
+          />
+
+          <Input
+            label={t("collection.amend.reason.label")}
+            value={state.cancellationReason}
+            error={amendValidation.reasonError}
+            maxLength={500}
+            disabled={state.isPending}
+            onChange={(event) =>
+              updateCancellationReason(event.target.value)
+            }
+          />
+
+          {!amendValidation.totalMatches ? (
+            <p className="rounded-xl border border-[var(--warning)]/20 bg-[var(--warning-soft)] px-4 py-3 text-sm font-semibold text-[var(--warning)]">
+              {t("collection.amend.totalsMismatch")}
+            </p>
+          ) : null}
+
+          <FormErrorBanner message={state.error} />
+
+          <div className="flex flex-wrap justify-end gap-3 border-t border-[var(--border)] pt-5">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={state.isPending}
+              onClick={requestCancelAmend}
+            >
+              {t("collection.amend.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={!canProceed}
+              onClick={enterAmendConfirmation}
+            >
+              {t("collection.amend.proceed")}
+            </Button>
+          </div>
+        </div>
+
+        <ConfirmationDialog
+          isOpen={showDiscardDialog}
+          title={t("collection.discard.title")}
+          description={t(
+            "collection.amend.discardDescription"
+          )}
+          icon={
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--warning-soft)] text-[var(--warning)]">
+              <AlertTriangle size={21} />
+            </span>
+          }
+          isProcessing={false}
+          closeLabel={t("collection.discard.close")}
+          cancelLabel={t("collection.discard.cancel")}
+          confirmLabel={t("collection.discard.confirm")}
+          processingLabel={t("collection.discard.confirm")}
+          confirmVariant="danger"
+          onCancel={() => setShowDiscardDialog(false)}
+          onConfirm={discardAmendChanges}
+        />
+      </>
+    );
+  }
+
+  if (state.phase === "amend-confirm") {
+    return (
+      <>
+        <CollectionScheduleView
+          resource={state.resource}
+          actionsDisabled
+        />
+        <AmendDialog
+          resource={state.resource}
+          proposedLines={state.lines}
+          proposedTotal={state.proposedTotal}
+          cancellationReason={state.cancellationReason}
+          error={state.error}
+          isProcessing={state.isProcessing}
+          onBack={backToAmendEditor}
+          onConfirm={() => void confirmAmend()}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <FormErrorBanner message={state.error ?? null} />
@@ -320,6 +517,7 @@ export function CollectionScheduleTab({
         onCreateDraft={() => enterDraftEditor(true)}
         onEditDraft={() => enterDraftEditor(false)}
         onFinalize={enterFinalizeConfirmation}
+        onAmend={enterAmendEditor}
         actionsDisabled={state.actionsDisabled}
       />
     </div>
@@ -337,7 +535,6 @@ export function CollectionScheduleTab({
           true
         );
 
-    onDirtyChange?.(false);
     setState({
       phase: "draft-edit",
       resource: state.resource,
@@ -624,6 +821,352 @@ export function CollectionScheduleTab({
       });
     }
   }
+
+  function enterAmendEditor(): void {
+    if (
+      state.phase !== "read" ||
+      !state.resource.allowed_actions.can_amend ||
+      state.actionsDisabled ||
+      state.resource.schedule.derived_state !==
+        "scheduled"
+    ) {
+      return;
+    }
+
+    const lines = cloneCollectionLines(
+      state.resource.schedule.active_collections,
+      false
+    );
+
+    onDirtyChange?.(false);
+    setState({
+      phase: "amend-edit",
+      resource: state.resource,
+      lines,
+      baseline: lines.map((line) => ({ ...line })),
+      generationToken:
+        state.resource.schedule.active_collections.map(
+          (collection) => collection.id
+        ),
+      cancellationReason: "",
+      isPending: false,
+      error: null,
+    });
+  }
+
+  function updateAmendLine(
+    key: string,
+    field: "title" | "amount" | "due_date" | "notes",
+    value: string
+  ): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    const lines = state.lines.map((line) =>
+      line._key === key ? { ...line, [field]: value } : line
+    );
+
+    notifyAmendDirty(lines, state.cancellationReason);
+    setState({ ...state, lines, error: null });
+  }
+
+  function addAmendLine(): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    const sequence =
+      state.lines.length === 0
+        ? 1
+        : Math.max(
+            ...state.lines.map((line) => line.sequence)
+          ) + 1;
+    const lines = [
+      ...state.lines,
+      createEmptyCollectionLine(sequence),
+    ];
+
+    notifyAmendDirty(lines, state.cancellationReason);
+    setState({ ...state, lines, error: null });
+  }
+
+  function deleteAmendLine(key: string): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    const lines = state.lines.filter(
+      (line) => line._key !== key
+    );
+
+    notifyAmendDirty(lines, state.cancellationReason);
+    setState({ ...state, lines, error: null });
+  }
+
+  function moveAmendLine(
+    index: number,
+    direction: -1 | 1
+  ): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    const targetIndex = index + direction;
+
+    if (
+      targetIndex < 0 ||
+      targetIndex >= state.lines.length
+    ) {
+      return;
+    }
+
+    const reordered = [...state.lines];
+    const [movedLine] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, movedLine);
+    const lines = reordered.map((line, lineIndex) => ({
+      ...line,
+      sequence: lineIndex + 1,
+    }));
+
+    notifyAmendDirty(lines, state.cancellationReason);
+    setState({ ...state, lines, error: null });
+  }
+
+  function updateCancellationReason(value: string): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    notifyAmendDirty(state.lines, value);
+    setState({
+      ...state,
+      cancellationReason: value,
+      error: null,
+    });
+  }
+
+  function notifyAmendDirty(
+    lines: CollectionLineInput[],
+    reason: string
+  ): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    onDirtyChange?.(
+      !collectionLinesEqual(lines, state.baseline) ||
+        reason !== ""
+    );
+  }
+
+  function requestCancelAmend(): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    const dirty =
+      !collectionLinesEqual(
+        state.lines,
+        state.baseline
+      ) || state.cancellationReason !== "";
+
+    if (!dirty) {
+      onDirtyChange?.(false);
+      setState({
+        phase: "read",
+        resource: state.resource,
+      });
+      return;
+    }
+
+    setShowDiscardDialog(true);
+  }
+
+  function discardAmendChanges(): void {
+    if (state.phase !== "amend-edit") {
+      return;
+    }
+
+    setShowDiscardDialog(false);
+    onDirtyChange?.(false);
+    setState({
+      phase: "read",
+      resource: state.resource,
+    });
+  }
+
+  function enterAmendConfirmation(): void {
+    if (
+      state.phase !== "amend-edit" ||
+      !amendValidation.isValid ||
+      !amendValidation.totalMatches
+    ) {
+      return;
+    }
+
+    setState({
+      phase: "amend-confirm",
+      resource: state.resource,
+      lines: state.lines.map((line) => ({ ...line })),
+      baseline: state.baseline.map((line) => ({ ...line })),
+      generationToken: [...state.generationToken],
+      cancellationReason: state.cancellationReason,
+      proposedTotal: amendValidation.proposedTotal,
+      isProcessing: false,
+      error: null,
+    });
+  }
+
+  function backToAmendEditor(): void {
+    if (
+      state.phase !== "amend-confirm" ||
+      state.isProcessing
+    ) {
+      return;
+    }
+
+    const dirty =
+      !collectionLinesEqual(
+        state.lines,
+        state.baseline
+      ) || state.cancellationReason !== "";
+
+    onDirtyChange?.(dirty);
+    setState({
+      phase: "amend-edit",
+      resource: state.resource,
+      lines: state.lines,
+      baseline: state.baseline,
+      generationToken: state.generationToken,
+      cancellationReason: state.cancellationReason,
+      isPending: false,
+      error: state.error,
+    });
+  }
+
+  async function confirmAmend(): Promise<void> {
+    if (
+      state.phase !== "amend-confirm" ||
+      state.isProcessing ||
+      !token
+    ) {
+      return;
+    }
+
+    const payload: AmendPayload = {
+      expected_active_collection_ids: [
+        ...state.generationToken,
+      ],
+      lines: state.lines.map((line) => ({
+        sequence: line.sequence,
+        title: line.title,
+        amount: line.amount,
+        due_date: line.due_date,
+        notes: line.notes === "" ? null : line.notes,
+      })),
+      cancellation_reason:
+        state.cancellationReason.trim(),
+    };
+
+    setState({ ...state, isProcessing: true, error: null });
+
+    try {
+      const commandResource =
+        await amendCollectionSchedule(
+          token,
+          contract.id,
+          payload
+        );
+      let resource = commandResource;
+
+      try {
+        resource = await fetchCollectionSchedule(
+          token,
+          contract.id
+        );
+      } catch {
+        resource = commandResource;
+      }
+
+      onDirtyChange?.(false);
+      setState({ phase: "read", resource });
+    } catch (error) {
+      if (
+        isApiRequestError(error) &&
+        error.code ===
+          "collection_schedule_changed_since_loaded"
+      ) {
+        const message = getCollectionErrorMessage(error, t);
+
+        onDirtyChange?.(false);
+        try {
+          const resource = await fetchCollectionSchedule(
+            token,
+            contract.id
+          );
+          setState({ phase: "read", resource });
+        } catch {
+          setState({
+            phase: "read",
+            resource: state.resource,
+            error: message,
+            actionsDisabled: true,
+          });
+        }
+        return;
+      }
+
+      if (
+        isApiRequestError(error) &&
+        error.code ===
+          "collection_schedule_integrity_violation"
+      ) {
+        onDirtyChange?.(false);
+        setState({
+          phase: "read",
+          resource: state.resource,
+          error: getCollectionErrorMessage(error, t),
+          actionsDisabled: true,
+        });
+        return;
+      }
+
+      if (
+        isApiRequestError(error) &&
+        error.status === 403
+      ) {
+        const message = getCollectionErrorMessage(error, t);
+
+        onDirtyChange?.(false);
+        try {
+          const resource = await fetchCollectionSchedule(
+            token,
+            contract.id
+          );
+          setState({
+            phase: "read",
+            resource,
+            error: message,
+          });
+        } catch {
+          setState({
+            phase: "read",
+            resource: state.resource,
+            error: message,
+            actionsDisabled: true,
+          });
+        }
+        return;
+      }
+
+      setState({
+        ...state,
+        isProcessing: false,
+        error: getCollectionErrorMessage(error, t),
+      });
+    }
+  }
 }
 
 function getCollectionErrorMessage(
@@ -678,6 +1221,31 @@ function getCollectionErrorMessage(
   const key = error.code ? errorKeys[error.code] : undefined;
 
   return key ? t(key) : error.message;
+}
+
+function calculateCollectionTotal(
+  lines: CollectionLineInput[]
+): string {
+  let totalCents = 0;
+
+  for (const line of lines) {
+    if (!/^\d{1,10}(?:\.\d{1,2})?$/.test(line.amount)) {
+      return "0.00";
+    }
+
+    const [whole, fraction = ""] = line.amount.split(".");
+    totalCents +=
+      Number(whole) * 100 +
+      Number(fraction.padEnd(2, "0"));
+  }
+
+  const whole = Math.floor(totalCents / 100);
+  const fraction = String(totalCents % 100).padStart(
+    2,
+    "0"
+  );
+
+  return `${whole}.${fraction}`;
 }
 
 function validateDraftLines(

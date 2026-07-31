@@ -141,6 +141,35 @@ export const enUS: TranslationDictionary = {
     "Collection item count",
   "collection.finalize.totalsMismatch":
     "The collection schedule total does not equal the contract value.",
+  "collection.amend.button": "Amend collection schedule",
+  "collection.amend.proceed": "Continue to confirmation",
+  "collection.amend.cancel": "Cancel",
+  "collection.amend.back": "Back",
+  "collection.amend.reason.label":
+    "Reason for replacing the collection schedule",
+  "collection.amend.totalsMismatch":
+    "The replacement schedule total must equal the contract value.",
+  "collection.amend.editorTitle":
+    "Create a replacement collection schedule",
+  "collection.amend.editorDescription":
+    "Create a complete replacement for the current approved schedule. The current schedule will not change before confirmation.",
+  "collection.amend.replacementNotice":
+    "These items are a new local copy without server IDs. On confirmation, the current schedule will be cancelled and new replacement items will be created.",
+  "collection.amend.discardDescription":
+    "All local replacement schedule changes and the replacement reason will be lost. The current collection schedule has not changed.",
+  "collection.amend.dialog.title":
+    "Confirm collection schedule replacement",
+  "collection.amend.dialog.description":
+    "The current approved collection schedule will be cancelled in full and replaced. Its items will remain in history. This financial action cannot be reversed automatically.",
+  "collection.amend.dialog.confirm": "Execute amendment",
+  "collection.amend.dialog.confirming": "Amending...",
+  "collection.amend.dialog.cancel": "Back",
+  "collection.amend.dialog.close": "Close",
+  "collection.amend.dialog.current":
+    "Current collection schedule",
+  "collection.amend.dialog.proposed":
+    "Proposed replacement schedule",
+  "collection.amend.dialog.reason": "Replacement reason",
   "collection.scheduled.title": "Approved collection schedule",
   "collection.scheduled.badge": "Approved",
   "collection.cancelled.title": "Cancelled collection schedule",
@@ -183,6 +212,10 @@ export const enUS: TranslationDictionary = {
     "Sequence numbers must be unique.",
   "collection.validation.dueDateOrder":
     "Due dates must be non-decreasing by sequence.",
+  "collection.validation.reasonRequired":
+    "A reason for replacing the collection schedule is required.",
+  "collection.validation.reasonTooLong":
+    "The replacement reason must not exceed 500 characters.",
   "collection.error.draftNotEligible":
     "The draft collection schedule cannot be edited in the contract's current state.",
   "collection.error.notDraft":

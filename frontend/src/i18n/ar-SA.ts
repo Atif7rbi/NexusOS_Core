@@ -134,6 +134,36 @@ export const arSA: TranslationDictionary = {
     "عدد بنود التحصيل",
   "collection.finalize.totalsMismatch":
     "إجمالي جدول التحصيل لا يساوي قيمة العقد.",
+  "collection.amend.button": "تعديل جدول التحصيل",
+  "collection.amend.proceed": "متابعة للتأكيد",
+  "collection.amend.cancel": "إلغاء",
+  "collection.amend.back": "رجوع",
+  "collection.amend.reason.label":
+    "سبب استبدال جدول التحصيل",
+  "collection.amend.totalsMismatch":
+    "إجمالي الجدول البديل يجب أن يساوي قيمة العقد.",
+  "collection.amend.editorTitle":
+    "إنشاء جدول تحصيل بديل",
+  "collection.amend.editorDescription":
+    "أنشئ بديلًا كاملًا للجدول المعتمد الحالي. لن يتغير الجدول الحالي قبل تأكيد العملية.",
+  "collection.amend.replacementNotice":
+    "هذه البنود نسخة محلية جديدة بلا معرّفات الخادم. عند التأكيد سيُلغى الجدول الحالي وتُنشأ بنود بديلة جديدة.",
+  "collection.amend.discardDescription":
+    "ستفقد جميع التعديلات المحلية على الجدول البديل وسبب الاستبدال. لم يتم تغيير جدول التحصيل الحالي.",
+  "collection.amend.dialog.title":
+    "تأكيد استبدال جدول التحصيل",
+  "collection.amend.dialog.description":
+    "سيتم إلغاء جدول التحصيل المعتمد الحالي بالكامل وإنشاء جدول بديل يحل محله. ستُحفظ بنود الجدول الحالي كسجل تاريخي. هذا إجراء مالي لا يمكن التراجع عنه تلقائيًا.",
+  "collection.amend.dialog.confirm": "تنفيذ التعديل",
+  "collection.amend.dialog.confirming":
+    "جارٍ التعديل...",
+  "collection.amend.dialog.cancel": "رجوع",
+  "collection.amend.dialog.close": "إغلاق",
+  "collection.amend.dialog.current":
+    "جدول التحصيل الحالي",
+  "collection.amend.dialog.proposed":
+    "الجدول البديل المقترح",
+  "collection.amend.dialog.reason": "سبب الاستبدال",
   "collection.scheduled.title": "جدول التحصيل المعتمد",
   "collection.scheduled.badge": "معتمد",
   "collection.cancelled.title": "جدول التحصيل الملغى",
@@ -176,6 +206,10 @@ export const arSA: TranslationDictionary = {
     "يجب ألا تتكرر أرقام التسلسل.",
   "collection.validation.dueDateOrder":
     "تواريخ الاستحقاق يجب أن تكون متصاعدة حسب التسلسل.",
+  "collection.validation.reasonRequired":
+    "سبب استبدال جدول التحصيل مطلوب.",
+  "collection.validation.reasonTooLong":
+    "يجب ألا يتجاوز سبب الاستبدال 500 حرف.",
   "collection.error.draftNotEligible":
     "لا يمكن تعديل مسودة جدول التحصيل في الحالة الحالية للعقد.",
   "collection.error.notDraft":

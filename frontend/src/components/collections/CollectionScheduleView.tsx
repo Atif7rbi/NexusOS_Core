@@ -6,6 +6,7 @@ import {
   Edit3,
   ListOrdered,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -26,6 +27,7 @@ type CollectionScheduleViewProps = {
   onCreateDraft?: () => void;
   onEditDraft?: () => void;
   onFinalize?: () => void;
+  onAmend?: () => void;
   actionsDisabled?: boolean;
 };
 
@@ -34,6 +36,7 @@ export function CollectionScheduleView({
   onCreateDraft,
   onEditDraft,
   onFinalize,
+  onAmend,
   actionsDisabled = false,
 }: CollectionScheduleViewProps) {
   const { t } = useTranslation();
@@ -149,6 +152,18 @@ export function CollectionScheduleView({
                 </Button>
               ) : null}
             </>
+          ) : resource.allowed_actions.can_amend &&
+            onAmend ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leadingIcon={<RefreshCw size={16} />}
+              disabled={actionsDisabled}
+              onClick={onAmend}
+            >
+              {t("collection.amend.button")}
+            </Button>
           ) : undefined
         }
       />
