@@ -20,6 +20,7 @@ export type CollectionHistoryState = {
   isVisible: boolean;
   rows: CancelledCollection[];
   error: string | null;
+  fingerprint: string | null;
 };
 
 type CollectionHistoryPanelProps = {
@@ -86,7 +87,7 @@ export function CollectionHistoryPanel({
         <div id="collection-history-content">
           {state.status === "loading" ||
           state.status === "not_loaded" ? (
-            <div role="status" aria-live="polite">
+            <div>
               <ListLoadingState
                 label={t("collection.history.loading")}
               />

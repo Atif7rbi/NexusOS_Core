@@ -319,31 +319,36 @@ function CollectionLinesTable({
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border)]">
       <DataTable minWidth={showSchedulingMetadata ? "920px" : "700px"}>
+        <caption className="sr-only">
+          {showSchedulingMetadata
+            ? t("collection.scheduled.title")
+            : t("collection.draft.title")}
+        </caption>
         <thead className="border-b border-[var(--border)] bg-[var(--surface-soft)] text-xs text-[var(--text-secondary)]">
           <tr>
-            <th className="px-3 py-3">
+            <th scope="col" className="px-3 py-3">
               {t("collection.line.sequence")}
             </th>
-            <th className="px-3 py-3">
+            <th scope="col" className="px-3 py-3">
               {t("collection.line.title")}
             </th>
-            <th className="px-3 py-3">
+            <th scope="col" className="px-3 py-3">
               {t("collection.line.amount")}
             </th>
-            <th className="px-3 py-3">
+            <th scope="col" className="px-3 py-3">
               {t("collection.line.dueDate")}
             </th>
             {showSchedulingMetadata ? (
               <>
-                <th className="px-3 py-3">
+                <th scope="col" className="px-3 py-3">
                   {t("collection.summary.scheduledAt")}
                 </th>
-                <th className="px-3 py-3">
+                <th scope="col" className="px-3 py-3">
                   {t("collection.summary.scheduledBy")}
                 </th>
               </>
             ) : (
-              <th className="px-3 py-3">
+              <th scope="col" className="px-3 py-3">
                 {t("collection.line.notes")}
               </th>
             )}

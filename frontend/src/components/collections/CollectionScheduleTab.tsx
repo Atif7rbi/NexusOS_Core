@@ -85,7 +85,6 @@ type CollectionScheduleTabState =
       baseline: CollectionLineInput[];
       generationToken: string[];
       cancellationReason: string;
-      isPending: boolean;
       error: string | null;
     }
   | {
@@ -105,6 +104,7 @@ const initialHistoryState: CollectionHistoryState = {
   isVisible: false,
   rows: [],
   error: null,
+  fingerprint: null,
 };
 
 export function CollectionScheduleTab({
@@ -144,9 +144,7 @@ export function CollectionScheduleTab({
     } catch (error) {
       setState({
         phase: "error",
-        message: isApiRequestError(error)
-          ? error.message
-          : t("collection.loadError"),
+        message: getCollectionErrorMessage(error, t),
       });
     }
   }, [contract.id, t, token]);
@@ -171,9 +169,7 @@ export function CollectionScheduleTab({
         if (isCurrent) {
           setState({
             phase: "error",
-            message: isApiRequestError(error)
-              ? error.message
-              : t("collection.loadError"),
+            message: getCollectionErrorMessage(error, t),
           });
         }
       }
@@ -209,12 +205,26 @@ export function CollectionScheduleTab({
           return;
         }
 
+        const rows = getCancelledHistory(resource);
+
+        if (!rows) {
+          setHistoryState({
+            status: "error",
+            isVisible: true,
+            rows: [],
+            error: t("collection.history.loadError"),
+            fingerprint: null,
+          });
+          return;
+        }
+
         setState({ phase: "read", resource });
         setHistoryState({
           status: "valid",
           isVisible: true,
-          rows: getCancelledHistory(resource),
+          rows,
           error: null,
+          fingerprint: getResourceFingerprint(resource),
         });
       },
       (error: unknown) => {
@@ -227,6 +237,7 @@ export function CollectionScheduleTab({
           isVisible: true,
           rows: [],
           error: getCollectionErrorMessage(error, t),
+          fingerprint: null,
         });
       }
     );
@@ -357,6 +368,16 @@ export function CollectionScheduleTab({
     );
   }
 
+  const currentResourceFingerprint =
+    state.phase === "read"
+      ? getResourceFingerprint(state.resource)
+      : null;
+  const visibleHistoryState =
+    historyState.status === "valid" &&
+    historyState.fingerprint !== currentResourceFingerprint
+      ? initialHistoryState
+      : historyState;
+
   if (state.phase === "draft-edit") {
     const dirty = !collectionLinesEqual(
       state.lines,
@@ -465,8 +486,7 @@ export function CollectionScheduleTab({
     const canProceed =
       dirty &&
       amendValidation.isValid &&
-      amendValidation.totalMatches &&
-      !state.isPending;
+      amendValidation.totalMatches;
 
     return (
       <>
@@ -487,7 +507,6 @@ export function CollectionScheduleTab({
           <CollectionLineEditor
             lines={state.lines}
             errors={amendValidation.errors}
-            disabled={state.isPending}
             onChange={(key, field, value) =>
               updateAmendLine(key, field, value)
             }
@@ -501,7 +520,6 @@ export function CollectionScheduleTab({
             value={state.cancellationReason}
             error={amendValidation.reasonError}
             maxLength={500}
-            disabled={state.isPending}
             onChange={(event) =>
               updateCancellationReason(event.target.value)
             }
@@ -519,7 +537,6 @@ export function CollectionScheduleTab({
             <Button
               type="button"
               variant="secondary"
-              disabled={state.isPending}
               onClick={requestCancelAmend}
             >
               {t("collection.amend.cancel")}
@@ -590,7 +607,7 @@ export function CollectionScheduleTab({
         onAmend={enterAmendEditor}
         actionsDisabled={state.actionsDisabled}
         history={{
-          state: historyState,
+          state: visibleHistoryState,
           onToggle: toggleHistory,
           onRetry: () => void loadHistory(),
         }}
@@ -626,7 +643,14 @@ export function CollectionScheduleTab({
       return;
     }
 
-    if (historyState.status === "valid") {
+    const currentFingerprint = getResourceFingerprint(
+      state.resource
+    );
+
+    if (
+      historyState.status === "valid" &&
+      historyState.fingerprint === currentFingerprint
+    ) {
       setHistoryState({
         ...historyState,
         isVisible: !historyState.isVisible,
@@ -653,6 +677,7 @@ export function CollectionScheduleTab({
       isVisible: true,
       rows: [],
       error: null,
+      fingerprint: null,
     });
 
     try {
@@ -661,13 +686,21 @@ export function CollectionScheduleTab({
         contract.id,
         { include_history: true }
       );
+      const rows = getCancelledHistory(resource);
+
+      if (!rows) {
+        throw new Error(
+          "The collection history response is missing cancelled_history."
+        );
+      }
 
       setState({ phase: "read", resource });
       setHistoryState({
         status: "valid",
         isVisible: true,
-        rows: getCancelledHistory(resource),
+        rows,
         error: null,
+        fingerprint: getResourceFingerprint(resource),
       });
     } catch (error) {
       setHistoryState({
@@ -675,6 +708,7 @@ export function CollectionScheduleTab({
         isVisible: true,
         rows: [],
         error: getCollectionErrorMessage(error, t),
+        fingerprint: null,
       });
     }
   }
@@ -982,7 +1016,6 @@ export function CollectionScheduleTab({
           (collection) => collection.id
         ),
       cancellationReason: "",
-      isPending: false,
       error: null,
     });
   }
@@ -1173,7 +1206,6 @@ export function CollectionScheduleTab({
       baseline: state.baseline,
       generationToken: state.generationToken,
       cancellationReason: state.cancellationReason,
-      isPending: false,
       error: state.error,
     });
   }
@@ -1359,10 +1391,24 @@ function getCollectionErrorMessage(
 
 function getCancelledHistory(
   resource: CollectionScheduleResource
-): CancelledCollection[] {
+): CancelledCollection[] | null {
   return Array.isArray(resource.schedule.cancelled_history)
     ? resource.schedule.cancelled_history
-    : [];
+    : null;
+}
+
+function getResourceFingerprint(
+  resource: CollectionScheduleResource
+): string {
+  const activeIds = resource.schedule.active_collections
+    .map((collection) => collection.id.toUpperCase())
+    .sort();
+
+  return [
+    resource.contract.id,
+    resource.schedule.derived_state,
+    activeIds.join(","),
+  ].join("|");
 }
 
 function calculateCollectionTotal(

@@ -113,11 +113,13 @@ export function CollectionLineEditor({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
+                id={`collection-line-${line._key}-title`}
                 label={t("collection.line.title")}
                 value={line.title}
                 error={lineErrors.title}
                 disabled={disabled}
                 maxLength={150}
+                autoFocus={index === 0}
                 onChange={(event) =>
                   onChange(
                     line._key,
@@ -127,6 +129,7 @@ export function CollectionLineEditor({
                 }
               />
               <Input
+                id={`collection-line-${line._key}-amount`}
                 label={t("collection.line.amount")}
                 value={line.amount}
                 error={lineErrors.amount}
@@ -142,6 +145,7 @@ export function CollectionLineEditor({
                 }
               />
               <Input
+                id={`collection-line-${line._key}-due-date`}
                 label={t("collection.line.dueDate")}
                 type="date"
                 value={line.due_date}
@@ -157,6 +161,7 @@ export function CollectionLineEditor({
                 }
               />
               <Input
+                id={`collection-line-${line._key}-notes`}
                 label={t("collection.line.notes")}
                 value={line.notes}
                 disabled={disabled}
