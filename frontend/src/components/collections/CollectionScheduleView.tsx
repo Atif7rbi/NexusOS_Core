@@ -2,6 +2,7 @@
 
 import {
   Ban,
+  CheckCircle2,
   Edit3,
   ListOrdered,
   Plus,
@@ -24,12 +25,16 @@ type CollectionScheduleViewProps = {
   resource: CollectionScheduleResource;
   onCreateDraft?: () => void;
   onEditDraft?: () => void;
+  onFinalize?: () => void;
+  actionsDisabled?: boolean;
 };
 
 export function CollectionScheduleView({
   resource,
   onCreateDraft,
   onEditDraft,
+  onFinalize,
+  actionsDisabled = false,
 }: CollectionScheduleViewProps) {
   const { t } = useTranslation();
   const { contract, schedule } = resource;
@@ -53,6 +58,7 @@ export function CollectionScheduleView({
               <Button
                 type="button"
                 leadingIcon={<Plus size={17} />}
+                disabled={actionsDisabled}
                 onClick={onCreateDraft}
               >
                 {t("collection.absent.create")}
@@ -99,18 +105,50 @@ export function CollectionScheduleView({
         }
         badgeVariant={isScheduled ? "success" : "warning"}
         actions={
-          !isScheduled &&
-          resource.allowed_actions.can_save_draft &&
-          onEditDraft ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              leadingIcon={<Edit3 size={16} />}
-              onClick={onEditDraft}
-            >
-              {t("collection.draft.edit")}
-            </Button>
+          !isScheduled ? (
+            <>
+              {resource.allowed_actions.can_save_draft &&
+              onEditDraft ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon={<Edit3 size={16} />}
+                  disabled={actionsDisabled}
+                  onClick={onEditDraft}
+                >
+                  {t("collection.draft.edit")}
+                </Button>
+              ) : null}
+              {resource.allowed_actions.can_finalize &&
+              onFinalize ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  leadingIcon={<CheckCircle2 size={16} />}
+                  disabled={
+                    actionsDisabled ||
+                    !collectionAmountsEqual(
+                      resource.schedule.active_total,
+                      resource.contract.total_amount
+                    )
+                  }
+                  title={
+                    collectionAmountsEqual(
+                      resource.schedule.active_total,
+                      resource.contract.total_amount
+                    )
+                      ? undefined
+                      : t(
+                          "collection.finalize.totalsMismatch"
+                        )
+                  }
+                  onClick={onFinalize}
+                >
+                  {t("collection.finalize.button")}
+                </Button>
+              ) : null}
+            </>
           ) : undefined
         }
       />
@@ -121,6 +159,17 @@ export function CollectionScheduleView({
         currency={contract.currency}
         lineCount={schedule.active_collections.length}
       />
+
+      {!isScheduled &&
+      resource.allowed_actions.can_finalize &&
+      !collectionAmountsEqual(
+        resource.schedule.active_total,
+        resource.contract.total_amount
+      ) ? (
+        <p className="rounded-xl border border-[var(--warning)]/20 bg-[var(--warning-soft)] px-4 py-3 text-sm font-semibold text-[var(--warning)]">
+          {t("collection.finalize.totalsMismatch")}
+        </p>
+      ) : null}
 
       <CollectionLinesTable
         collections={schedule.active_collections}
@@ -313,9 +362,23 @@ function CollectionLinesTable({
   );
 }
 
-function formatCollectionAmount(
+export function formatCollectionAmount(
   amount: string,
   currency: string
 ): string {
   return `${formatMoney(amount)} ${currency}`;
+}
+
+export function collectionAmountsEqual(
+  left: string,
+  right: string
+): boolean {
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+
+  return (
+    Number.isFinite(leftNumber) &&
+    Number.isFinite(rightNumber) &&
+    leftNumber.toFixed(2) === rightNumber.toFixed(2)
+  );
 }

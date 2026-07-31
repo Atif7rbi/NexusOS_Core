@@ -128,6 +128,19 @@ export const enUS: TranslationDictionary = {
   "collection.draft.editorTitle": "Edit draft collection schedule",
   "collection.draft.editorDescription":
     "Enter the schedule items and save the draft. A draft total may be partial.",
+  "collection.finalize.button": "Finalize collection schedule",
+  "collection.finalize.dialog.title":
+    "Finalize collection schedule",
+  "collection.finalize.dialog.description":
+    "The collection schedule will move from Draft to Scheduled. It cannot return to Draft; later financial changes must use an amendment.",
+  "collection.finalize.dialog.confirm": "Finalize schedule",
+  "collection.finalize.dialog.confirming": "Finalizing...",
+  "collection.finalize.dialog.cancel": "Cancel",
+  "collection.finalize.dialog.close": "Close",
+  "collection.finalize.dialog.lineCount":
+    "Collection item count",
+  "collection.finalize.totalsMismatch":
+    "The collection schedule total does not equal the contract value.",
   "collection.scheduled.title": "Approved collection schedule",
   "collection.scheduled.badge": "Approved",
   "collection.cancelled.title": "Cancelled collection schedule",
@@ -170,6 +183,42 @@ export const enUS: TranslationDictionary = {
     "Sequence numbers must be unique.",
   "collection.validation.dueDateOrder":
     "Due dates must be non-decreasing by sequence.",
+  "collection.error.draftNotEligible":
+    "The draft collection schedule cannot be edited in the contract's current state.",
+  "collection.error.notDraft":
+    "The collection schedule is not in Draft state.",
+  "collection.error.finalizeNotEligible":
+    "The collection schedule cannot be finalized in the contract's current state.",
+  "collection.error.amendNotEligible":
+    "The collection schedule cannot be amended in the contract's current state.",
+  "collection.error.noActiveSchedule":
+    "There is no active collection schedule to amend.",
+  "collection.error.scheduleChanged":
+    "The collection schedule changed since it was loaded. Refreshing the data...",
+  "collection.error.integrity":
+    "The collection schedule cannot be displayed because its data is inconsistent. Contact support.",
+  "collection.error.invalidGeneration":
+    "The amendment could not be completed because of a technical error. Reload the page.",
+  "collection.error.totalMismatch":
+    "The collection schedule total does not equal the contract value.",
+  "collection.error.duplicateSequence":
+    "Sequence numbers are duplicated. Review the lines and try again.",
+  "collection.error.dueDateOrder":
+    "Due dates must be non-decreasing by sequence.",
+  "collection.error.blankTitle":
+    "A collection item title is blank.",
+  "collection.error.invalidAmount":
+    "A collection item amount is invalid.",
+  "collection.error.decimalPrecision":
+    "Amounts must not exceed two decimal places.",
+  "collection.error.invalidReason":
+    "The cancellation reason is invalid or too long.",
+  "collection.error.notAuthorized":
+    "You are not authorized to perform this action.",
+  "collection.error.serviceUnavailable":
+    "The service is temporarily unavailable. Try again.",
+  "collection.error.invalidQuery":
+    "The request is invalid. Reload the page.",
 
   "pages.crm.title": "Leads",
   "pages.crm.description":

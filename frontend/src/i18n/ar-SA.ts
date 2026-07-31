@@ -121,6 +121,19 @@ export const arSA: TranslationDictionary = {
   "collection.draft.editorTitle": "تحرير مسودة جدول التحصيل",
   "collection.draft.editorDescription":
     "أدخل بنود الجدول واحفظ المسودة. يمكن أن يكون إجمالي المسودة جزئيًا.",
+  "collection.finalize.button": "اعتماد جدول التحصيل",
+  "collection.finalize.dialog.title": "اعتماد جدول التحصيل",
+  "collection.finalize.dialog.description":
+    "سيُعتمد جدول التحصيل ويُحوَّل من مسودة إلى مجدول. لا يمكن إعادته إلى مسودة — أي تعديل مالي لاحق يتم من خلال تعديل جدول التحصيل.",
+  "collection.finalize.dialog.confirm": "اعتماد الجدول",
+  "collection.finalize.dialog.confirming":
+    "جارٍ الاعتماد...",
+  "collection.finalize.dialog.cancel": "إلغاء",
+  "collection.finalize.dialog.close": "إغلاق",
+  "collection.finalize.dialog.lineCount":
+    "عدد بنود التحصيل",
+  "collection.finalize.totalsMismatch":
+    "إجمالي جدول التحصيل لا يساوي قيمة العقد.",
   "collection.scheduled.title": "جدول التحصيل المعتمد",
   "collection.scheduled.badge": "معتمد",
   "collection.cancelled.title": "جدول التحصيل الملغى",
@@ -163,6 +176,41 @@ export const arSA: TranslationDictionary = {
     "يجب ألا تتكرر أرقام التسلسل.",
   "collection.validation.dueDateOrder":
     "تواريخ الاستحقاق يجب أن تكون متصاعدة حسب التسلسل.",
+  "collection.error.draftNotEligible":
+    "لا يمكن تعديل مسودة جدول التحصيل في الحالة الحالية للعقد.",
+  "collection.error.notDraft":
+    "جدول التحصيل ليس في حالة مسودة.",
+  "collection.error.finalizeNotEligible":
+    "لا يمكن اعتماد جدول التحصيل في الحالة الحالية للعقد.",
+  "collection.error.amendNotEligible":
+    "لا يمكن تعديل جدول التحصيل في الحالة الحالية للعقد.",
+  "collection.error.noActiveSchedule":
+    "لا يوجد جدول تحصيل نشط للتعديل عليه.",
+  "collection.error.scheduleChanged":
+    "تغيّر جدول التحصيل منذ آخر تحميل. يتم تحديث البيانات...",
+  "collection.error.integrity":
+    "تعذر عرض جدول التحصيل بسبب حالة غير متسقة في البيانات. يرجى التواصل مع الدعم.",
+  "collection.error.invalidGeneration":
+    "تعذر تنفيذ التعديل بسبب خطأ تقني. أعد تحميل الصفحة.",
+  "collection.error.totalMismatch":
+    "إجمالي جدول التحصيل لا يساوي قيمة العقد.",
+  "collection.error.duplicateSequence":
+    "يوجد تكرار في أرقام التسلسل. راجع الأسطر وأعد المحاولة.",
+  "collection.error.dueDateOrder":
+    "تواريخ الاستحقاق يجب أن تكون متصاعدة حسب التسلسل.",
+  "collection.error.blankTitle": "عنوان أحد البنود فارغ.",
+  "collection.error.invalidAmount":
+    "مبلغ أحد البنود غير صالح.",
+  "collection.error.decimalPrecision":
+    "يجب ألا يتجاوز المبلغ منزلتين عشريتين.",
+  "collection.error.invalidReason":
+    "سبب الإلغاء غير صالح أو طويل جدًا.",
+  "collection.error.notAuthorized":
+    "ليست لديك صلاحية تنفيذ هذا الإجراء.",
+  "collection.error.serviceUnavailable":
+    "الخدمة غير متاحة مؤقتًا. حاول مرة أخرى.",
+  "collection.error.invalidQuery":
+    "طلب غير صالح. أعد تحميل الصفحة.",
 
   "pages.crm.title": "إدارة العملاء المحتملين",
   "pages.crm.description":

@@ -15,7 +15,11 @@ import {
   isValidCalendarDate,
   type CollectionLineErrors,
 } from "@/components/collections/CollectionLineEditor";
-import { CollectionScheduleView } from "@/components/collections/CollectionScheduleView";
+import { FinalizeDialog } from "@/components/collections/FinalizeDialog";
+import {
+  collectionAmountsEqual,
+  CollectionScheduleView,
+} from "@/components/collections/CollectionScheduleView";
 import { Button } from "@/components/ui/Button";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { FormErrorBanner } from "@/components/ui/FormErrorBanner";
@@ -28,6 +32,7 @@ import { isApiRequestError } from "@/lib/api-error";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   fetchCollectionSchedule,
+  finalizeCollectionSchedule,
   saveDraftCollectionSchedule,
 } from "@/services/collections";
 import type { Contract } from "@/types/contract";
@@ -50,6 +55,7 @@ type CollectionScheduleTabState =
       phase: "read";
       resource: CollectionScheduleResource;
       error?: string | null;
+      actionsDisabled?: boolean;
     }
   | {
       phase: "draft-edit";
@@ -58,6 +64,12 @@ type CollectionScheduleTabState =
       baseline: CollectionLineInput[];
       enteredFromAbsent: boolean;
       isSaving: boolean;
+      error: string | null;
+    }
+  | {
+      phase: "finalize-confirm";
+      resource: CollectionScheduleResource;
+      isProcessing: boolean;
       error: string | null;
     };
 
@@ -282,6 +294,24 @@ export function CollectionScheduleTab({
     );
   }
 
+  if (state.phase === "finalize-confirm") {
+    return (
+      <>
+        <CollectionScheduleView
+          resource={state.resource}
+          actionsDisabled
+        />
+        <FinalizeDialog
+          resource={state.resource}
+          error={state.error}
+          isProcessing={state.isProcessing}
+          onCancel={cancelFinalize}
+          onConfirm={() => void confirmFinalize()}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <FormErrorBanner message={state.error ?? null} />
@@ -289,6 +319,8 @@ export function CollectionScheduleTab({
         resource={state.resource}
         onCreateDraft={() => enterDraftEditor(true)}
         onEditDraft={() => enterDraftEditor(false)}
+        onFinalize={enterFinalizeConfirmation}
+        actionsDisabled={state.actionsDisabled}
       />
     </div>
   );
@@ -477,6 +509,175 @@ export function CollectionScheduleTab({
       });
     }
   }
+
+  function enterFinalizeConfirmation(): void {
+    if (
+      state.phase !== "read" ||
+      !state.resource.allowed_actions.can_finalize ||
+      state.actionsDisabled ||
+      state.resource.schedule.derived_state !== "draft" ||
+      !collectionAmountsEqual(
+        state.resource.schedule.active_total,
+        state.resource.contract.total_amount
+      )
+    ) {
+      return;
+    }
+
+    setState({
+      phase: "finalize-confirm",
+      resource: state.resource,
+      isProcessing: false,
+      error: null,
+    });
+  }
+
+  function cancelFinalize(): void {
+    if (
+      state.phase !== "finalize-confirm" ||
+      state.isProcessing
+    ) {
+      return;
+    }
+
+    setState({
+      phase: "read",
+      resource: state.resource,
+    });
+  }
+
+  async function confirmFinalize(): Promise<void> {
+    if (
+      state.phase !== "finalize-confirm" ||
+      state.isProcessing ||
+      !token
+    ) {
+      return;
+    }
+
+    setState({ ...state, isProcessing: true, error: null });
+
+    try {
+      const commandResource =
+        await finalizeCollectionSchedule(
+          token,
+          contract.id
+        );
+      let resource = commandResource;
+
+      try {
+        resource = await fetchCollectionSchedule(
+          token,
+          contract.id
+        );
+      } catch {
+        resource = commandResource;
+      }
+
+      setState({ phase: "read", resource });
+    } catch (error) {
+      if (
+        isApiRequestError(error) &&
+        error.code ===
+          "collection_schedule_integrity_violation"
+      ) {
+        setState({
+          phase: "read",
+          resource: state.resource,
+          error: getCollectionErrorMessage(error, t),
+          actionsDisabled: true,
+        });
+        return;
+      }
+
+      if (
+        isApiRequestError(error) &&
+        error.status === 403
+      ) {
+        const message = getCollectionErrorMessage(error, t);
+
+        try {
+          const resource = await fetchCollectionSchedule(
+            token,
+            contract.id
+          );
+          setState({
+            phase: "read",
+            resource,
+            error: message,
+          });
+        } catch {
+          setState({
+            phase: "read",
+            resource: state.resource,
+            error: message,
+            actionsDisabled: true,
+          });
+        }
+        return;
+      }
+
+      setState({
+        ...state,
+        isProcessing: false,
+        error: getCollectionErrorMessage(error, t),
+      });
+    }
+  }
+}
+
+function getCollectionErrorMessage(
+  error: unknown,
+  t: (key: import("@/i18n/types").TranslationKey) => string
+): string {
+  if (!isApiRequestError(error)) {
+    return t("collection.genericError");
+  }
+
+  const errorKeys: Record<
+    string,
+    import("@/i18n/types").TranslationKey
+  > = {
+    contract_not_eligible_for_draft_edit:
+      "collection.error.draftNotEligible",
+    schedule_not_in_draft_state:
+      "collection.error.notDraft",
+    contract_not_eligible_for_finalization:
+      "collection.error.finalizeNotEligible",
+    contract_not_eligible_for_amendment:
+      "collection.error.amendNotEligible",
+    no_active_schedule_to_amend:
+      "collection.error.noActiveSchedule",
+    collection_schedule_changed_since_loaded:
+      "collection.error.scheduleChanged",
+    collection_schedule_integrity_violation:
+      "collection.error.integrity",
+    invalid_expected_active_collection_ids:
+      "collection.error.invalidGeneration",
+    schedule_total_mismatch:
+      "collection.error.totalMismatch",
+    duplicate_collection_sequence:
+      "collection.error.duplicateSequence",
+    non_decreasing_due_date_violation:
+      "collection.error.dueDateOrder",
+    blank_collection_title:
+      "collection.error.blankTitle",
+    invalid_collection_amount:
+      "collection.error.invalidAmount",
+    excess_decimal_precision:
+      "collection.error.decimalPrecision",
+    invalid_cancellation_reason:
+      "collection.error.invalidReason",
+    role_not_authorized:
+      "collection.error.notAuthorized",
+    service_unavailable:
+      "collection.error.serviceUnavailable",
+    invalid_query_parameter:
+      "collection.error.invalidQuery",
+  };
+  const key = error.code ? errorKeys[error.code] : undefined;
+
+  return key ? t(key) : error.message;
 }
 
 function validateDraftLines(
