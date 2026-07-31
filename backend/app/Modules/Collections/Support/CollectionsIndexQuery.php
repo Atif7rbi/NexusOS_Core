@@ -43,6 +43,10 @@ final class CollectionsIndexQuery
                         [$search],
                     )
                     ->orWhereRaw(
+                        'STRPOS(LOWER(projects.name), LOWER(?)) > 0',
+                        [$search],
+                    )
+                    ->orWhereRaw(
                         'STRPOS(LOWER(units.unit_number), LOWER(?)) > 0',
                         [$search],
                     );

@@ -32,7 +32,7 @@ All parameters are optional. Unknown parameters are ignored.
 |---|---|---|---|---|
 | `page` | integer | min: 1 | 1 | Page number |
 | `per_page` | integer | min: 1, max: 100 | 20 | Items per page |
-| `search` | string | max: 255 | — | Partial match against customer name or unit number |
+| `search` | string | max: 255 | — | Partial match against customer name, project name, or unit number |
 | `status` | string | one of: `draft`, `active`, `completed`, `cancelled` | — | Filter by contract status |
 | `schedule_state` | string | one of: `absent`, `draft`, `scheduled`, `cancelled` | — | Filter by derived schedule state |
 
@@ -149,9 +149,10 @@ Filters apply to `data.items` and `pagination.total`. They do not affect `summar
 Leading and trailing whitespace is trimmed before matching. Matching is case-insensitive and partial (substring). A contract matches if:
 
 - `customer_name` is non-null and contains the search term, **or**
+- `project_name` is non-null and contains the search term, **or**
 - `unit_number` is non-null and contains the search term.
 
-A null `customer_name` cannot satisfy the customer condition; a null `unit_number` cannot satisfy the unit condition. A contract with a null customer is not excluded if its unit number matches, and vice versa.
+A null value cannot satisfy its individual search condition. A null customer, project, or unit value does not prevent either of the other available fields from matching.
 
 ### `status`
 
@@ -203,6 +204,7 @@ No domain-specific error codes. The endpoint is read-only.
 
 **Filtering:**
 - `search` by customer name returns matching contracts and excludes non-matching ones.
+- `search` by project name returns matching contracts and excludes non-matching ones.
 - `search` by unit number returns matching contracts and excludes non-matching ones.
 - A contract with a null customer but a matching unit number is returned when searching.
 - A contract with a null unit but a matching customer name is returned when searching.
