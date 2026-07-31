@@ -2,110 +2,14 @@ import {
   createQueryString,
   requestJson,
 } from "@/lib/http";
-import type { ContractStatus } from "@/types/contract";
-
-export type CollectionStatus =
-  | "draft"
-  | "scheduled"
-  | "cancelled";
-
-export type CollectionScheduleState =
-  | "absent"
-  | "draft"
-  | "scheduled"
-  | "cancelled";
-
-export type CollectionActor = {
-  id: number;
-  name: string;
-};
-
-export type ActiveCollection = {
-  id: string;
-  sequence: number;
-  title: string;
-  amount: string;
-  due_date: string;
-  notes: string | null;
-  status: "draft" | "scheduled";
-  scheduled_at: string | null;
-  scheduled_by: CollectionActor | null;
-};
-
-export type CancelledCollection = {
-  id: string;
-  sequence: number;
-  title: string;
-  amount: string;
-  due_date: string;
-  notes: string | null;
-  status: "cancelled";
-  scheduled_at: string | null;
-  scheduled_by: CollectionActor | null;
-  cancelled_at: string;
-  cancelled_by: CollectionActor;
-  cancellation_reason: string;
-};
-
-export type CollectionScheduleResource = {
-  contract: {
-    id: string;
-    status: ContractStatus;
-    currency: string;
-    total_amount: string;
-  };
-  schedule: {
-    derived_state: CollectionScheduleState;
-    active_total: string;
-    active_collections: ActiveCollection[];
-    cancelled_history?: CancelledCollection[];
-  };
-  allowed_actions: {
-    can_save_draft: boolean;
-    can_finalize: boolean;
-    can_amend: boolean;
-  };
-};
-
-export type CollectionDraftLinePayload = {
-  id?: string | null;
-  sequence: number;
-  title: string;
-  amount: string;
-  due_date: string;
-  notes?: string | null;
-};
-
-export type SaveDraftCollectionSchedulePayload = {
-  lines: CollectionDraftLinePayload[];
-};
-
-export type CollectionAmendmentLinePayload = {
-  sequence: number;
-  title: string;
-  amount: string;
-  due_date: string;
-  notes?: string | null;
-};
-
-export type AmendCollectionSchedulePayload = {
-  expected_active_collection_ids: string[];
-  lines: CollectionAmendmentLinePayload[];
-  cancellation_reason: string;
-};
-
-export type CollectionScheduleResponse = {
-  data: CollectionScheduleResource;
-};
-
-export type CollectionScheduleCommandResponse = {
-  message: string;
-  data: CollectionScheduleResource;
-};
-
-export type CollectionScheduleQuery = {
-  include_history?: boolean;
-};
+import type {
+  AmendPayload,
+  CollectionCommandResponse,
+  CollectionScheduleQuery,
+  CollectionScheduleResource,
+  GetCollectionScheduleResponse,
+  SaveDraftPayload,
+} from "@/types/collection";
 
 function schedulePath(contractId: string): string {
   return `/contracts/${contractId}/collection-schedule`;
@@ -115,21 +19,25 @@ export async function fetchCollectionSchedule(
   token: string,
   contractId: string,
   query: CollectionScheduleQuery = {}
-): Promise<CollectionScheduleResponse> {
+): Promise<CollectionScheduleResource> {
   const queryString = createQueryString(query);
   const path = queryString
     ? `${schedulePath(contractId)}?${queryString}`
     : schedulePath(contractId);
+  const response = await requestJson<GetCollectionScheduleResponse>(
+    path,
+    { token }
+  );
 
-  return requestJson<CollectionScheduleResponse>(path, { token });
+  return response.data;
 }
 
 export async function saveDraftCollectionSchedule(
   token: string,
   contractId: string,
-  payload: SaveDraftCollectionSchedulePayload
-): Promise<CollectionScheduleCommandResponse> {
-  return requestJson<CollectionScheduleCommandResponse>(
+  payload: SaveDraftPayload
+): Promise<CollectionScheduleResource> {
+  const response = await requestJson<CollectionCommandResponse>(
     `${schedulePath(contractId)}/draft`,
     {
       token,
@@ -137,27 +45,32 @@ export async function saveDraftCollectionSchedule(
       body: payload,
     }
   );
+
+  return response.data;
 }
 
 export async function finalizeCollectionSchedule(
   token: string,
   contractId: string
-): Promise<CollectionScheduleCommandResponse> {
-  return requestJson<CollectionScheduleCommandResponse>(
+): Promise<CollectionScheduleResource> {
+  const response = await requestJson<CollectionCommandResponse>(
     `${schedulePath(contractId)}/finalize`,
     {
       token,
       method: "POST",
+      body: {},
     }
   );
+
+  return response.data;
 }
 
 export async function amendCollectionSchedule(
   token: string,
   contractId: string,
-  payload: AmendCollectionSchedulePayload
-): Promise<CollectionScheduleCommandResponse> {
-  return requestJson<CollectionScheduleCommandResponse>(
+  payload: AmendPayload
+): Promise<CollectionScheduleResource> {
+  const response = await requestJson<CollectionCommandResponse>(
     `${schedulePath(contractId)}/amend`,
     {
       token,
@@ -165,4 +78,6 @@ export async function amendCollectionSchedule(
       body: payload,
     }
   );
+
+  return response.data;
 }
