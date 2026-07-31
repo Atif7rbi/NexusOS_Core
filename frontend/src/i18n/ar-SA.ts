@@ -112,8 +112,15 @@ export const arSA: TranslationDictionary = {
   "collection.absent.title": "لا يوجد جدول تحصيل",
   "collection.absent.description":
     "لم يتم إنشاء جدول تحصيل لهذا العقد بعد.",
+  "collection.absent.create": "إنشاء جدول التحصيل",
   "collection.draft.title": "مسودة جدول التحصيل",
   "collection.draft.badge": "مسودة",
+  "collection.draft.edit": "تعديل المسودة",
+  "collection.draft.save": "حفظ المسودة",
+  "collection.draft.saving": "جارٍ الحفظ...",
+  "collection.draft.editorTitle": "تحرير مسودة جدول التحصيل",
+  "collection.draft.editorDescription":
+    "أدخل بنود الجدول واحفظ المسودة. يمكن أن يكون إجمالي المسودة جزئيًا.",
   "collection.scheduled.title": "جدول التحصيل المعتمد",
   "collection.scheduled.badge": "معتمد",
   "collection.cancelled.title": "جدول التحصيل الملغى",
@@ -125,6 +132,10 @@ export const arSA: TranslationDictionary = {
   "collection.line.amount": "المبلغ",
   "collection.line.dueDate": "تاريخ الاستحقاق",
   "collection.line.notes": "ملاحظات",
+  "collection.line.delete": "حذف السطر",
+  "collection.line.addLine": "إضافة سطر",
+  "collection.line.moveUp": "نقل السطر لأعلى",
+  "collection.line.moveDown": "نقل السطر لأسفل",
   "collection.summary.activeTotal": "إجمالي جدول التحصيل",
   "collection.summary.contractTotal": "قيمة العقد",
   "collection.summary.lineCount": "عدد البنود",
@@ -133,6 +144,25 @@ export const arSA: TranslationDictionary = {
   "collection.loading": "جارٍ تحميل جدول التحصيل...",
   "collection.loadError": "تعذر تحميل جدول التحصيل.",
   "collection.retry": "إعادة المحاولة",
+  "collection.genericError": "تعذر إكمال العملية.",
+  "collection.discard.title": "تجاهل التعديلات؟",
+  "collection.discard.description":
+    "ستفقد جميع التعديلات غير المحفوظة على جدول التحصيل.",
+  "collection.discard.confirm": "تجاهل التعديلات",
+  "collection.discard.cancel": "متابعة التحرير",
+  "collection.discard.close": "إغلاق",
+  "collection.validation.titleRequired":
+    "بيان البند مطلوب.",
+  "collection.validation.titleTooLong":
+    "يجب ألا يتجاوز بيان البند 150 حرفًا.",
+  "collection.validation.amountInvalid":
+    "أدخل مبلغًا موجبًا وبحد أقصى منزلتين عشريتين.",
+  "collection.validation.dateInvalid":
+    "أدخل تاريخ استحقاق صالحًا.",
+  "collection.validation.sequenceDuplicate":
+    "يجب ألا تتكرر أرقام التسلسل.",
+  "collection.validation.dueDateOrder":
+    "تواريخ الاستحقاق يجب أن تكون متصاعدة حسب التسلسل.",
 
   "pages.crm.title": "إدارة العملاء المحتملين",
   "pages.crm.description":

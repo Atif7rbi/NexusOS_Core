@@ -2,11 +2,14 @@
 
 import {
   Ban,
+  Edit3,
   ListOrdered,
+  Plus,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/crud/DataTable";
 import { ListEmptyState } from "@/components/ui/crud/ListState";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -19,10 +22,14 @@ import type {
 
 type CollectionScheduleViewProps = {
   resource: CollectionScheduleResource;
+  onCreateDraft?: () => void;
+  onEditDraft?: () => void;
 };
 
 export function CollectionScheduleView({
   resource,
+  onCreateDraft,
+  onEditDraft,
 }: CollectionScheduleViewProps) {
   const { t } = useTranslation();
   const { contract, schedule } = resource;
@@ -40,6 +47,18 @@ export function CollectionScheduleView({
           icon={ListOrdered}
           title={t("collection.absent.title")}
           description={t("collection.absent.description")}
+          action={
+            resource.allowed_actions.can_save_draft &&
+            onCreateDraft ? (
+              <Button
+                type="button"
+                leadingIcon={<Plus size={17} />}
+                onClick={onCreateDraft}
+              >
+                {t("collection.absent.create")}
+              </Button>
+            ) : undefined
+          }
         />
       </div>
     );
@@ -79,6 +98,21 @@ export function CollectionScheduleView({
             : t("collection.draft.badge")
         }
         badgeVariant={isScheduled ? "success" : "warning"}
+        actions={
+          !isScheduled &&
+          resource.allowed_actions.can_save_draft &&
+          onEditDraft ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Edit3 size={16} />}
+              onClick={onEditDraft}
+            >
+              {t("collection.draft.edit")}
+            </Button>
+          ) : undefined
+        }
       />
 
       <ScheduleSummary
@@ -102,11 +136,13 @@ function ScheduleHeader({
   title,
   badge,
   badgeVariant,
+  actions,
 }: {
   icon: ReactNode;
   title: string;
   badge: string;
   badgeVariant: "success" | "warning" | "danger";
+  actions?: ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -118,7 +154,10 @@ function ScheduleHeader({
           {title}
         </h3>
       </div>
-      <Badge variant={badgeVariant}>{badge}</Badge>
+      <div className="flex flex-wrap items-center gap-2">
+        {actions}
+        <Badge variant={badgeVariant}>{badge}</Badge>
+      </div>
     </div>
   );
 }

@@ -119,8 +119,15 @@ export const enUS: TranslationDictionary = {
   "collection.absent.title": "No collection schedule",
   "collection.absent.description":
     "No collection schedule has been created for this contract yet.",
+  "collection.absent.create": "Create collection schedule",
   "collection.draft.title": "Draft collection schedule",
   "collection.draft.badge": "Draft",
+  "collection.draft.edit": "Edit draft",
+  "collection.draft.save": "Save draft",
+  "collection.draft.saving": "Saving...",
+  "collection.draft.editorTitle": "Edit draft collection schedule",
+  "collection.draft.editorDescription":
+    "Enter the schedule items and save the draft. A draft total may be partial.",
   "collection.scheduled.title": "Approved collection schedule",
   "collection.scheduled.badge": "Approved",
   "collection.cancelled.title": "Cancelled collection schedule",
@@ -132,6 +139,10 @@ export const enUS: TranslationDictionary = {
   "collection.line.amount": "Amount",
   "collection.line.dueDate": "Due date",
   "collection.line.notes": "Notes",
+  "collection.line.delete": "Delete line",
+  "collection.line.addLine": "Add line",
+  "collection.line.moveUp": "Move line up",
+  "collection.line.moveDown": "Move line down",
   "collection.summary.activeTotal": "Collection schedule total",
   "collection.summary.contractTotal": "Contract value",
   "collection.summary.lineCount": "Item count",
@@ -140,6 +151,25 @@ export const enUS: TranslationDictionary = {
   "collection.loading": "Loading collection schedule...",
   "collection.loadError": "Unable to load the collection schedule.",
   "collection.retry": "Try again",
+  "collection.genericError": "Unable to complete the operation.",
+  "collection.discard.title": "Discard changes?",
+  "collection.discard.description":
+    "All unsaved collection schedule changes will be lost.",
+  "collection.discard.confirm": "Discard changes",
+  "collection.discard.cancel": "Continue editing",
+  "collection.discard.close": "Close",
+  "collection.validation.titleRequired":
+    "The collection item is required.",
+  "collection.validation.titleTooLong":
+    "The collection item must not exceed 150 characters.",
+  "collection.validation.amountInvalid":
+    "Enter a positive amount with no more than two decimal places.",
+  "collection.validation.dateInvalid":
+    "Enter a valid due date.",
+  "collection.validation.sequenceDuplicate":
+    "Sequence numbers must be unique.",
+  "collection.validation.dueDateOrder":
+    "Due dates must be non-decreasing by sequence.",
 
   "pages.crm.title": "Leads",
   "pages.crm.description":
