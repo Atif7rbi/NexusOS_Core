@@ -1,8 +1,8 @@
 # CRM / Leads v1 — Phone Normalization & Validation Specification
 
-**Project:** NexusOS Pilot  
-**Module:** CRM / Leads v1  
-**Version:** 1.0  
+**Project:** NexusOS Pilot
+**Module:** CRM / Leads v1
+**Version:** 1.0
 **Status:** DRAFT — Codex Follow-up Amendments Required
 **Repository:** `Atif7rbi/ufq-pilot`
 
