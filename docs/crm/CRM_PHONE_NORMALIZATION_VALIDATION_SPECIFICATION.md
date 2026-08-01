@@ -3,7 +3,7 @@
 **Project:** NexusOS Pilot
 **Module:** CRM / Leads v1
 **Version:** 1.0
-**Status:** DRAFT — Codex Follow-up Amendments Required
+**Status:** FROZEN
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
@@ -1113,12 +1113,12 @@ These items may not reopen:
 
 ## 24. Freeze Statement
 
-CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is in DRAFT while the required Codex follow-up amendments undergo architecture review.
+CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is FROZEN and is the approved reference for implementation.
 
-It is not FROZEN or authoritative until those amendments receive final approval in a separate freeze action.
+It is the authoritative phone normalization and validation contract for CRM / Leads v1 and every governed field defined in this document.
 
 ```text
-DRAFT — Codex Follow-up Amendments Required
+FROZEN
 ```
 
-No CRM implementation may begin from this draft. After final approval restores `FROZEN`, any later change to supported phone type, canonical format, preprocessing, validation, storage, field scope, uniqueness, matching, conversion, frontend behavior, database enforcement, rollout order, or required test coverage requires an explicit Product Owner amendment.
+After this freeze, any change to supported phone type, canonical format, preprocessing, validation, storage, field scope, uniqueness, matching, conversion, frontend behavior, database enforcement, rollout order, or required test coverage requires an explicit Product Owner amendment.
