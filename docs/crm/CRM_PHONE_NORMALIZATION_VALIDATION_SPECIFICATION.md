@@ -360,6 +360,23 @@ Generic list/search interfaces may support partial phone search for discovery. P
 
 A partial-search result does not prove identity.
 
+### 9.1 Hidden Exact Customer Match
+
+An exact Tenant-scoped Customer phone match may exist while the current actor is not permitted to view or link that Customer.
+
+In that case, the system must:
+
+- preserve Customer and Lead visibility rules from the frozen CRM architecture;
+- disclose no Customer identity, field, status, or other data;
+- omit the hidden Customer from duplicate-warning details;
+- reject any attempted explicit link to the hidden Customer;
+- allow Lead creation only when the actor otherwise has permission to create the Lead;
+- avoid creating a duplicate Customer during later conversion merely because the actor could not view the existing match;
+- preserve the approved `404` resource-hiding and `403` role-authorization semantics;
+- require an Administrator or another actor explicitly authorized to review and complete the conversion when necessary.
+
+Lead creation does not broaden Customer visibility. A hidden match is not proof to the current actor that a particular Customer exists, and no response may be shaped to reveal that hidden record.
+
 ---
 
 ## 10. Customer Uniqueness
@@ -419,8 +436,25 @@ When a returning Customer creates a new opportunity:
 2. perform a Tenant-scoped exact Customer lookup;
 3. show the visible existing Customer match;
 4. allow creation of a new Lead;
-5. link the Lead to the existing Customer only after explicit confirmation;
+5. optionally link the Lead to the existing Customer during Lead creation only after explicit confirmation;
 6. do not create a duplicate Customer.
+
+An early `Lead.customer_id` link is permitted only when:
+
+- an exact Tenant-scoped Customer match exists;
+- the actor is permitted to see and link that Customer;
+- the user explicitly confirms the link.
+
+This early link:
+
+- is optional;
+- does not move the Lead to `won`;
+- is not Lead conversion;
+- does not create a Reservation;
+- does not create a Contract;
+- does not bypass or shorten the normal Lead lifecycle.
+
+If the visible Customer match is not confirmed, the permitted Lead may still be created without `customer_id`. A hidden Customer match must follow Section 9.1 and must not be linked by an unauthorized actor.
 
 Each Lead retains an independent:
 
@@ -460,7 +494,23 @@ When one exact matching Customer exists:
 - do not create another Customer;
 - do not overwrite existing Customer data automatically.
 
-### 13.3 Ambiguous or Changed Match
+### 13.3 Already-Linked Lead
+
+When `Lead.customer_id` is already set, the conversion command must:
+
+1. lock the Lead and the linked Customer inside the conversion transaction;
+2. verify that the linked Customer belongs to the same Tenant as the Lead;
+3. verify that the link remains valid under the approved visibility, authorization, and lifecycle rules;
+4. use the linked Customer as the conversion target;
+5. avoid creating a duplicate Customer;
+6. avoid overwriting Customer data automatically;
+7. complete the remaining Lead conversion changes transactionally.
+
+An already-linked Lead is not already converted. The Lead still follows the normal lifecycle and reaches `won` only through the approved conversion command.
+
+If the reviewed match, `customer_id`, linked Customer, or link validity changes concurrently, the command must return the approved `409` conflict, refresh the current state, and require explicit re-review. It must not silently switch targets, remove the link, create a different Customer, or continue against stale confirmation.
+
+### 13.4 Ambiguous or Changed Match
 
 If more than one matching Customer exists because historical data violated the canonical identity rule:
 
@@ -479,7 +529,9 @@ HTTP 409 Conflict
 → require a new explicit confirmation
 ```
 
-The command must not silently change a user decision from Customer creation to Customer linking or from one Customer target to another.
+The command must not silently change a user decision from Customer creation to Customer linking, from an existing link to a different target, or from one Customer target to another.
+
+When an exact Customer match is hidden from the current actor, conversion follows Section 9.1. Lack of visibility must never cause the command to create a duplicate Customer. The command must stop behind the approved visibility and authorization boundary and require an Administrator or otherwise authorized conversion path where necessary.
 
 The Lead remains preserved as a historical sales record after conversion.
 
@@ -502,6 +554,28 @@ Customer represents current official information. Historical Leads retain the na
 
 Future Leads use the Customer's current data at the time those Leads are created. A later Customer update does not retroactively alter earlier Lead snapshots or Activities.
 
+### 14.1 Changing Phone on a Linked Open Lead
+
+If an open Lead already has `customer_id` and its `Lead.phone` is changed, the update flow must:
+
+1. preprocess and validate the proposed phone;
+2. rerun exact Tenant-scoped Customer matching;
+3. compare the current link with the result of the new exact match;
+4. present the permitted link outcome for explicit user review;
+5. require explicit confirmation to retain, change, or remove the Customer link;
+6. persist the Lead phone and confirmed link outcome transactionally.
+
+The system must not:
+
+- retain an inconsistent Customer link silently;
+- change or remove the link without confirmation;
+- link a hidden Customer for an unauthorized actor;
+- modify `Customer.phone` automatically;
+- overwrite other Customer data automatically;
+- rewrite any other Lead.
+
+If the match or link changes concurrently after review, the update returns the approved `409` conflict and requires a fresh review. Closed and `won` Lead edit restrictions remain governed by the frozen Lead lifecycle and are not relaxed by this phone policy.
+
 ---
 
 ## 15. Error Contract
@@ -512,7 +586,7 @@ The following failure categories are distinct:
 |---|---:|---|
 | Invalid mobile format | `422` | The governed value is absent when required or fails the canonical format after preprocessing. |
 | Duplicate Customer phone | `422` | Another Customer in the same Tenant owns the canonical phone. |
-| Customer match changed during conversion | `409` | The previously reviewed conversion match is stale and must be reviewed again. |
+| Customer match or link changed concurrently | `409` | A previously reviewed Lead link, phone-match decision, or conversion target is stale and must be reviewed again. |
 | Hidden or inaccessible Customer or Lead | `404` | The resource is outside Tenant or role visibility scope. |
 | Unauthorized role | `403` | The authenticated active member lacks authority for the requested operation. |
 
@@ -645,6 +719,8 @@ Lead phone is not unique. It requires an index appropriate for Tenant-scoped exa
 tenant_id + phone
 ```
 
+The Leads CHECK constraint and Tenant-scoped phone index are created with the `leads` table as part of CRM DDL. They are not installed during the existing-fields rollout before that table exists.
+
 ### 18.3 Users
 
 ```sql
@@ -715,20 +791,46 @@ Inspection queries must run read-only before any approved correction or migratio
 
 ## 20. Safe Rollout Sequence
 
-The rollout order is mandatory:
+The rollout is split into two ordered phases.
+
+### 20.1 Phase A — Existing Governed Fields
+
+Phase A applies only to:
+
+```text
+customers.phone
+users.phone
+system_settings.phone
+```
+
+Its order is mandatory:
 
 ```text
 1. Inspect current governed phone data.
 2. Correct or remove invalid experimental data with Product Owner approval.
 3. Add the shared normalization and validation component.
-4. Update every governed application write path.
-5. Update exact lookup and duplicate detection.
-6. Add PostgreSQL CHECK constraints and required indexes.
-7. Update frontend fields.
-8. Run backend, database, concurrency, and frontend tests.
+4. Update existing Customer, User, and System Settings application writes.
+5. Update current Customer exact lookup and duplicate detection.
+6. Add PostgreSQL CHECK constraints for existing governed columns while preserving Customer uniqueness.
+7. Update existing Customer, User, and System Settings frontend fields.
+8. Run existing-module backend, database, concurrency, and frontend tests.
 9. Verify Customers, Users, and System Settings end to end.
-10. Begin CRM DDL and implementation only after phone prerequisites are approved.
 ```
+
+### 20.2 Phase B — CRM Leads
+
+Phase B begins only after Phase A and the required CRM DDL approvals:
+
+```text
+1. Create leads.phone with its CHECK constraint as part of CRM DDL.
+2. Create the Tenant-scoped Lead phone index as part of CRM DDL.
+3. Implement Lead writes using the approved shared mobile-number component.
+4. Implement Lead matching, early linking, linked-Lead updates, and conversion using that component.
+5. Run CRM-specific domain, API, database, concurrency, and frontend tests.
+6. Enable CRM behavior only after all CRM acceptance gates pass.
+```
+
+The Leads CHECK constraint and index must not be installed or described as installed before the `leads` table exists.
 
 No production Lead conversion behavior may be enabled before canonical Customer matching, existing-data inspection, conflict resolution, application writes, and PostgreSQL enforcement are ready together.
 
@@ -788,13 +890,24 @@ Rejected:
 - exact Customer matching is Tenant-scoped;
 - hidden Customer information is not disclosed;
 - returning Customer creates a new independent Lead;
-- explicit confirmation links the new Lead to the existing Customer;
+- early Customer linking during Lead creation is optional;
+- explicit confirmation links the new Lead to a visible existing Customer;
+- early linking does not make the Lead `won` or create a Reservation or Contract;
+- Lead creation remains allowed without a link when frozen permissions allow it;
+- a hidden Customer match is not disclosed through warnings or responses;
+- an unauthorized actor cannot explicitly link a hidden Customer;
+- hidden-match Lead creation does not authorize duplicate Customer creation during conversion;
 - conversion links one matching Customer;
+- conversion of an already-linked Lead locks and uses the same-Tenant linked Customer;
+- conversion of an already-linked Lead does not create or silently switch to another Customer;
 - conversion creates a Customer when no match exists;
 - created Customer status is `customer`;
 - linking does not overwrite Customer data;
 - ambiguous historical Customer matches block conversion;
 - concurrent Customer match change returns `409`;
+- concurrent linked-Customer or `customer_id` change returns `409`;
+- changing phone on a linked open Lead requires explicit retain, change, or remove-link confirmation;
+- linked Lead phone update never modifies Customer phone or another Lead;
 - conversion rollback leaves no partial Customer, Lead mutation, or Activity;
 - Lead phone snapshots remain canonical.
 
