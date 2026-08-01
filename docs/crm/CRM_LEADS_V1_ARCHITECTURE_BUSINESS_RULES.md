@@ -3,7 +3,7 @@
 **Project:** NexusOS Pilot  
 **Module:** CRM / Leads v1  
 **Version:** 1.0  
-**Status:** FROZEN CANDIDATE — Engineering Amendments Applied<br>
+**Status:** FROZEN<br>
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
