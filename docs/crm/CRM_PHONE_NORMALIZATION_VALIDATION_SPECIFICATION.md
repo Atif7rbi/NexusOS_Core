@@ -3,7 +3,7 @@
 **Project:** NexusOS Pilot  
 **Module:** CRM / Leads v1  
 **Version:** 1.0  
-**Status:** FROZEN<br>
+**Status:** DRAFT — Architecture Amendments Required<br>
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
@@ -69,7 +69,7 @@ The value received from a user, API client, command, import, or internal applica
 
 ### 3.3 Preprocessed Value
 
-The value after edge whitespace is trimmed and Arabic-Indic or Persian digits are converted to ASCII digits.
+The value after the approved ASCII edge-whitespace characters are removed and Arabic-Indic or Persian digits are converted to ASCII digits.
 
 ### 3.4 Canonical Value
 
@@ -148,10 +148,31 @@ Preprocessing occurs once and in this order:
 
 ```text
 1. Preserve null for a nullable governed field.
-2. Trim leading and trailing whitespace only.
+2. Remove approved ASCII edge whitespace from the beginning and end only.
 3. Convert Arabic-Indic digits to ASCII digits.
 4. Convert Persian digits to ASCII digits.
 5. Validate the complete resulting value.
+```
+
+The only removable edge-whitespace characters in v1 are:
+
+| Code point | Name |
+|---|---|
+| `U+0009` | CHARACTER TABULATION |
+| `U+000A` | LINE FEED |
+| `U+000B` | LINE TABULATION |
+| `U+000C` | FORM FEED |
+| `U+000D` | CARRIAGE RETURN |
+| `U+0020` | SPACE |
+
+The backend and frontend must implement this exact code-point set. Generic runtime `trim` functions may be used only if they are constrained or wrapped to produce exactly this behavior.
+
+No other Unicode whitespace is removed. In particular:
+
+```text
+U+00A0 NO-BREAK SPACE
+→ not removed
+→ fails mobile format validation
 ```
 
 Arabic-Indic mapping:
@@ -199,6 +220,8 @@ The preprocessor must not remove, repair, or reinterpret:
 - extensions;
 - other symbols.
 
+Unsupported Unicode whitespace is treated as an unsupported symbol and is not removed.
+
 Consequently:
 
 ```text
@@ -207,7 +230,7 @@ Consequently:
 → rejected
 ```
 
-For nullable governed fields, an omitted value or `null` remains `null`. An empty value after edge trimming is treated as absent: it becomes `null` for a nullable field and fails required validation for a required field.
+For nullable governed fields, an omitted value or `null` remains `null`. An empty value after removing only the approved ASCII edge-whitespace characters is treated as absent: it becomes `null` for a nullable field and fails required validation for a required field.
 
 Preprocessing must be deterministic and idempotent:
 
@@ -343,7 +366,7 @@ Exact full-phone matching is mandatory for:
 Exact identity lookup preprocesses the supplied input as follows:
 
 ```text
-trim edge whitespace
+remove approved ASCII edge whitespace only
 → convert Arabic-Indic and Persian digits
 → validate the full canonical format
 → compare exact canonical values
@@ -434,27 +457,24 @@ When a returning Customer creates a new opportunity:
 
 1. preprocess and validate the Lead phone;
 2. perform a Tenant-scoped exact Customer lookup;
-3. show the visible existing Customer match;
-4. allow creation of a new Lead;
-5. optionally link the Lead to the existing Customer during Lead creation only after explicit confirmation;
-6. do not create a duplicate Customer.
+3. show a visible existing Customer match for awareness only;
+4. allow creation of a new independent Lead;
+5. keep `Lead.customer_id = null`;
+6. preserve the complete new Lead lifecycle;
+7. do not create a duplicate Customer during later conversion.
 
-An early `Lead.customer_id` link is permitted only when:
+A visible match acknowledgement during Lead creation is informational UI state only. It is not persisted as `customer_id`, is not Customer linking, and is not conversion.
 
-- an exact Tenant-scoped Customer match exists;
-- the actor is permitted to see and link that Customer;
-- the user explicitly confirms the link.
+The frozen lifecycle invariant is authoritative:
 
-This early link:
+```text
+stage != won
+→ customer_id IS NULL
+```
 
-- is optional;
-- does not move the Lead to `won`;
-- is not Lead conversion;
-- does not create a Reservation;
-- does not create a Contract;
-- does not bypass or shorten the normal Lead lifecycle.
+Customer linking occurs only inside a successful Lead conversion. On conversion, the command rechecks the exact Tenant-scoped Customer match, links the confirmed existing Customer, and sets the Lead to `won` atomically.
 
-If the visible Customer match is not confirmed, the permitted Lead may still be created without `customer_id`. A hidden Customer match must follow Section 9.1 and must not be linked by an unauthorized actor.
+A hidden Customer match follows Section 9.1 and is not disclosed through Lead creation.
 
 Each Lead retains an independent:
 
@@ -494,23 +514,9 @@ When one exact matching Customer exists:
 - do not create another Customer;
 - do not overwrite existing Customer data automatically.
 
-### 13.3 Already-Linked Lead
+Linking `Lead.customer_id` and changing `Lead.stage` to `won` occur in the same successful transaction. Before conversion, `customer_id` remains `null`. There is no already-linked open or lost Lead conversion path in v1.
 
-When `Lead.customer_id` is already set, the conversion command must:
-
-1. lock the Lead and the linked Customer inside the conversion transaction;
-2. verify that the linked Customer belongs to the same Tenant as the Lead;
-3. verify that the link remains valid under the approved visibility, authorization, and lifecycle rules;
-4. use the linked Customer as the conversion target;
-5. avoid creating a duplicate Customer;
-6. avoid overwriting Customer data automatically;
-7. complete the remaining Lead conversion changes transactionally.
-
-An already-linked Lead is not already converted. The Lead still follows the normal lifecycle and reaches `won` only through the approved conversion command.
-
-If the reviewed match, `customer_id`, linked Customer, or link validity changes concurrently, the command must return the approved `409` conflict, refresh the current state, and require explicit re-review. It must not silently switch targets, remove the link, create a different Customer, or continue against stale confirmation.
-
-### 13.4 Ambiguous or Changed Match
+### 13.3 Ambiguous or Changed Match
 
 If more than one matching Customer exists because historical data violated the canonical identity rule:
 
@@ -529,7 +535,7 @@ HTTP 409 Conflict
 → require a new explicit confirmation
 ```
 
-The command must not silently change a user decision from Customer creation to Customer linking, from an existing link to a different target, or from one Customer target to another.
+The command must not silently change a user decision from Customer creation to Customer linking or from one Customer target to another.
 
 When an exact Customer match is hidden from the current actor, conversion follows Section 9.1. Lack of visibility must never cause the command to create a duplicate Customer. The command must stop behind the approved visibility and authorization boundary and require an Administrator or otherwise authorized conversion path where necessary.
 
@@ -554,27 +560,25 @@ Customer represents current official information. Historical Leads retain the na
 
 Future Leads use the Customer's current data at the time those Leads are created. A later Customer update does not retroactively alter earlier Lead snapshots or Activities.
 
-### 14.1 Changing Phone on a Linked Open Lead
+### 14.1 Changing Phone on an Open Lead
 
-If an open Lead already has `customer_id` and its `Lead.phone` is changed, the update flow must:
+When an open Lead phone is changed, the update flow must:
 
 1. preprocess and validate the proposed phone;
-2. rerun exact Tenant-scoped Customer matching;
-3. compare the current link with the result of the new exact match;
-4. present the permitted link outcome for explicit user review;
-5. require explicit confirmation to retain, change, or remove the Customer link;
-6. persist the Lead phone and confirmed link outcome transactionally.
+2. rerun Lead duplicate discovery;
+3. rerun exact Tenant-scoped Customer-match discovery;
+4. present only matches visible under the frozen visibility rules;
+5. persist the canonical Lead phone while keeping `customer_id = null`.
 
 The system must not:
 
-- retain an inconsistent Customer link silently;
-- change or remove the link without confirmation;
-- link a hidden Customer for an unauthorized actor;
+- persist an early Customer link;
+- persist match acknowledgement as `customer_id`;
 - modify `Customer.phone` automatically;
 - overwrite other Customer data automatically;
 - rewrite any other Lead.
 
-If the match or link changes concurrently after review, the update returns the approved `409` conflict and requires a fresh review. Closed and `won` Lead edit restrictions remain governed by the frozen Lead lifecycle and are not relaxed by this phone policy.
+All open Lead stages satisfy `customer_id IS NULL`. Closed, lost, and `won` Lead edit restrictions remain governed by the frozen Lead lifecycle and are not relaxed by this phone policy.
 
 ---
 
@@ -586,7 +590,7 @@ The following failure categories are distinct:
 |---|---:|---|
 | Invalid mobile format | `422` | The governed value is absent when required or fails the canonical format after preprocessing. |
 | Duplicate Customer phone | `422` | Another Customer in the same Tenant owns the canonical phone. |
-| Customer match or link changed concurrently | `409` | A previously reviewed Lead link, phone-match decision, or conversion target is stale and must be reviewed again. |
+| Customer match changed during conversion | `409` | A previously reviewed phone-match decision or conversion target is stale and must be reviewed again. |
 | Hidden or inaccessible Customer or Lead | `404` | The resource is outside Tenant or role visibility scope. |
 | Unauthorized role | `403` | The authenticated active member lacks authority for the requested operation. |
 
@@ -664,7 +668,7 @@ Its responsibilities are:
 
 ```text
 preprocess nullable or required input
-→ trim edge whitespace
+→ remove only U+0009, U+000A, U+000B, U+000C, U+000D, and U+0020 from edges
 → convert Arabic-Indic and Persian digits
 → validate the complete canonical pattern
 → return canonical value or a typed validation failure
@@ -763,13 +767,34 @@ Before enabling final constraints:
 
 1. inspect every non-null governed phone value;
 2. inspect the two Customer phone values;
-3. confirm every Customer value matches `^05[0-9]{8}$` after approved digit conversion and edge trimming;
-4. confirm nullable `users.phone` values are either `null` or valid;
-5. confirm nullable `system_settings.phone` values are either `null` or valid;
-6. confirm no canonical Customer collision exists inside a Tenant;
-7. stop if invalid or ambiguous data remains.
+3. derive the proposed canonical value using only approved ASCII edge-whitespace removal and digit conversion;
+4. classify each value as invalid, transformable, or already stored canonically;
+5. report every invalid value;
+6. detect Customer collisions using the proposed canonical values;
+7. stop if invalid values or collisions remain;
+8. obtain explicit Product Owner approval for every data correction;
+9. write approved canonical values for transformable records;
+10. rerun collision detection and raw-storage validation;
+11. confirm every non-null stored value itself matches `^05[0-9]{8}$`;
+12. install CHECK constraints only after all preceding checks pass.
 
-If an experimental Customer phone is invalid, it may be corrected manually or the experimental Customer may be deleted only after explicit Product Owner approval.
+The inspection must distinguish:
+
+```text
+logically valid after preprocessing
+!=
+already stored in canonical ASCII form
+```
+
+Values requiring an explicit approved canonical data write include:
+
+- Arabic-Indic digits;
+- Persian digits;
+- approved ASCII edge whitespace.
+
+Values containing internal spaces, punctuation, country-code formats, unsupported Unicode whitespace, symbols, or other ambiguous content are invalid and must not be silently repaired.
+
+If an experimental Customer phone is invalid, it may be corrected manually or the experimental Customer may be deleted only after explicit Product Owner approval. Transformable values also require approved explicit writes; successful preprocessing during inspection does not itself change stored data.
 
 No full database reset is permitted. No complex historical Customer backfill is required for the currently reported environment.
 
@@ -784,6 +809,8 @@ stop rollout
 ```
 
 The migration must fail safely before installing final constraints if preconditions are not satisfied. It must not select a Customer, merge records, or discard data automatically.
+
+After every approved canonical rewrite, Customer collisions and raw canonical-storage compliance must be checked again before any constraint is installed. No Customer is selected arbitrarily when a collision exists, and no automatic Customer merge is permitted.
 
 Inspection queries must run read-only before any approved correction or migration.
 
@@ -806,15 +833,22 @@ system_settings.phone
 Its order is mandatory:
 
 ```text
-1. Inspect current governed phone data.
-2. Correct or remove invalid experimental data with Product Owner approval.
-3. Add the shared normalization and validation component.
-4. Update existing Customer, User, and System Settings application writes.
-5. Update current Customer exact lookup and duplicate detection.
-6. Add PostgreSQL CHECK constraints for existing governed columns while preserving Customer uniqueness.
-7. Update existing Customer, User, and System Settings frontend fields.
-8. Run existing-module backend, database, concurrency, and frontend tests.
-9. Verify Customers, Users, and System Settings end to end.
+1. Inspect raw Customer, User, and System Settings phone values.
+2. Derive proposed canonical values without writing data.
+3. Report invalid values and transformable non-canonical values.
+4. Detect Customer collisions after canonicalization.
+5. Stop if invalid values or collisions remain.
+6. Obtain explicit Product Owner approval for data corrections.
+7. Write approved canonical values for transformable records.
+8. Rerun collision detection and raw-storage validation.
+9. Confirm every non-null stored value itself matches ^05[0-9]{8}$.
+10. Add the shared normalization and validation component.
+11. Update existing Customer, User, and System Settings application writes.
+12. Update current Customer exact lookup and duplicate detection.
+13. Add PostgreSQL CHECK constraints for existing governed columns while preserving Customer uniqueness.
+14. Update existing Customer, User, and System Settings frontend fields.
+15. Run existing-module backend, database, concurrency, and frontend tests.
+16. Verify Customers, Users, and System Settings end to end.
 ```
 
 ### 20.2 Phase B — CRM Leads
@@ -825,7 +859,7 @@ Phase B begins only after Phase A and the required CRM DDL approvals:
 1. Create leads.phone with its CHECK constraint as part of CRM DDL.
 2. Create the Tenant-scoped Lead phone index as part of CRM DDL.
 3. Implement Lead writes using the approved shared mobile-number component.
-4. Implement Lead matching, early linking, linked-Lead updates, and conversion using that component.
+4. Implement Lead matching and conversion using that component while preserving customer_id = null before won.
 5. Run CRM-specific domain, API, database, concurrency, and frontend tests.
 6. Enable CRM behavior only after all CRM acceptance gates pass.
 ```
@@ -847,8 +881,8 @@ Accepted:
 - valid ASCII `05XXXXXXXX`;
 - Arabic-Indic digits converted to ASCII;
 - Persian digits converted to ASCII;
-- leading whitespace trimmed;
-- trailing whitespace trimmed;
+- each approved ASCII edge-whitespace character is removed from the beginning and end;
+- combinations of `U+0009`, `U+000A`, `U+000B`, `U+000C`, `U+000D`, and `U+0020` behave identically in backend and frontend;
 - repeated preprocessing is idempotent;
 - `null` accepted for nullable fields;
 - empty input becomes `null` for nullable fields.
@@ -862,6 +896,8 @@ Rejected:
 - eleven digits;
 - arbitrary ten-digit value not beginning with `05`;
 - internal spaces;
+- `U+00A0 NO-BREAK SPACE` at either edge or internally;
+- unsupported Unicode whitespace;
 - hyphens;
 - parentheses;
 - slash;
@@ -890,24 +926,24 @@ Rejected:
 - exact Customer matching is Tenant-scoped;
 - hidden Customer information is not disclosed;
 - returning Customer creates a new independent Lead;
-- early Customer linking during Lead creation is optional;
-- explicit confirmation links the new Lead to a visible existing Customer;
-- early linking does not make the Lead `won` or create a Reservation or Contract;
-- Lead creation remains allowed without a link when frozen permissions allow it;
+- returning Customer Lead is created with `customer_id = null`;
+- a visible Customer match may be shown for awareness but does not persist an early link;
+- match acknowledgement is not persisted as `customer_id`;
+- no already-linked open or lost Lead conversion path exists;
+- Lead creation remains allowed when frozen permissions allow it;
 - a hidden Customer match is not disclosed through warnings or responses;
-- an unauthorized actor cannot explicitly link a hidden Customer;
 - hidden-match Lead creation does not authorize duplicate Customer creation during conversion;
 - conversion links one matching Customer;
-- conversion of an already-linked Lead locks and uses the same-Tenant linked Customer;
-- conversion of an already-linked Lead does not create or silently switch to another Customer;
+- conversion links `customer_id` and sets `stage = won` atomically;
+- conversion rechecks the exact Customer match before linking;
 - conversion creates a Customer when no match exists;
 - created Customer status is `customer`;
 - linking does not overwrite Customer data;
 - ambiguous historical Customer matches block conversion;
 - concurrent Customer match change returns `409`;
-- concurrent linked-Customer or `customer_id` change returns `409`;
-- changing phone on a linked open Lead requires explicit retain, change, or remove-link confirmation;
-- linked Lead phone update never modifies Customer phone or another Lead;
+- changing an open Lead phone reruns duplicate and Customer-match discovery;
+- changing an open Lead phone keeps `customer_id = null`;
+- open Lead phone update never modifies Customer phone or another Lead;
 - conversion rollback leaves no partial Customer, Lead mutation, or Activity;
 - Lead phone snapshots remain canonical.
 
@@ -917,7 +953,20 @@ Rejected:
 - future Leads use the Customer's current phone at creation time;
 - old Lead Activities and conversion records remain unchanged.
 
-### 21.5 Users and System Settings
+### 21.5 Existing Data and Constraint Rollout
+
+- inspection distinguishes transformable values from already-canonical stored values;
+- Arabic-Indic stored values are rewritten to canonical ASCII before CHECK installation;
+- Persian stored values are rewritten to canonical ASCII before CHECK installation;
+- approved ASCII edge-whitespace values are rewritten before CHECK installation;
+- `U+00A0` values are reported invalid rather than rewritten;
+- collision detection runs against proposed canonical Customer values before writes;
+- collision detection reruns after approved canonical writes;
+- constraints are not installed while invalid values or collisions remain;
+- every non-null stored value matches `^05[0-9]{8}$` before constraint installation;
+- no automatic Customer merge or arbitrary Customer selection occurs.
+
+### 21.6 Users and System Settings
 
 - `null` remains accepted;
 - a valid canonical value succeeds;
@@ -927,13 +976,15 @@ Rejected:
 - phone remains non-unique;
 - email remains User login identity.
 
-### 21.6 Frontend
+### 21.7 Frontend
 
 - placeholder is `05XXXXXXXX`;
 - no permanent helper text appears;
 - ASCII digits are accepted;
 - Arabic-Indic digits convert correctly;
 - Persian digits convert correctly;
+- approved ASCII edge whitespace matches backend behavior exactly;
+- `U+00A0` is rejected consistently with backend behavior;
 - more than ten digits are prevented without silent valid truncation;
 - formatting symbols are not silently repaired;
 - invalid-format message is displayed;
@@ -1009,12 +1060,14 @@ These items may not reopen:
 
 ## 24. Freeze Statement
 
-CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is FROZEN.
+CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is undergoing required architecture amendments identified during Codex review.
 
-It is the authoritative phone normalization and validation contract for CRM / Leads v1 and every governed field defined in this document.
+Its current status is:
 
 ```text
-FROZEN
+DRAFT — Architecture Amendments Required
 ```
 
-After this freeze, any change to supported phone type, canonical format, preprocessing, validation, storage, field scope, uniqueness, matching, conversion, frontend behavior, database enforcement, rollout order, or required test coverage requires an explicit Product Owner amendment.
+The specification is not frozen or authoritative while these findings remain under review. A separate Product Owner action is required to restore `Status: FROZEN` after the amendments receive final architecture approval.
+
+No CRM implementation, migration, database write, API, or frontend change may begin from this draft.
