@@ -3,7 +3,7 @@
 **Project:** NexusOS Pilot  
 **Module:** CRM / Leads v1  
 **Version:** 1.0  
-**Status:** FROZEN — Approved for Specification and DDL Design  
+**Status:** FROZEN CANDIDATE — Engineering Amendments Applied<br>
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
@@ -77,6 +77,18 @@ Customer.status: lead → customer
 
 No other Customer identity or contact fields are overwritten automatically.
 
+After CRM / Leads v1 is launched, the CRM Lead is the only official path for managing newly created prospective customers. `Customer.status = lead` remains a legacy compatibility state for records and behavior that predate the CRM module.
+
+The compatibility rules are:
+
+- A Customer created directly without a Lead starts with `status = customer`.
+- `lead` is not offered or accepted as the status of a newly created Customer after CRM launch.
+- A normal Customer update cannot move a non-legacy Customer into the deprecated `lead` state.
+- Existing Customers already in `lead` remain unchanged until an explicit business operation changes them.
+- Existing legacy Customers linked to Reservations or Contracts are not rewritten automatically during migration or deployment.
+- Linking a legacy Customer during Lead conversion atomically promotes it to `customer` as defined above.
+- CRM / Leads v1 does not redesign Reservation eligibility. Until an independent Customer / Reservation amendment is approved, new Reservations continue to accept any non-archived Customer under the existing Reservation contract.
+
 ---
 
 ## 3. Lead Data Contract
@@ -94,7 +106,7 @@ source_detail         nullable
 project_id            nullable FK
 unit_id               nullable FK
 stage                 required enum, system-controlled
-assigned_to           nullable FK
+assigned_to           nullable FK → tenant_users.id
 next_follow_up_at     nullable datetime
 lost_reason           nullable enum
 lost_reason_detail    nullable
@@ -115,6 +127,8 @@ updated_by            nullable FK
 created_at
 updated_at
 ```
+
+`assigned_to` identifies a Tenant membership, not a global User account. General actor fields (`created_by`, `updated_by`, `lost_by`, `converted_by`, `archived_by`, and `restored_by`) continue to reference `users.id` in accordance with the current repository convention. Every command validates the actor's active Tenant membership.
 
 ### 3.1 Minimum Creation Data
 
@@ -152,6 +166,8 @@ tenant_id + normalized_phone
 ```
 
 Duplicate handling is advisory and application-level.
+
+Phone identity matching uses one centralized canonicalization contract across Lead and Customer create, update, lookup, duplicate warning, and conversion operations. The existing raw `customers.phone` uniqueness constraint is not sufficient protection for normalized identity matching.
 
 ---
 
@@ -311,8 +327,8 @@ previous_next_follow_up_at
 Required payload:
 
 ```text
-from_user_id nullable
-to_user_id nullable
+from_tenant_user_id nullable
+to_tenant_user_id nullable
 ```
 
 At least one value must differ.
@@ -345,6 +361,31 @@ created_at  = persistence timestamp
 
 Users cannot provide or modify `occurred_at`.
 
+### 5.4 Selective Operational History
+
+`LeadActivity` in v1 is a selective operational timeline. It is not a complete field-level audit log.
+
+It records:
+
+- notes;
+- stage changes;
+- assignment changes;
+- archive operations;
+- restore operations;
+- conversion context inside the conversion `stage_change` activity.
+
+It does not preserve a historical entry for ordinary changes to:
+
+- name;
+- phone;
+- email;
+- source and source detail;
+- Project or Unit interest;
+- follow-up rescheduling;
+- other general editable fields.
+
+Those ordinary changes update only `updated_by` and `updated_at`. CRM / Leads v1 must not describe this timeline as a full audit history beyond the events explicitly recorded above.
+
 ---
 
 ## 6. Lead Lifecycle
@@ -360,6 +401,8 @@ viewing → negotiation
 ```
 
 Skipping open stages is allowed when it reflects operational reality. Every change creates a transactional `stage_change` activity.
+
+Administrator may perform forward movement on any visible non-archived open Lead. Sales / Employee may perform forward movement only on their own assigned non-archived open Lead.
 
 ### 6.2 Backward Correction
 
@@ -522,7 +565,7 @@ A Lead may be unassigned:
 assigned_to = null
 ```
 
-An assignee must belong to the same Tenant, have an active account, have an active Tenant membership, and have one of:
+For every new assignment, claim, reassignment, initial assignment, or assignment preserved during restore or reopen, the assignee must belong to the same Tenant, have an active account, have an active Tenant membership, and have one of:
 
 ```text
 administrator
@@ -538,6 +581,8 @@ project_manager
 system_owner
 ```
 
+This is assignment-time eligibility. An existing assignment may remain temporarily attached to an ineligible membership only after the explicitly permitted emergency security suspension described in §9.5. No new Lead may be assigned to that membership while it remains ineligible.
+
 ### 9.2 Assignment Authority
 
 Administrator may assign, reassign, unassign, assign to self, or assign to any eligible user.
@@ -545,7 +590,7 @@ Administrator may assign, reassign, unassign, assign to self, or assign to any e
 Sales / Employee may only claim an unassigned open Lead for self:
 
 ```text
-assigned_to: null → current_user
+assigned_to: null → current TenantUser membership
 ```
 
 They may not assign to another user, take a Lead from another assignee, unassign, or redistribute Leads.
@@ -563,7 +608,7 @@ assigned_to = null
 For Sales / Employee, the system sets:
 
 ```text
-assigned_to = current_user
+assigned_to = current TenantUser membership
 ```
 
 They cannot create a Lead unassigned or assign it to another user. The backend derives assignment from the authenticated user and rejects unauthorized `assigned_to` input.
@@ -574,17 +619,30 @@ If a Lead is assigned during creation:
 
 ```text
 assignment:
-from_user_id = null
-to_user_id = initial assignee
+from_tenant_user_id = null
+to_tenant_user_id = initial assignee membership
 ```
 
 No assignment activity is created when Administrator creates an unassigned Lead. Creation and initial assignment activity are atomic.
 
 ### 9.5 User Deactivation
 
-Normal deactivation or membership removal is blocked while the user has assigned open Leads. Leads must first be reassigned or unassigned.
+Lead assignment introduces the following cross-module protection for a membership that has assigned open Leads:
 
-Emergency security suspension may proceed without reassignment. Those Leads remain assigned historically and are surfaced to Administrator as assigned to an inactive user.
+| User or membership change | Required behavior |
+|---|---|
+| Change role to an ineligible role | Blocked until open Leads are reassigned or unassigned |
+| Change membership to `paused` | Blocked until open Leads are reassigned or unassigned |
+| Change membership to `removed` | Blocked until open Leads are reassigned or unassigned |
+| Administrative User archival | Blocked until open Leads are reassigned or unassigned |
+| Emergency security `suspended` | Allowed immediately; existing assignments remain |
+
+After emergency suspension:
+
+- no new Lead may be assigned to the suspended membership;
+- existing assignments are shown to Administrator with an inactive-assignee warning;
+- Administrator redistributes or unassigns them manually;
+- restoring membership eligibility does not recreate any assignment that was previously cleared or reassigned.
 
 ### 9.6 Assignment During Reopen or Restore
 
@@ -611,7 +669,7 @@ Administrator sees all Leads inside the Tenant, including all assignees, unassig
 They see:
 
 ```text
-assigned_to = current_user
+assigned_to = current TenantUser membership
 OR
 assigned_to IS NULL
 ```
@@ -663,6 +721,54 @@ own Leads + unassigned Leads
 ### 10.8 No Sharing
 
 CRM / Leads v1 has no multi-owner model, Lead sharing, watchers, delegated access, secondary assignees, or team ownership. Each Lead has zero or one assignee.
+
+### 10.9 Roles Without CRM Access
+
+The following roles have no CRM module access in v1:
+
+```text
+accountant
+project_manager
+system_owner
+```
+
+An authenticated active Tenant member with one of those roles receives:
+
+```text
+403 Forbidden
+```
+
+This differs from an authorized CRM user requesting a Lead outside their visibility scope, which remains:
+
+```text
+404 Not Found
+```
+
+`system_owner` receives no implicit Tenant CRM access.
+
+### 10.10 Command Authorization Matrix
+
+| Command or operation | Administrator | Sales / Employee |
+|---|---|---|
+| Create Lead | Yes | Yes; system assigns current membership |
+| Edit basic data on an open Lead | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Edit source | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Edit Project / Unit interest | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Edit follow-up | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Add note to an open Lead | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Move forward in open stage | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Move backward in open stage | Yes | No |
+| Claim unassigned Lead | Yes | For self only |
+| Move to lost | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Reopen lost Lead | Yes | No |
+| Convert Lead | Any visible non-archived open Lead | Own assigned non-archived open Lead only |
+| Archive / restore | Yes | No |
+
+An unassigned Lead is read-and-claim only for Sales / Employee. No edit, note, lifecycle command, or conversion is permitted before claim.
+
+A `lost` Lead is readable by its owning Sales / Employee but remains read-only for them. Administrator may read, reopen, or archive it. No new note is accepted on a `lost` Lead in v1.
+
+A `won` Lead is read-only for every actor who retains visibility. It cannot be edited, receive notes, be reassigned, archived, or moved through another lifecycle command.
 
 ---
 
@@ -726,6 +832,8 @@ AND archived_at IS NULL
 - After restoring an archived open Lead, the preserved follow-up becomes operational again.
 - No automated reminder or notification is sent in v1.
 
+`next_follow_up_at` is stored as a UTC `timestamptz`. Overdue presentation uses the Tenant timezone. Future date filters follow the same Tenant-timezone boundary rule unless amended explicitly.
+
 When conversion or loss clears a follow-up, the previous value may be included in the command’s activity payload for historical context.
 
 ---
@@ -755,7 +863,19 @@ tenant_id + normalized phone
 
 No matching by name or email exists in v1.
 
-The UI performs an early check, but the command revalidates inside the transaction. The Customer unique constraint remains the final protection.
+The UI performs an early check, but the command revalidates inside the transaction using the same centralized phone canonicalization contract used by every Lead and Customer write path.
+
+Before production conversion behavior is enabled, existing Customers must be backfilled or otherwise evaluated under that canonicalization. A final normalized Customer identity constraint cannot be enabled until existing normalized collisions are resolved.
+
+If more than one Customer inside the Tenant matches the same normalized phone:
+
+```text
+Conversion is blocked
+→ integrity conflict
+→ administrative data resolution is required
+```
+
+The command never selects one matching Customer arbitrarily. The existing unique constraint on raw `customers.phone` is not treated as final normalized-identity protection.
 
 ### 13.3 No Matching Customer
 
@@ -769,9 +889,10 @@ phone
 email
 ```
 
-The user completes every required Customer field under existing Customer validation. The conversion creates a Customer and records:
+The user completes every required Customer field under existing Customer validation. Customer status is not user-selectable in the conversion form. The command creates:
 
 ```text
+Customer.status = customer
 conversion_mode = created
 ```
 
@@ -835,7 +956,23 @@ customer_id
 conversion_mode
 ```
 
-Only one concurrent conversion attempt may succeed.
+For concurrent attempts on the same Lead, exactly one conversion may succeed. A later attempt observes the completed Lead and fails as already converted.
+
+Multiple different Leads may link to the same Customer because they may represent distinct opportunities:
+
+```text
+leads.customer_id is not unique
+```
+
+If two different Leads concurrently attempt to create a Customer using the same normalized phone:
+
+1. the first successful transaction may create the Customer;
+2. the later transaction must re-resolve the normalized match after locking or after the normalized-identity conflict;
+3. if exactly one matching Customer now exists, the command must not silently change the user's confirmed mode from `create` to `link`;
+4. it returns `409 Conflict` indicating that the Customer match changed;
+5. the UI reloads the match and requires explicit user review and confirmation before a new link attempt.
+
+If the later lookup yields multiple normalized matches, the integrity-conflict behavior in §13.2 applies.
 
 ---
 
@@ -996,17 +1133,23 @@ Specialized actor metadata such as `lost_by`, `converted_by`, `archived_by`, and
 | Condition | Required invariant |
 |---|---|
 | `stage = won` | `customer_id`, `converted_at`, `converted_by`, and `conversion_mode` are non-null |
-| `stage != won` | Current conversion metadata is null |
+| `stage != won` | `customer_id`, `converted_at`, `converted_by`, and `conversion_mode` are all null |
 | `stage = lost` | `lost_reason`, `lost_at`, and `lost_by` are non-null |
-| `stage != lost` | Current loss metadata is null |
+| `stage != lost` | `lost_reason`, `lost_reason_detail`, `lost_at`, and `lost_by` are all null |
+| `stage IN (won, lost)` | `next_follow_up_at` is null |
 | `archived_at != null` | `archived_by` and `archive_reason` are non-null |
-| `archived_at = null` | Current archive reason metadata is null |
+| `archived_at = null` | `archived_by`, `archive_reason`, and `archive_reason_detail` are all null; latest restore metadata is not cleared |
 | `source = other` | `source_detail` is non-empty |
 | `source != other` | `source_detail = null` |
 | `lost_reason = other` | `lost_reason_detail` is non-empty |
 | `archive_reason = other` | `archive_reason_detail` is non-empty |
 | `unit_id != null` | `project_id != null` |
-| Project and Unit selected | Both belong to Lead Tenant and Unit belongs to Project |
+| `project_id != null` | Project belongs to Lead Tenant |
+| `unit_id != null` | Unit belongs to Lead Tenant and `unit.project_id = lead.project_id` |
+| `customer_id != null` | Customer belongs to Lead Tenant; multiple Leads may reference the same Customer |
+| `assigned_to != null` at assignment time | TenantUser belongs to Lead Tenant and satisfies assignment eligibility; emergency suspension may later preserve the existing reference under §9.5 |
+| LeadActivity exists | `LeadActivity.tenant_id = Lead.tenant_id` and the Activity cannot move to another Lead |
+| Actor executes a Lead command | Actor operates through an active membership in Lead Tenant; no system-actor exception exists in v1 |
 | Lead is archived | No operational command except Restore is permitted |
 | Lead is `won` | No lifecycle reversal or archive is permitted in v1 |
 
@@ -1033,6 +1176,8 @@ Definition:
 active Lead = stage IN (new, qualified, viewing, negotiation)
               AND archived_at IS NULL
 ```
+
+`converted_at` is stored as a UTC `timestamptz`. “Converted this month” uses the start and end of the month in `Tenant.timezone`, converted to UTC boundaries for the database query. Activity timestamps are also stored as UTC and presented in the Tenant timezone.
 
 ### 18.2 Search
 
@@ -1062,7 +1207,7 @@ archived
 ### 18.4 Sorting and Pagination
 
 ```text
-Default sort: updated_at descending
+Default sort: updated_at DESC, id DESC
 Default page size: 20
 ```
 
@@ -1138,35 +1283,50 @@ Configurable Lead source administration
 The following do not reopen approved business rules. They require technical specification:
 
 1. Canonical phone normalization format.
-2. Centralized normalization implementation location.
-3. Existing Customer phone normalization and backfill strategy.
-4. Physical phone storage and non-unique indexing strategy for Leads.
-5. LeadActivity payload representation and validation.
-6. CHECK constraints and cross-table enforcement boundaries.
-7. Foreign-key delete/restrict behavior.
-8. Concurrency strategy for claim, conversion, and lifecycle commands.
-9. API request and response contracts.
-10. Domain error and HTTP conflict mapping.
-11. Query indexes and pagination strategy.
-12. Legacy Customer `lead → customer` promotion implementation.
-13. Exact activity payload requirements for cleared follow-up values.
-14. PostgreSQL integration test matrix.
+2. Centralized normalization implementation location across every Lead and Customer write and lookup path.
+3. Existing Customer phone normalization, backfill, collision detection, and administrative resolution strategy.
+4. Physical phone display and normalized-identity storage strategy.
+5. Non-unique normalized-phone indexing strategy for Leads and final normalized identity protection for Customers.
+6. `assigned_to` physical FK to `tenant_users.id` and its API representation with related User identity.
+7. Tenant-safe FK or transactional enforcement strategy for Customer, Project, Unit, Assignee, LeadActivity, and actor relationships.
+8. LeadActivity payload representation, schema validation, and payload versioning.
+9. Append-only LeadActivity enforcement boundary.
+10. Exact activity payload requirements for cleared follow-up values.
+11. CHECK constraints and cross-table enforcement boundaries.
+12. Field lengths and trim, case, empty-string, and null-normalization rules.
+13. UTC storage and Tenant-timezone query and presentation boundaries.
+14. Foreign-key delete/restrict behavior for every relationship and actor field.
+15. Concurrency and fixed lock-order strategy for claim, conversion, lifecycle commands, Customer create, and Customer phone update.
+16. Stale-update and optimistic-concurrency strategy for editable Leads.
+17. API request and response contracts.
+18. Exact domain errors and `403` / `404` / `409` / `422` HTTP mapping.
+19. Query indexes, stable pagination, search behavior, and tie-break ordering.
+20. Summary interaction with search and filters while preserving role visibility scope.
+21. Legacy Customer `lead → customer` promotion implementation.
+22. Customer direct-create and update compatibility changes that prevent new legacy `lead` records.
+23. Reservation compatibility verification without redesigning its current non-archived Customer eligibility rule.
+24. User / TenantUser role and status transition guards introduced by assigned open Leads.
+25. Normalized Customer match-changed behavior and explicit re-confirmation after a conversion race.
+26. PostgreSQL integration test matrix spanning Leads, Customers, Users, TenantUser, Reservations, tenant isolation, rollback, and real row-lock concurrency.
 
 ---
 
 ## 22. Freeze Statement
 
-The business architecture and business rules in this document are approved and frozen for CRM / Leads v1.
+The Product Owner has approved the CRM / Leads v1 business architecture, business rules, and repository-engineering amendments contained in this document.
+
+The document is a frozen candidate pending one final repository engineering verification that the approved amendments have been applied completely and consistently. No aggregate or lifecycle decision is reopened by that verification.
 
 The next permitted phases are:
 
 ```text
-1. Repository engineering review
-2. Technical specification
-3. Validation and phone normalization specification
-4. DDL specification and database constraints
-5. API specification
-6. Implementation planning
+1. Final repository engineering verification
+2. Mark Architecture & Business Rules v1.0 as FROZEN
+3. Phone normalization and validation specification
+4. Technical specification
+5. DDL specification and database constraints
+6. API specification
+7. Implementation planning
 ```
 
-No implementation, migration, public API, lifecycle, authorization, or aggregate-boundary change may contradict this document without an explicit Product Owner amendment.
+After final approval, no implementation, migration, public API, lifecycle, authorization, or aggregate-boundary change may contradict this document without an explicit Product Owner amendment.
