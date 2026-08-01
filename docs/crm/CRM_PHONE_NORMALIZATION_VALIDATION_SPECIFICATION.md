@@ -3,7 +3,7 @@
 **Project:** NexusOS Pilot  
 **Module:** CRM / Leads v1  
 **Version:** 1.0  
-**Status:** DRAFT — Architecture Amendments Required<br>
+**Status:** FROZEN
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
@@ -12,7 +12,7 @@
 
 This document defines the single mobile-number contract used by CRM / Leads v1 and the existing NexusOS Pilot fields that represent mobile numbers.
 
-It freezes the business-visible rules for preprocessing, validation, persistence, matching, duplicate handling, frontend behavior, database enforcement, rollout safety, and testing before CRM DDL or implementation begins.
+It defines the business-visible rules for preprocessing, validation, persistence, matching, duplicate handling, frontend behavior, database enforcement, rollout safety, and testing before CRM DDL or implementation begins.
 
 This specification supplements, and does not replace:
 
@@ -1060,14 +1060,12 @@ These items may not reopen:
 
 ## 24. Freeze Statement
 
-CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is undergoing required architecture amendments identified during Codex review.
+CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is FROZEN.
 
-Its current status is:
+It is the authoritative phone normalization and validation contract for CRM / Leads v1 and every governed field defined in this document.
 
 ```text
-DRAFT — Architecture Amendments Required
+FROZEN
 ```
 
-The specification is not frozen or authoritative while these findings remain under review. A separate Product Owner action is required to restore `Status: FROZEN` after the amendments receive final architecture approval.
-
-No CRM implementation, migration, database write, API, or frontend change may begin from this draft.
+After this freeze, any change to supported phone type, canonical format, preprocessing, validation, storage, field scope, uniqueness, matching, conversion, frontend behavior, database enforcement, rollout order, or required test coverage requires an explicit Product Owner amendment.
