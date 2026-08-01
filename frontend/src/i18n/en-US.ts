@@ -7,6 +7,7 @@ export const enUS: TranslationDictionary = {
   "common.loading": "Loading...",
   "common.search": "Search",
   "common.showAll": "View all",
+  "common.userMenu": "User menu",
   "common.logout": "Sign out",
   "common.systemRunning": "System operational",
   "common.underConstruction": "This module is under construction",
@@ -273,7 +274,7 @@ export const enUS: TranslationDictionary = {
   "collections.cards.absent": "No Schedule",
   "collections.search.label": "Search",
   "collections.search.placeholder":
-    "Search by customer or unit number...",
+    "Search by customer, project, or unit number...",
   "collections.filter.status": "Contract Status",
   "collections.filter.allStatuses": "All Statuses",
   "collections.filter.scheduleState": "Schedule State",

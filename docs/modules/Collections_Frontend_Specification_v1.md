@@ -344,7 +344,7 @@ Every key below must be added to `TranslationKey` in `src/i18n/types.ts`. The ex
 
 // Toolbar
 "collections.search.label":              "بحث",
-"collections.search.placeholder":        "بحث بالعميل أو رقم الوحدة...",
+"collections.search.placeholder":        "بحث بالعميل أو المشروع أو رقم الوحدة...",
 "collections.filter.status":             "حالة العقد",
 "collections.filter.allStatuses":        "جميع الحالات",
 "collections.filter.scheduleState":      "حالة الجدول",
@@ -404,7 +404,7 @@ Every key below must be added to `TranslationKey` in `src/i18n/types.ts`. The ex
 
 // Toolbar
 "collections.search.label":              "Search",
-"collections.search.placeholder":        "Search by customer or unit number...",
+"collections.search.placeholder":        "Search by customer, project, or unit number...",
 "collections.filter.status":             "Contract Status",
 "collections.filter.allStatuses":        "All Statuses",
 "collections.filter.scheduleState":      "Schedule State",

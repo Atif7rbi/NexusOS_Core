@@ -120,6 +120,54 @@ final class CollectionsIndexApiTest extends ApiTestCase
             ->assertJsonPath('data.items.0.contract_id', $unitOnly);
     }
 
+    public function test_project_search_is_tenant_scoped_and_does_not_change_summary(): void
+    {
+        [$tenantId, $userId] = $this->authenticate();
+
+        $matching = $this->createContract(
+            $tenantId,
+            $userId,
+            'عميل المشروع المطابق',
+            'PROJECT-101',
+            projectName: 'واحة النخيل السكنية',
+        );
+        $this->createContract(
+            $tenantId,
+            $userId,
+            'عميل مشروع آخر',
+            'PROJECT-102',
+            projectName: 'روابي الشرق',
+        );
+
+        $otherUser = $this->createActiveUser();
+        $otherTenantId = (string) TenantUser::query()
+            ->where('user_id', $otherUser->id)
+            ->value('tenant_id');
+        $this->createContract(
+            $otherTenantId,
+            $otherUser->id,
+            'عميل مستأجر آخر',
+            'PROJECT-103',
+            projectName: 'واحة النخيل الدولية',
+        );
+
+        $baselineSummary = $this->getJson('/api/collections')
+            ->assertOk()
+            ->json('data.summary');
+
+        $response = $this->getJson(
+            '/api/collections?search='.urlencode('  واحة النخيل  '),
+        )->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.contract_id', $matching);
+
+        $this->assertSame(
+            $baselineSummary,
+            $response->json('data.summary'),
+        );
+    }
+
     public function test_pagination_ordering_and_decimal_representation_are_exact(): void
     {
         [$tenantId, $userId] = $this->authenticate();
@@ -269,6 +317,7 @@ final class CollectionsIndexApiTest extends ApiTestCase
         ContractStatus $status = ContractStatus::Draft,
         ?CarbonImmutable $createdAt = null,
         string $totalAmount = '1000.00',
+        ?string $projectName = null,
     ): string {
         $this->fixtureSequence++;
         $createdAt ??= CarbonImmutable::now();
@@ -284,7 +333,7 @@ final class CollectionsIndexApiTest extends ApiTestCase
             'project_number' => "IDX-{$this->fixtureSequence}",
             'project_number_year' => 2026,
             'project_sequence_number' => $this->fixtureSequence,
-            'name' => "مشروع {$this->fixtureSequence}",
+            'name' => $projectName ?? "مشروع {$this->fixtureSequence}",
             'project_type' => 'residential',
             'status' => 'active',
             'city' => 'الرياض',

@@ -9,6 +9,7 @@ export type TranslationKey =
   | "common.loading"
   | "common.search"
   | "common.showAll"
+  | "common.userMenu"
   | "common.logout"
   | "common.systemRunning"
   | "common.underConstruction"

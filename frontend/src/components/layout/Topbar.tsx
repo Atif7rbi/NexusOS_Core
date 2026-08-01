@@ -7,6 +7,13 @@ import {
   Search,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+} from "react";
 
 import { LanguageToggle } from "@/components/language/LanguageToggle";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -31,6 +38,14 @@ export function Topbar() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { openMobileSidebar } = useAppShell();
+  const [isUserMenuOpen, setIsUserMenuOpen] =
+    useState(false);
+  const userMenuContainerRef =
+    useRef<HTMLDivElement>(null);
+  const userMenuButtonRef =
+    useRef<HTMLButtonElement>(null);
+  const logoutButtonRef =
+    useRef<HTMLButtonElement>(null);
 
   const page = getPageTitle(pathname);
 
@@ -45,9 +60,76 @@ export function Topbar() {
       )
     : "";
 
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (
+      event: PointerEvent
+    ): void => {
+      if (
+        !userMenuContainerRef.current?.contains(
+          event.target as Node
+        )
+      ) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (
+      event: globalThis.KeyboardEvent
+    ): void => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      setIsUserMenuOpen(false);
+      userMenuButtonRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDown
+      );
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isUserMenuOpen]);
+
   const handleLogout = async (): Promise<void> => {
+    setIsUserMenuOpen(false);
     await logout();
     router.replace("/login/");
+  };
+
+  const handleUserMenuKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>
+  ): void => {
+    if (event.key !== "ArrowDown") {
+      return;
+    }
+
+    event.preventDefault();
+    setIsUserMenuOpen(true);
+    window.requestAnimationFrame(() => {
+      logoutButtonRef.current?.focus();
+    });
+  };
+
+  const handleUserMenuBlur = (
+    event: FocusEvent<HTMLDivElement>
+  ): void => {
+    if (
+      !event.currentTarget.contains(
+        event.relatedTarget as Node | null
+      )
+    ) {
+      setIsUserMenuOpen(false);
+    }
   };
 
   return (
@@ -184,9 +266,18 @@ export function Topbar() {
 
           <div className="mx-1 hidden h-8 w-px bg-[var(--border)] sm:block" />
 
-          <div className="group relative">
+          <div
+            ref={userMenuContainerRef}
+            className="relative"
+            onMouseEnter={() => setIsUserMenuOpen(true)}
+            onMouseLeave={() => setIsUserMenuOpen(false)}
+            onBlur={handleUserMenuBlur}
+          >
             <button
+              ref={userMenuButtonRef}
               type="button"
+              onClick={() => setIsUserMenuOpen(true)}
+              onKeyDown={handleUserMenuKeyDown}
               className={[
                 "motion-ui flex items-center gap-3",
                 "rounded-[var(--radius-md)]",
@@ -195,6 +286,10 @@ export function Topbar() {
                 "hover:border-[var(--border)]",
                 "hover:bg-[var(--surface-soft)]",
               ].join(" ")}
+              aria-label={t("common.userMenu")}
+              aria-haspopup="menu"
+              aria-expanded={isUserMenuOpen}
+              aria-controls="topbar-user-menu"
             >
               <div className="hidden min-w-0 text-start sm:block">
                 <p className="max-w-36 truncate text-sm font-bold text-[var(--text-primary)]">
@@ -225,23 +320,22 @@ export function Topbar() {
             </button>
 
             <div
+              id="topbar-user-menu"
+              role="menu"
               className={[
-                "invisible absolute end-0 top-full z-50 mt-2 w-52",
-                "translate-y-1",
+                "absolute end-0 top-full z-[70] mt-2 w-52",
+                "max-w-[calc(100vw-2rem)]",
                 "rounded-[var(--radius-md)]",
                 "border border-[var(--border)]",
                 "bg-[var(--surface)] p-2",
-                "opacity-0 shadow-[var(--shadow-lg)]",
+                "shadow-[var(--shadow-lg)]",
                 "transition-all duration-150",
-                "group-focus-within:visible",
-                "group-focus-within:translate-y-0",
-                "group-focus-within:opacity-100",
-                "group-hover:visible",
-                "group-hover:translate-y-0",
-                "group-hover:opacity-100",
+                isUserMenuOpen
+                  ? "visible translate-y-0 opacity-100"
+                  : "invisible translate-y-1 opacity-0",
               ].join(" ")}
             >
-              <div className="mb-2 border-b border-[var(--border)] px-3 py-2 sm:hidden">
+              <div className="mb-2 border-b border-[var(--border)] px-3 py-2">
                 <p className="truncate text-sm font-bold text-[var(--text-primary)]">
                   {user?.name ?? ""}
                 </p>
@@ -252,8 +346,10 @@ export function Topbar() {
               </div>
 
               <button
+                ref={logoutButtonRef}
                 type="button"
                 onClick={handleLogout}
+                role="menuitem"
                 className={[
                   "motion-ui w-full rounded-lg px-3 py-2.5",
                   "text-start text-sm font-semibold",

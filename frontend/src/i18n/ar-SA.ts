@@ -7,6 +7,7 @@ export const arSA: TranslationDictionary = {
   "common.loading": "جارٍ التحميل...",
   "common.search": "بحث",
   "common.showAll": "عرض الكل",
+  "common.userMenu": "قائمة المستخدم",
   "common.logout": "تسجيل الخروج",
   "common.systemRunning": "النظام يعمل",
   "common.underConstruction": "هذه الوحدة قيد البناء",
@@ -266,7 +267,8 @@ export const arSA: TranslationDictionary = {
   "collections.cards.draft": "مسودات قيد التحرير",
   "collections.cards.absent": "بدون جدول تحصيل",
   "collections.search.label": "بحث",
-  "collections.search.placeholder": "بحث بالعميل أو رقم الوحدة...",
+  "collections.search.placeholder":
+    "بحث بالعميل أو المشروع أو رقم الوحدة...",
   "collections.filter.status": "حالة العقد",
   "collections.filter.allStatuses": "جميع الحالات",
   "collections.filter.scheduleState": "حالة الجدول",
