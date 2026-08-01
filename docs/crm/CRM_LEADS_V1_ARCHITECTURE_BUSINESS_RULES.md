@@ -670,11 +670,13 @@ They see:
 
 ```text
 assigned_to = current TenantUser membership
-OR
-assigned_to IS NULL
+OR (
+    assigned_to IS NULL
+    AND stage IN (new, qualified, viewing, negotiation)
+)
 ```
 
-They do not see Leads assigned to another user.
+They see all Leads assigned to their current TenantUser membership, including open, `lost`, and `won` Leads. They see unassigned Leads only while those Leads are in an open stage. They do not see Leads assigned to another user or unassigned `lost` and `won` Leads.
 
 A hidden Lead is treated as:
 
@@ -682,15 +684,15 @@ A hidden Lead is treated as:
 404 Not Found
 ```
 
-Backend visibility applies to list, single retrieval, activities, updates, lifecycle commands, assignment, conversion, archive actions, and every future endpoint.
+The same visibility rule applies to list visibility, single-resource visibility, Activities visibility, summary scope, duplicate-warning visibility, and all future CRM read queries. Backend visibility also applies to updates, lifecycle commands, assignment, conversion, and archive actions.
 
 ### 10.3 Unassigned Lead Access
 
-Sales / Employee may read an unassigned Lead and claim it. Before claiming, they may not edit it, change stage, add notes, convert it, or move it to lost.
+Sales / Employee may read and claim an unassigned Lead only while it is in an open stage. Before claiming, they may not edit it, change stage, add notes, convert it, or move it to lost. Unassigned `lost` and `won` Leads are not visible to them.
 
 ### 10.4 Closed Leads
 
-Sales / Employee may read their own assigned `won` and `lost` Leads, subject to lifecycle restrictions.
+Sales / Employee may read their own assigned `won` and `lost` Leads, subject to lifecycle restrictions. They may not read unassigned `won` or `lost` Leads.
 
 ### 10.5 Archived Leads
 
@@ -715,8 +717,12 @@ Administrator summaries are Tenant-wide.
 Sales / Employee summaries cover only:
 
 ```text
-own Leads + unassigned Leads
+own assigned Leads
+OR
+unassigned Leads in open stages only
 ```
+
+They do not include unassigned `won` or `lost` Leads.
 
 ### 10.8 No Sharing
 
@@ -787,12 +793,12 @@ Administrator may see all matching Leads in the Tenant, including archived match
 Sales / Employee may see only matching Leads already within their visibility scope:
 
 ```text
-own
+own assigned Leads
 or
-unassigned
+unassigned Leads in open stages only
 ```
 
-Matches assigned to other users are not disclosed or hinted at.
+Matches assigned to other users and unassigned `won` or `lost` matches are not disclosed or hinted at.
 
 For a visible duplicate, the UI provides:
 
@@ -1315,18 +1321,16 @@ The following do not reopen approved business rules. They require technical spec
 
 The Product Owner has approved the CRM / Leads v1 business architecture, business rules, and repository-engineering amendments contained in this document.
 
-The document is a frozen candidate pending one final repository engineering verification that the approved amendments have been applied completely and consistently. No aggregate or lifecycle decision is reopened by that verification.
+CRM / Leads v1 Architecture & Business Rules v1.0 is FROZEN. Its approved aggregate boundaries, lifecycle, authorization rules, invariants, technical-design items, and out-of-scope items are the authoritative business architecture for CRM / Leads v1.
 
 The next permitted phases are:
 
 ```text
-1. Final repository engineering verification
-2. Mark Architecture & Business Rules v1.0 as FROZEN
-3. Phone normalization and validation specification
-4. Technical specification
-5. DDL specification and database constraints
-6. API specification
-7. Implementation planning
+1. Phone normalization and validation specification
+2. Technical specification
+3. DDL specification and database constraints
+4. API specification
+5. Implementation planning
 ```
 
-After final approval, no implementation, migration, public API, lifecycle, authorization, or aggregate-boundary change may contradict this document without an explicit Product Owner amendment.
+After this freeze, no implementation, migration, public API, lifecycle, authorization, or aggregate-boundary change may contradict this document without an explicit Product Owner amendment.
