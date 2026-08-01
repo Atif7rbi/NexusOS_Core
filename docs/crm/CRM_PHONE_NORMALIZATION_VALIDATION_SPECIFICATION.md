@@ -3,7 +3,7 @@
 **Project:** NexusOS Pilot  
 **Module:** CRM / Leads v1  
 **Version:** 1.0  
-**Status:** FROZEN
+**Status:** DRAFT — Codex Follow-up Amendments Required
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
@@ -502,19 +502,54 @@ When no exact Tenant-scoped Customer match exists:
 2. copy only approved Lead conversion data, including name, canonical phone, email when available, and other fields approved by the conversion contract;
 3. force `Customer.status = customer` server-side;
 4. link `Lead.customer_id`;
-5. move the Lead to `won` through the approved conversion command.
+5. move the Lead to `won` through the approved conversion command;
+6. set `conversion_mode = created`.
 
 ### 13.2 Existing Matching Customer
 
-When one exact matching Customer exists:
+When one exact matching Customer exists, conversion preserves the Customer-state cases frozen in the CRM architecture.
 
-- present that Customer for explicit linking confirmation;
+#### 13.2.1 Matching Archived Customer
+
+- conversion is blocked;
+- the Customer is not linked;
+- the Customer is not restored implicitly;
+- an Administrator must restore the Customer through the independent Customer workflow;
+- conversion may be retried only after restoration.
+
+#### 13.2.2 Matching Legacy Customer in `lead`
+
+Inside the same atomic conversion transaction, the command must:
+
+1. lock the Lead and matching Customer;
+2. validate Tenant, visibility, authorization, Customer archive state, Lead stage, and Lead archive state;
+3. promote `Customer.status` from `lead` to `customer`;
+4. link `Lead.customer_id`;
+5. set `Lead.stage = won`;
+6. set `converted_at`, `converted_by`, and the other approved conversion metadata;
+7. set `conversion_mode = linked_and_promoted`;
+8. clear `next_follow_up_at`;
+9. create the approved `stage_change` Activity;
+10. commit atomically.
+
+The command must not create a duplicate Customer, promote the Customer outside the conversion transaction, or overwrite Customer identity or contact fields automatically.
+
+#### 13.2.3 Matching Customer in `customer`
+
+- present the Customer for explicit linking confirmation;
 - show material data differences for review;
-- link the Lead after confirmation;
-- do not create another Customer;
-- do not overwrite existing Customer data automatically.
+- link the existing Customer without automatically overwriting Customer data;
+- set `conversion_mode = linked`.
 
-Linking `Lead.customer_id` and changing `Lead.stage` to `won` occur in the same successful transaction. Before conversion, `customer_id` remains `null`. There is no already-linked open or lost Lead conversion path in v1.
+#### 13.2.4 Matching Customer in `inactive`
+
+The frozen CRM architecture behavior remains unchanged:
+
+- require explicit confirmation;
+- link without automatically changing Customer status or data;
+- set `conversion_mode = linked`.
+
+For every successful existing-Customer path, linking `Lead.customer_id` and changing `Lead.stage` to `won` occur in the same transaction. Before conversion, `customer_id` remains `null`. There is no already-linked open or lost Lead conversion path in v1. The only approved conversion modes remain `created`, `linked`, and `linked_and_promoted`.
 
 ### 13.3 Ambiguous or Changed Match
 
@@ -833,23 +868,30 @@ system_settings.phone
 Its order is mandatory:
 
 ```text
-1. Inspect raw Customer, User, and System Settings phone values.
-2. Derive proposed canonical values without writing data.
-3. Report invalid values and transformable non-canonical values.
-4. Detect Customer collisions after canonicalization.
-5. Stop if invalid values or collisions remain.
-6. Obtain explicit Product Owner approval for data corrections.
-7. Write approved canonical values for transformable records.
-8. Rerun collision detection and raw-storage validation.
-9. Confirm every non-null stored value itself matches ^05[0-9]{8}$.
-10. Add the shared normalization and validation component.
-11. Update existing Customer, User, and System Settings application writes.
-12. Update current Customer exact lookup and duplicate detection.
-13. Add PostgreSQL CHECK constraints for existing governed columns while preserving Customer uniqueness.
-14. Update existing Customer, User, and System Settings frontend fields.
-15. Run existing-module backend, database, concurrency, and frontend tests.
-16. Verify Customers, Users, and System Settings end to end.
+1. Prepare and validate the shared normalization and validation component.
+2. Update existing Customer, User, and System Settings application write paths to use the shared component.
+3. Update current Customer exact lookup and duplicate detection.
+4. Establish an approved cutover barrier before final data inspection.
+5. Inspect raw Customer, User, and System Settings phone values and derive proposed canonical values without writing data.
+6. Report invalid values and transformable non-canonical values.
+7. Detect Customer collisions after canonicalization.
+8. Stop if invalid values or collisions remain and obtain explicit Product Owner approval for data corrections.
+9. Write approved canonical values for transformable records.
+10. Rerun collision detection and raw-storage validation while the cutover barrier remains active.
+11. Confirm every non-null stored value itself matches ^05[0-9]{8}$.
+12. Add PostgreSQL CHECK constraints for existing governed columns while preserving Customer uniqueness.
+13. Verify that every required constraint is active.
+14. Remove the cutover barrier only after successful constraint verification.
+15. Update existing Customer, User, and System Settings frontend fields.
+16. Run existing-module backend, database, concurrency, and frontend tests.
+17. Verify Customers, Users, and System Settings end to end.
 ```
+
+From the start of the final canonical inspection until all PostgreSQL phone constraints are installed and verified, every governed write must either be blocked or already pass through the new canonical shared component. There must be no interval in which an unrestricted legacy write path can insert a non-canonical governed value after final inspection and before constraint installation.
+
+The approved cutover barrier may use maintenance mode for affected writes, temporary write blocking, deployment ordering that guarantees only canonical writes, or another explicitly reviewed locking or guard mechanism. This specification freezes the safety invariant and ordering, not the final production mechanism.
+
+If constraint installation fails, the deployment must keep or restore the approved write barrier, must not resume unsafe writes, must report the failure, and must resolve the data or migration issue explicitly before rerunning inspection and verification. Unsafe writes remain blocked until all required constraints are confirmed active.
 
 ### 20.2 Phase B — CRM Leads
 
@@ -938,13 +980,19 @@ Rejected:
 - conversion rechecks the exact Customer match before linking;
 - conversion creates a Customer when no match exists;
 - created Customer status is `customer`;
+- archived matching Customer blocks conversion;
+- blocked conversion does not restore an archived Customer implicitly;
+- conversion may be retried after an Administrator restores the matching Customer through the independent Customer workflow;
+- matching legacy Customer in `lead` is promoted to `customer` atomically with Lead conversion;
+- legacy Customer promotion uses `conversion_mode = linked_and_promoted`;
+- matching Customer in `customer` uses `conversion_mode = linked`;
 - linking does not overwrite Customer data;
 - ambiguous historical Customer matches block conversion;
 - concurrent Customer match change returns `409`;
 - changing an open Lead phone reruns duplicate and Customer-match discovery;
 - changing an open Lead phone keeps `customer_id = null`;
 - open Lead phone update never modifies Customer phone or another Lead;
-- conversion rollback leaves no partial Customer, Lead mutation, or Activity;
+- conversion rollback leaves the Customer and Lead unchanged and creates no partial Customer, Lead mutation, or Activity;
 - Lead phone snapshots remain canonical.
 
 ### 21.4 Customer History
@@ -965,6 +1013,10 @@ Rejected:
 - constraints are not installed while invalid values or collisions remain;
 - every non-null stored value matches `^05[0-9]{8}$` before constraint installation;
 - no automatic Customer merge or arbitrary Customer selection occurs.
+- legacy write paths cannot write non-canonical governed values during cutover;
+- a concurrent non-canonical write cannot enter after final inspection;
+- required PostgreSQL constraints are active before the cutover barrier is removed;
+- failed constraint installation keeps or restores the barrier and does not reopen unsafe writes.
 
 ### 21.6 Users and System Settings
 
@@ -1041,6 +1093,7 @@ Only the following implementation-shape details remain for the technical, DDL, A
 8. Exact frontend utility, hook, and component file names.
 9. Exact mechanics for preventing or displaying invalid eleventh-digit and symbol input without silent repair.
 10. Exact lock and retry implementation used to translate concurrent Customer match changes to the approved `409` behavior.
+11. Exact reviewed cutover-barrier mechanism used to prevent legacy or non-canonical governed writes between final inspection and successful constraint verification.
 
 These items may not reopen:
 
@@ -1060,12 +1113,12 @@ These items may not reopen:
 
 ## 24. Freeze Statement
 
-CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is FROZEN.
+CRM / Leads v1 — Phone Normalization & Validation Specification v1.0 is in DRAFT while the required Codex follow-up amendments undergo architecture review.
 
-It is the authoritative phone normalization and validation contract for CRM / Leads v1 and every governed field defined in this document.
+It is not FROZEN or authoritative until those amendments receive final approval in a separate freeze action.
 
 ```text
-FROZEN
+DRAFT — Codex Follow-up Amendments Required
 ```
 
-After this freeze, any change to supported phone type, canonical format, preprocessing, validation, storage, field scope, uniqueness, matching, conversion, frontend behavior, database enforcement, rollout order, or required test coverage requires an explicit Product Owner amendment.
+No CRM implementation may begin from this draft. After final approval restores `FROZEN`, any later change to supported phone type, canonical format, preprocessing, validation, storage, field scope, uniqueness, matching, conversion, frontend behavior, database enforcement, rollout order, or required test coverage requires an explicit Product Owner amendment.
