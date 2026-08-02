@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { useTranslation } from "@/hooks/useTranslation";
+import {isInternationalSaudiMobile,normalizeNullableSaudiMobile} from "@/lib/phone";
 import type {
   CreateTenantUserPayload,
   TenantUser,
@@ -131,6 +132,8 @@ export function UserFormModal({
         passwordMismatch:
           "تأكيد كلمة المرور غير مطابق.",
         close: "إغلاق",
+        phoneFormat: "استخدم رقم جوال محليًا من 10 أرقام يبدأ بـ 05.",
+        phoneInternational: "استخدم الصيغة المحلية 05 بدل صيغة رمز الدولة.",
       }
     : {
         createTitle: "Add new user",
@@ -161,6 +164,8 @@ export function UserFormModal({
         passwordMismatch:
           "Password confirmation does not match.",
         close: "Close",
+        phoneFormat: "Use a 10-digit local mobile number starting with 05.",
+        phoneInternational: "Use the local 05 format instead of a country-code format.",
       };
 
   const roleLabels: Record<UserRole, string> =
@@ -215,6 +220,8 @@ export function UserFormModal({
       setError(labels.required);
       return;
     }
+    let canonicalPhone:string|null;
+    try{canonicalPhone=normalizeNullableSaudiMobile(form.phone);}catch{setError(isInternationalSaudiMobile(form.phone)?labels.phoneInternational:labels.phoneFormat);return;}
 
     if (
       form.password &&
@@ -229,7 +236,7 @@ export function UserFormModal({
         const payload: UpdateTenantUserPayload = {
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim() || null,
+          phone: canonicalPhone,
           role: form.role,
           status: form.status,
         };
@@ -245,7 +252,7 @@ export function UserFormModal({
         await onSubmit({
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim() || null,
+          phone: canonicalPhone,
           role: form.role,
           password: form.password,
           password_confirmation:
@@ -319,6 +326,7 @@ export function UserFormModal({
                     name: event.target.value,
                   }))
                 }
+                onBlur={()=>{try{const phone=normalizeNullableSaudiMobile(form.phone);setForm(current=>({...current,phone:phone??""}));}catch{/* Keep invalid input visible. */}}}
                 className={inputClass}
                 required
               />

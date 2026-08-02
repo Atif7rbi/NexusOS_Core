@@ -5,6 +5,7 @@ namespace App\Modules\Users\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Users\Requests\StoreTenantUserRequest;
 use App\Modules\Users\Requests\UpdateTenantUserRequest;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 class TenantUserController extends Controller
 {
     private const DEMO_USERS_LIMIT = 3;
+    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -129,7 +131,7 @@ class TenantUserController extends Controller
                     'email' => mb_strtolower(
                         trim($validated['email'])
                     ),
-                    'phone' => $validated['phone'] ?? null,
+                    'phone' => $this->phoneNormalizer->normalizeNullable($validated['phone'] ?? null),
                     'role' => $validated['role'],
                     'status' => User::STATUS_ACTIVE,
                     'email_verified_at' => now(),
@@ -224,6 +226,7 @@ class TenantUserController extends Controller
                         trim($identityData['email'])
                     );
                 }
+                if (array_key_exists('phone', $identityData)) $identityData['phone'] = $this->phoneNormalizer->normalizeNullable($identityData['phone']);
 
                 if ($identityData !== []) {
                     $user->user->update($identityData);

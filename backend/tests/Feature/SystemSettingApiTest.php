@@ -121,14 +121,14 @@ class SystemSettingApiTest extends ApiTestCase
         $originalCurrency = $settings->currency;
 
         $response = $this->putJson('/api/system-settings', [
-            'phone' => '+966500000000',
+            'phone' => ' ٠٥٠٠٠٠٠٠٠٠ ',
         ]);
 
         $response
             ->assertOk()
             ->assertJsonPath(
                 'data.phone',
-                '+966500000000'
+                '0500000000'
             )
             ->assertJsonPath(
                 'data.company_name_ar',
@@ -138,5 +138,13 @@ class SystemSettingApiTest extends ApiTestCase
                 'data.currency',
                 $originalCurrency
             );
+    }
+    public function test_phone_nullable_and_raw_http_boundary(): void
+    {
+        Sanctum::actingAs($this->createActiveUser());
+        foreach (["\0".'0500000000', "0500000000\0", "0500000000\u{00A0}", '+966500000000'] as $phone) {
+            $this->putJson('/api/system-settings',['phone'=>$phone])->assertUnprocessable()->assertJsonValidationErrors('phone');
+        }
+        $this->putJson('/api/system-settings',['phone'=>" \t\r\n\v\f"])->assertOk()->assertJsonPath('data.phone',null);
     }
 }
