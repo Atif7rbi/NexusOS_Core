@@ -19,6 +19,7 @@ import { FormErrorBanner } from "@/components/ui/FormErrorBanner";
 import { Input } from "@/components/ui/Input";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { useTranslation } from "@/hooks/useTranslation";
+import {isInternationalSaudiMobile,normalizeRequiredSaudiMobile,SaudiMobileError} from "@/lib/phone";
 import type {
   Customer,
   CustomerCategory,
@@ -172,6 +173,8 @@ export function CustomerFormModal({
         close: "إغلاق",
         requiredError:
           "اسم العميل ورقم الجوال مطلوبان.",
+        phoneFormat: "استخدم رقم جوال محليًا من 10 أرقام يبدأ بـ 05.",
+        phoneInternational: "استخدم الصيغة المحلية 05 بدل صيغة رمز الدولة.",
         individual: "فرد",
         company: "شركة",
         investor: "مستثمر",
@@ -217,6 +220,8 @@ export function CustomerFormModal({
         close: "Close",
         requiredError:
           "Customer name and phone number are required.",
+        phoneFormat: "Use a 10-digit local mobile number starting with 05.",
+        phoneInternational: "Use the local 05 format instead of a country-code format.",
         individual: "Individual",
         company: "Company",
         investor: "Investor",
@@ -273,24 +278,27 @@ export function CustomerFormModal({
     event.preventDefault();
     clearValidation();
 
-    if (!form.name.trim() || !form.phone.trim()) {
+    if (!form.name.trim() || form.phone === "") {
       setClientFieldErrors({
         ...(!form.name.trim()
           ? { name: [labels.requiredError] }
           : {}),
-        ...(!form.phone.trim()
+        ...(form.phone === ""
           ? { phone: [labels.requiredError] }
           : {}),
       });
       return;
     }
+    let canonicalPhone:string;
+    try { canonicalPhone=normalizeRequiredSaudiMobile(form.phone); }
+    catch(error){ setClientFieldErrors({phone:[error instanceof SaudiMobileError&&error.reason==="required"?labels.requiredError:isInternationalSaudiMobile(form.phone)?labels.phoneInternational:labels.phoneFormat]}); return; }
 
     const payload: CustomerFormPayload = {
       type: form.type,
       category: form.category,
       status: form.status,
       name: form.name.trim(),
-      phone: form.phone.trim(),
+      phone: canonicalPhone,
       email: form.email.trim() || null,
       national_id:
         form.type === "individual"
@@ -509,10 +517,9 @@ export function CustomerFormModal({
                     updateField(
                       "phone",
                       event.target.value
-                        .replace(/[^\d+]/g, "")
-                        .slice(0, 20)
                     )
                   }
+                  onBlur={()=>{try{updateField("phone",normalizeRequiredSaudiMobile(form.phone));}catch{/* Keep invalid input visible. */}}}
                   placeholder={labels.phonePlaceholder}
                   inputMode="tel"
                   leading={<Phone size={17} />}
