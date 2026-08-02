@@ -1,0 +1,793 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Models\Tenant;
+use App\Models\TenantUser;
+use App\Models\User;
+use App\Modules\Leads\Enums\ActivityType;
+use App\Modules\Leads\Enums\ArchiveReason;
+use App\Modules\Leads\Enums\LeadSource;
+use App\Modules\Leads\Enums\LeadStage;
+use App\Modules\Leads\Enums\LostReason;
+use App\Modules\Leads\Models\Lead;
+use Illuminate\Support\Carbon;
+use Laravel\Sanctum\Sanctum;
+use Tests\Support\CreatesLeadFixtures;
+
+final class LeadsApiTest extends ApiTestCase
+{
+    use CreatesLeadFixtures;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Carbon::setTestNow('2026-08-02 12:00:00 UTC');
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    public function test_guest_and_non_crm_roles_cannot_access_leads(): void
+    {
+        $this->getJson('/api/leads')
+            ->assertUnauthorized()
+            ->assertJsonPath('error.code', 'unauthenticated');
+
+        $tenant = $this->createLeadTenant();
+        $accountant = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ACCOUNTANT,
+        )['user'];
+        Sanctum::actingAs($accountant);
+
+        $this->getJson('/api/leads')
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'lead_action_not_authorized');
+    }
+
+    public function test_sales_and_employee_creation_normalizes_phone_and_auto_assigns_actor(): void
+    {
+        foreach ([
+            User::ROLE_SALES => "\t٠٥٠١٢٣٤٥٦٧ ",
+            User::ROLE_EMPLOYEE => '۰۵۰۱۲۳۴۵۶۸',
+        ] as $role => $phone) {
+            $tenant = $this->createLeadTenant();
+            $actor = $this->createLeadUser($tenant, $role)['user'];
+            Sanctum::actingAs($actor);
+
+            $expected = $role === User::ROLE_SALES ? '0501234567' : '0501234568';
+            $response = $this->postJson('/api/leads', $this->createPayload($phone));
+
+            $response
+                ->assertCreated()
+                ->assertJsonPath('data.lead.phone', $expected)
+                ->assertJsonPath('data.lead.stage', LeadStage::New->value)
+                ->assertJsonPath('data.lead.assigned_to.id', $actor->id)
+                ->assertJsonPath('data.lead.created_by', $actor->id)
+                ->assertJsonPath('data.lead.updated_by', $actor->id);
+
+            $this->assertDatabaseHas('leads', [
+                'tenant_id' => $tenant->id,
+                'phone' => $expected,
+                'stage' => LeadStage::New->value,
+                'assigned_to' => $actor->id,
+            ]);
+        }
+    }
+
+    public function test_administrator_may_create_unassigned_or_assign_an_eligible_user(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        Sanctum::actingAs($administrator);
+
+        $this->postJson('/api/leads', $this->createPayload($this->nextLeadPhone()))
+            ->assertCreated()
+            ->assertJsonPath('data.lead.assigned_to', null);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $sales->id],
+        ))
+            ->assertCreated()
+            ->assertJsonPath('data.lead.assigned_to.id', $sales->id);
+    }
+
+    public function test_sales_and_employee_cannot_supply_assigned_to_on_create(): void
+    {
+        foreach ([User::ROLE_SALES, User::ROLE_EMPLOYEE] as $role) {
+            $tenant = $this->createLeadTenant();
+            $actor = $this->createLeadUser($tenant, $role)['user'];
+            Sanctum::actingAs($actor);
+
+            $this->postJson('/api/leads', array_merge(
+                $this->createPayload($this->nextLeadPhone()),
+                ['assigned_to' => $actor->id],
+            ))
+                ->assertUnprocessable()
+                ->assertJsonPath('error.code', 'validation_error')
+                ->assertJsonValidationErrors('assigned_to');
+        }
+    }
+
+    public function test_create_request_rejects_stage_unknown_fields_and_invalid_source_detail(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        Sanctum::actingAs($administrator);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['stage' => 'qualified'],
+        ))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'validation_error');
+
+        $this->postJson('/api/leads', [
+            'name' => 'Other Source',
+            'phone' => $this->nextLeadPhone(),
+            'source' => LeadSource::Other->value,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('source_detail');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['unknown_field' => true],
+        ))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'validation_error');
+
+        $this->postJson('/api/leads', $this->createPayload('+966501234567'))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'validation_error')
+            ->assertJsonValidationErrors('phone');
+    }
+
+    public function test_administrator_assignment_requires_an_active_eligible_same_tenant_user(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $paused = $this->createLeadUser(
+            $tenant,
+            User::ROLE_SALES,
+            TenantUser::STATUS_PAUSED,
+        )['user'];
+        $ineligible = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ACCOUNTANT,
+        )['user'];
+        $otherTenant = $this->createLeadTenant();
+        $otherUser = $this->createLeadUser($otherTenant, User::ROLE_SALES)['user'];
+        Sanctum::actingAs($administrator);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $paused->id],
+        ))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_assignee_not_active');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $ineligible->id],
+        ))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_assignee_role_not_eligible');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $otherUser->id],
+        ))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_assignee_not_active');
+    }
+
+    public function test_duplicate_protocol_discloses_only_visible_matches_and_requires_acknowledgement(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $firstSales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $secondSales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $phone = $this->nextLeadPhone();
+
+        Sanctum::actingAs($firstSales);
+        $hiddenLeadId = $this->postJson('/api/leads', $this->createPayload($phone))
+            ->assertCreated()
+            ->json('data.lead.id');
+
+        Sanctum::actingAs($secondSales);
+        $visibleLeadId = $this->postJson('/api/leads', $this->createPayload($phone))
+            ->assertCreated()
+            ->json('data.lead.id');
+
+        $conflict = $this->postJson('/api/leads', $this->createPayload($phone));
+        $conflict
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'lead_phone_duplicate_detected')
+            ->assertJsonCount(1, 'error.matches')
+            ->assertJsonPath('error.matches.0.id', $visibleLeadId);
+        $this->assertNotSame($hiddenLeadId, $conflict->json('error.matches.0.id'));
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($phone),
+            ['acknowledge_duplicate' => true],
+        ))->assertCreated();
+
+        $this->assertSame(3, Lead::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('phone', $phone)
+            ->count());
+    }
+
+    public function test_tenant_isolation_applies_to_list_show_and_mutation(): void
+    {
+        $firstTenant = $this->createLeadTenant();
+        $firstAdmin = $this->createLeadUser(
+            $firstTenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $lead = $this->createLead($firstTenant, $firstAdmin);
+
+        $secondTenant = $this->createLeadTenant();
+        $secondAdmin = $this->createLeadUser(
+            $secondTenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        Sanctum::actingAs($secondAdmin);
+
+        $this->getJson('/api/leads')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 0);
+        $this->getJson("/api/leads/{$lead->id}")
+            ->assertNotFound()
+            ->assertJsonPath('error.code', 'lead_not_found');
+        $this->patchJson("/api/leads/{$lead->id}", ['name' => 'Cross tenant'])
+            ->assertNotFound()
+            ->assertJsonPath('error.code', 'lead_not_found');
+    }
+
+    public function test_final_visibility_rule_and_archived_mode_are_enforced(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $otherSales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+
+        $ownOpen = $this->createLead($tenant, $sales);
+        $ownLost = $this->createLead($tenant, $sales, ['stage' => 'lost']);
+        $ownWon = $this->createLead($tenant, $sales, ['stage' => 'won']);
+        $unassignedOpen = $this->createLead($tenant, $administrator, [
+            'assigned_to' => null,
+        ]);
+        $unassignedLost = $this->createLead($tenant, $administrator, [
+            'assigned_to' => null,
+            'stage' => 'lost',
+        ]);
+        $unassignedWon = $this->createLead($tenant, $administrator, [
+            'assigned_to' => null,
+            'stage' => 'won',
+        ]);
+        $assignedToOther = $this->createLead($tenant, $otherSales);
+        $archivedOwn = $this->createLead($tenant, $sales, [
+            'archived_at' => now(),
+        ]);
+
+        Sanctum::actingAs($sales);
+        $visibleIds = collect($this->getJson('/api/leads')
+            ->assertOk()
+            ->json('data.leads'))
+            ->pluck('id')
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame(collect([
+            $ownOpen->id,
+            $ownLost->id,
+            $ownWon->id,
+            $unassignedOpen->id,
+        ])->sort()->values()->all(), $visibleIds);
+        $this->getJson("/api/leads/{$ownLost->id}")->assertOk();
+        $this->getJson("/api/leads/{$ownWon->id}")->assertOk();
+        $this->getJson("/api/leads/{$unassignedOpen->id}")
+            ->assertOk()
+            ->assertJsonPath('data.lead.allowed_actions.can_edit', false)
+            ->assertJsonPath('data.lead.allowed_actions.can_claim', true);
+
+        $this->getJson('/api/leads')
+            ->assertOk()
+            ->assertJsonPath('data.summary.active', 2)
+            ->assertJsonPath('data.summary.unassigned', 1)
+            ->assertJsonPath('data.summary.converted_this_month', 1);
+
+        $this->getJson('/api/leads?archived=true')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 4)
+            ->assertJsonMissing(['id' => (string) $archivedOwn->id]);
+
+        foreach ([$unassignedLost, $unassignedWon, $assignedToOther, $archivedOwn] as $hidden) {
+            $this->getJson("/api/leads/{$hidden->id}")
+                ->assertNotFound()
+                ->assertJsonPath('error.code', 'lead_not_found');
+        }
+
+        Sanctum::actingAs($administrator);
+        $this->getJson('/api/leads')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 7);
+        $archived = $this->getJson('/api/leads?archived=true')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->json('data.leads.0.id');
+        $this->assertSame((string) $archivedOwn->id, $archived);
+    }
+
+    public function test_employee_uses_the_same_own_and_unassigned_open_visibility_contract_as_sales(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $employee = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE)['user'];
+        $otherEmployee = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE)['user'];
+        $own = $this->createLead($tenant, $employee);
+        $unassigned = $this->createLead($tenant, $administrator, ['assigned_to' => null]);
+        $this->createLead($tenant, $otherEmployee);
+        Sanctum::actingAs($employee);
+
+        $this->getJson('/api/leads')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 2);
+        $this->patchJson("/api/leads/{$own->id}/stage", ['stage' => 'qualified'])
+            ->assertOk();
+        $this->patchJson("/api/leads/{$unassigned->id}/stage", ['stage' => 'qualified'])
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'lead_action_not_authorized');
+    }
+
+    public function test_search_filters_pagination_and_summary_obey_the_frozen_scope(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $project = $this->createLeadProject($tenant, $administrator);
+
+        $overdue = $this->createLead($tenant, $administrator, [
+            'name' => 'Overdue Search Lead',
+            'source' => LeadSource::PhoneCall,
+            'next_follow_up_at' => now()->subMinute(),
+            'project_id' => $project->id,
+        ]);
+        $target = $this->createLead($tenant, $administrator, [
+            'name' => 'Qualified Target',
+            'source' => LeadSource::Referral,
+            'stage' => LeadStage::Qualified,
+            'project_id' => $project->id,
+        ]);
+        $this->createLead($tenant, $administrator, [
+            'name' => 'Unassigned Open',
+            'assigned_to' => null,
+        ]);
+        $this->createLead($tenant, $administrator, [
+            'name' => 'Unassigned Lost',
+            'assigned_to' => null,
+            'stage' => LeadStage::Lost,
+        ]);
+        $this->createLead($tenant, $administrator, [
+            'name' => 'Converted Lead',
+            'stage' => LeadStage::Won,
+        ]);
+        Sanctum::actingAs($administrator);
+
+        $response = $this->getJson('/api/leads?'.http_build_query([
+            'search' => 'Qualified Target',
+            'stage' => 'qualified',
+            'source' => 'referral',
+            'assigned_to' => $administrator->id,
+            'project_id' => $project->id,
+            'page' => 1,
+            'per_page' => 1,
+        ]));
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $target->id)
+            ->assertJsonPath('data.summary.active', 3)
+            ->assertJsonPath('data.summary.unassigned', 2)
+            ->assertJsonPath('data.summary.overdue', 1)
+            ->assertJsonPath('data.summary.converted_this_month', 1);
+
+        $this->getJson('/api/leads?overdue=true')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $overdue->id);
+
+        $this->getJson('/api/leads?per_page=2&page=2')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.current_page', 2)
+            ->assertJsonPath('data.pagination.per_page', 2)
+            ->assertJsonCount(2, 'data.leads');
+    }
+
+    public function test_project_and_unit_interest_validation_is_tenant_safe(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $firstProject = $this->createLeadProject($tenant, $administrator);
+        $secondProject = $this->createLeadProject($tenant, $administrator);
+        $unit = $this->createLeadUnit($tenant, $firstProject, $administrator);
+        $archivedProject = $this->archiveLeadProject(
+            $this->createLeadProject($tenant, $administrator),
+            $administrator,
+        );
+        $archivedUnit = $this->archiveLeadUnit(
+            $this->createLeadUnit($tenant, $firstProject, $administrator),
+            $administrator,
+        );
+        $otherTenant = $this->createLeadTenant();
+        $otherAdmin = $this->createLeadUser(
+            $otherTenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $otherProject = $this->createLeadProject($otherTenant, $otherAdmin);
+        Sanctum::actingAs($administrator);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['project_id' => $firstProject->id, 'unit_id' => $unit->id],
+        ))
+            ->assertCreated()
+            ->assertJsonPath('data.lead.project_id', (string) $firstProject->id)
+            ->assertJsonPath('data.lead.unit_id', (string) $unit->id);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['unit_id' => $unit->id],
+        ))->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_unit_project_mismatch');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['project_id' => $secondProject->id, 'unit_id' => $unit->id],
+        ))->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_unit_project_mismatch');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['project_id' => $archivedProject->id],
+        ))->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_project_is_archived');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['project_id' => $firstProject->id, 'unit_id' => $archivedUnit->id],
+        ))->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_unit_is_archived');
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['project_id' => $otherProject->id],
+        ))->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_unit_project_mismatch');
+    }
+
+    public function test_open_assigned_lead_can_be_updated_and_project_change_clears_unit(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $firstProject = $this->createLeadProject($tenant, $sales);
+        $secondProject = $this->createLeadProject($tenant, $sales);
+        $unit = $this->createLeadUnit($tenant, $firstProject, $sales);
+        $lead = $this->createLead($tenant, $sales, [
+            'project_id' => $firstProject->id,
+            'unit_id' => $unit->id,
+        ]);
+        Sanctum::actingAs($sales);
+        Carbon::setTestNow('2026-08-02 13:00:00 UTC');
+
+        $this->patchJson("/api/leads/{$lead->id}", [
+            'name' => 'Updated Lead',
+            'phone' => '٠٥٠١٢٣٤٥٦٩',
+            'project_id' => $secondProject->id,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.lead.name', 'Updated Lead')
+            ->assertJsonPath('data.lead.phone', '0501234569')
+            ->assertJsonPath('data.lead.project_id', (string) $secondProject->id)
+            ->assertJsonPath('data.lead.unit_id', null)
+            ->assertJsonPath('data.lead.updated_by', $sales->id);
+
+        $lead->refresh();
+        $this->assertSame('2026-08-02T13:00:00.000000Z', $lead->updated_at?->toISOString());
+    }
+
+    public function test_update_is_blocked_for_unassigned_closed_and_archived_leads(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $unassigned = $this->createLead($tenant, $administrator, ['assigned_to' => null]);
+        $lost = $this->createLead($tenant, $sales, ['stage' => 'lost']);
+        $archived = $this->createLead($tenant, $administrator, ['archived_at' => now()]);
+
+        Sanctum::actingAs($sales);
+        $this->patchJson("/api/leads/{$unassigned->id}", ['name' => 'Denied'])
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'lead_action_not_authorized');
+        $this->patchJson("/api/leads/{$lost->id}", ['name' => 'Denied'])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'lead_not_in_open_stage');
+
+        Sanctum::actingAs($administrator);
+        $this->patchJson("/api/leads/{$archived->id}", ['name' => 'Denied'])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'lead_is_archived');
+    }
+
+    public function test_forward_and_administrator_backward_stage_transitions_write_activities(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $salesLead = $this->createLead($tenant, $sales);
+        $adminLead = $this->createLead($tenant, $administrator);
+
+        Sanctum::actingAs($sales);
+        $this->patchJson("/api/leads/{$salesLead->id}/stage", ['stage' => 'qualified'])
+            ->assertOk()
+            ->assertJsonPath('data.lead.stage', 'qualified')
+            ->assertJsonPath('data.lead.updated_by', $sales->id);
+        $this->patchJson("/api/leads/{$salesLead->id}/stage", ['stage' => 'new'])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'lead_stage_transition_not_allowed');
+
+        Sanctum::actingAs($administrator);
+        $this->patchJson("/api/leads/{$adminLead->id}/stage", ['stage' => 'viewing'])
+            ->assertOk();
+        $this->patchJson("/api/leads/{$adminLead->id}/stage", ['stage' => 'qualified'])
+            ->assertOk()
+            ->assertJsonPath('data.lead.stage', 'qualified')
+            ->assertJsonPath('data.lead.updated_by', $administrator->id);
+
+        $this->assertSame(3, $this->activityCount(ActivityType::StageChange));
+    }
+
+    public function test_claim_assign_and_unassign_follow_role_and_activity_rules(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $unassigned = $this->createLead($tenant, $administrator, ['assigned_to' => null]);
+        Sanctum::actingAs($sales);
+
+        $this->patchJson("/api/leads/{$unassigned->id}/claim")
+            ->assertOk()
+            ->assertJsonPath('data.lead.assigned_to.id', $sales->id)
+            ->assertJsonPath('data.lead.updated_by', $sales->id);
+        $this->patchJson("/api/leads/{$unassigned->id}/claim")
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'lead_claim_conflict');
+        $this->patchJson("/api/leads/{$unassigned->id}/assign", ['assigned_to' => null])
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'lead_action_not_authorized');
+
+        Sanctum::actingAs($administrator);
+        $this->patchJson("/api/leads/{$unassigned->id}/assign", ['assigned_to' => $administrator->id])
+            ->assertOk()
+            ->assertJsonPath('data.lead.assigned_to.id', $administrator->id)
+            ->assertJsonPath('data.lead.updated_by', $administrator->id);
+        $this->patchJson("/api/leads/{$unassigned->id}/assign", ['assigned_to' => null])
+            ->assertOk()
+            ->assertJsonPath('data.lead.assigned_to', null)
+            ->assertJsonPath('data.lead.updated_by', $administrator->id);
+
+        $this->assertSame(3, $this->activityCount(ActivityType::Assignment));
+    }
+
+    public function test_loss_and_reopen_are_atomic_and_clear_ineligible_assignment(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $salesContext = $this->createLeadUser($tenant, User::ROLE_SALES);
+        $sales = $salesContext['user'];
+        $lead = $this->createLead($tenant, $sales, [
+            'next_follow_up_at' => now()->addDay(),
+        ]);
+        Sanctum::actingAs($sales);
+
+        $this->patchJson("/api/leads/{$lead->id}/lose", [
+            'lost_reason' => LostReason::Other->value,
+            'lost_reason_detail' => 'Customer postponed the decision',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.lead.stage', 'lost')
+            ->assertJsonPath('data.lead.next_follow_up_at', null)
+            ->assertJsonPath('data.lead.lost_reason', 'other')
+            ->assertJsonPath('data.lead.updated_by', $sales->id);
+        $this->patchJson("/api/leads/{$lead->id}/reopen")
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'lead_action_not_authorized');
+
+        $salesContext['membership']->update(['status' => TenantUser::STATUS_PAUSED]);
+        Sanctum::actingAs($administrator);
+        $this->patchJson("/api/leads/{$lead->id}/reopen")
+            ->assertOk()
+            ->assertJsonPath('data.lead.stage', 'new')
+            ->assertJsonPath('data.lead.assigned_to', null)
+            ->assertJsonPath('data.lead.lost_reason', null)
+            ->assertJsonPath('data.lead.updated_by', $administrator->id);
+
+        $this->assertSame(2, $this->activityCount(ActivityType::StageChange));
+        $this->assertSame(1, $this->activityCount(ActivityType::Assignment));
+    }
+
+    public function test_archive_and_restore_preserve_stage_and_follow_up_and_clear_ineligible_assignment(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $salesContext = $this->createLeadUser($tenant, User::ROLE_SALES);
+        $followUp = now()->addDays(2);
+        $lead = $this->createLead($tenant, $salesContext['user'], [
+            'stage' => LeadStage::Qualified,
+            'next_follow_up_at' => $followUp,
+        ]);
+        Sanctum::actingAs($administrator);
+
+        $this->patchJson("/api/leads/{$lead->id}/archive", [
+            'archive_reason' => ArchiveReason::Other->value,
+            'archive_reason_detail' => 'Duplicate sales opportunity',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.lead.stage', 'qualified')
+            ->assertJsonPath('data.lead.archive_reason', 'other')
+            ->assertJsonPath('data.lead.updated_by', $administrator->id);
+
+        $lead->refresh();
+        $this->assertSame($followUp->toISOString(), $lead->next_follow_up_at?->toISOString());
+        $salesContext['membership']->update(['status' => TenantUser::STATUS_PAUSED]);
+
+        $this->patchJson("/api/leads/{$lead->id}/restore")
+            ->assertOk()
+            ->assertJsonPath('data.lead.stage', 'qualified')
+            ->assertJsonPath('data.lead.archived_at', null)
+            ->assertJsonPath('data.lead.assigned_to', null)
+            ->assertJsonPath('data.lead.updated_by', $administrator->id);
+
+        $won = $this->createLead($tenant, $administrator, [
+            'stage' => LeadStage::Won,
+        ]);
+        $this->patchJson("/api/leads/{$won->id}/archive", [
+            'archive_reason' => ArchiveReason::Duplicate->value,
+        ])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'lead_won_cannot_be_archived');
+
+        $this->assertSame(1, $this->activityCount(ActivityType::Archive));
+        $this->assertSame(1, $this->activityCount(ActivityType::Restore));
+        $this->assertSame(1, $this->activityCount(ActivityType::Assignment));
+    }
+
+    public function test_pause_guard_is_tenant_scoped_and_blocks_only_open_active_assignments(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $employeeContext = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE);
+        $this->createLead($tenant, $employeeContext['user']);
+        Sanctum::actingAs($administrator);
+
+        $this->putJson("/api/users/{$employeeContext['membership']->id}", [
+            'status' => TenantUser::STATUS_PAUSED,
+        ])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'user_has_open_assigned_leads');
+
+        $this->putJson("/api/users/{$employeeContext['membership']->id}", [
+            'status' => TenantUser::STATUS_SUSPENDED,
+        ])->assertOk()
+            ->assertJsonPath('data.user.status', TenantUser::STATUS_SUSPENDED);
+    }
+
+    public function test_other_tenant_closed_and_archived_leads_do_not_block_pause(): void
+    {
+        foreach (['other_tenant', 'closed', 'archived'] as $case) {
+            $tenant = $this->createLeadTenant();
+            $administrator = $this->createLeadUser(
+                $tenant,
+                User::ROLE_ADMINISTRATOR,
+            )['user'];
+            $employeeContext = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE);
+
+            if ($case === 'other_tenant') {
+                $otherTenant = $this->createLeadTenant();
+                $otherAdmin = $this->createLeadUser(
+                    $otherTenant,
+                    User::ROLE_ADMINISTRATOR,
+                )['user'];
+                TenantUser::factory()
+                    ->forTenant($otherTenant)
+                    ->forUser($employeeContext['user'])
+                    ->active()
+                    ->create();
+                $this->createLead($otherTenant, $otherAdmin, [
+                    'assigned_to' => $employeeContext['user']->id,
+                ]);
+            } elseif ($case === 'closed') {
+                $this->createLead($tenant, $employeeContext['user'], ['stage' => 'lost']);
+            } else {
+                $this->createLead($tenant, $employeeContext['user'], [
+                    'archived_at' => now(),
+                ]);
+            }
+
+            Sanctum::actingAs($administrator);
+            $this->putJson("/api/users/{$employeeContext['membership']->id}", [
+                'status' => TenantUser::STATUS_PAUSED,
+            ])->assertOk()
+                ->assertJsonPath('data.user.status', TenantUser::STATUS_PAUSED);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function createPayload(string $phone): array
+    {
+        return [
+            'name' => 'CRM API Lead',
+            'phone' => $phone,
+            'source' => LeadSource::WhatsApp->value,
+        ];
+    }
+
+    private function activityCount(ActivityType $type): int
+    {
+        return (int) \App\Modules\Leads\Models\LeadActivity::query()
+            ->where('type', $type->value)
+            ->count();
+    }
+}
