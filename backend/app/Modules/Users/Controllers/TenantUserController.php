@@ -5,6 +5,7 @@ namespace App\Modules\Users\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Modules\Leads\Support\EnsureTenantUserCanBePaused;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Users\Requests\StoreTenantUserRequest;
 use App\Modules\Users\Requests\UpdateTenantUserRequest;
@@ -17,7 +18,10 @@ use Illuminate\Validation\ValidationException;
 class TenantUserController extends Controller
 {
     private const DEMO_USERS_LIMIT = 3;
-    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) {}
+    public function __construct(
+        private readonly SaudiMobileNormalizer $phoneNormalizer,
+        private readonly EnsureTenantUserCanBePaused $ensureCanBePaused,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -207,6 +211,19 @@ class TenantUserController extends Controller
 
         DB::transaction(
             function () use ($validated, $request, $user): void {
+                $membership = TenantUser::query()
+                    ->with('user')
+                    ->whereKey($user->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (
+                    ($validated['status'] ?? null) === TenantUser::STATUS_PAUSED
+                    && $membership->status !== TenantUser::STATUS_PAUSED
+                ) {
+                    $this->ensureCanBePaused->handle($membership);
+                }
+
                 $identityData = [];
 
                 foreach ([
@@ -226,16 +243,19 @@ class TenantUserController extends Controller
                         trim($identityData['email'])
                     );
                 }
-                if (array_key_exists('phone', $identityData)) $identityData['phone'] = $this->phoneNormalizer->normalizeNullable($identityData['phone']);
+                if (array_key_exists('phone', $identityData)) {
+                    $identityData['phone'] = $this->phoneNormalizer
+                        ->normalizeNullable($identityData['phone']);
+                }
 
                 if ($identityData !== []) {
-                    $user->user->update($identityData);
+                    $membership->user->update($identityData);
                 }
 
                 if (array_key_exists('status', $validated)) {
-                    $user->status = $validated['status'];
+                    $membership->status = $validated['status'];
 
-                    $user->user->forceFill([
+                    $membership->user->forceFill([
                         'status' => $validated['status']
                             === TenantUser::STATUS_SUSPENDED
                                 ? User::STATUS_SUSPENDED
@@ -243,12 +263,12 @@ class TenantUserController extends Controller
                     ])->save();
 
                     if ($validated['status'] !== TenantUser::STATUS_ACTIVE) {
-                        $user->user->tokens()->delete();
+                        $membership->user->tokens()->delete();
                     }
                 }
 
-                $user->updated_by = $request->user()->id;
-                $user->save();
+                $membership->updated_by = $request->user()->id;
+                $membership->save();
             }
         );
 

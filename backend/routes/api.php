@@ -6,6 +6,8 @@ use App\Modules\Collections\Controllers\CollectionScheduleController;
 use App\Modules\Collections\Controllers\CollectionsIndexController;
 use App\Modules\Contracts\Controllers\ContractController;
 use App\Modules\Customers\Controllers\CustomerController;
+use App\Modules\Leads\Controllers\LeadActivityController;
+use App\Modules\Leads\Controllers\LeadController;
 use App\Modules\Projects\Controllers\ProjectController;
 use App\Modules\Reservations\Controllers\ReservationController;
 use App\Modules\Units\Controllers\UnitController;
@@ -80,6 +82,33 @@ Route::middleware([
 
     Route::get('/collections', CollectionsIndexController::class)
         ->name('collections.index');
+
+    Route::get('/leads', [LeadController::class, 'index'])
+        ->name('leads.index');
+    Route::post('/leads', [LeadController::class, 'store'])
+        ->name('leads.store');
+    Route::get('/leads/{lead}', [LeadController::class, 'show'])
+        ->name('leads.show');
+    Route::patch('/leads/{lead}', [LeadController::class, 'update'])
+        ->name('leads.update');
+    Route::patch('/leads/{lead}/stage', [LeadController::class, 'moveStage'])
+        ->name('leads.stage');
+    Route::patch('/leads/{lead}/claim', [LeadController::class, 'claim'])
+        ->name('leads.claim');
+    Route::patch('/leads/{lead}/assign', [LeadController::class, 'assign'])
+        ->name('leads.assign');
+    Route::patch('/leads/{lead}/lose', [LeadController::class, 'lose'])
+        ->name('leads.lose');
+    Route::patch('/leads/{lead}/reopen', [LeadController::class, 'reopen'])
+        ->name('leads.reopen');
+    Route::patch('/leads/{lead}/archive', [LeadController::class, 'archive'])
+        ->name('leads.archive');
+    Route::patch('/leads/{lead}/restore', [LeadController::class, 'restore'])
+        ->name('leads.restore');
+    Route::get('/leads/{lead}/activities', [LeadActivityController::class, 'index'])
+        ->name('leads.activities.index');
+    Route::post('/leads/{lead}/notes', [LeadActivityController::class, 'store'])
+        ->name('leads.notes.store');
 
     Route::get(
         '/contracts/{contract}/collection-schedule',

@@ -33,7 +33,6 @@ final class LeadDuplicateDetector
         return Lead::query()
             ->forTenant($tenantId)
             ->visibleTo($actor)
-            ->activeOnly()
             ->where('phone', $canonicalPhone)
             ->when(
                 $exceptLeadId !== null,
