@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Modules\Customers\Actions\CreateCustomerAction;
 use App\Modules\Customers\Models\Customer;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
@@ -126,6 +127,19 @@ final class CustomersApiTest extends ApiTestCase
             'updated_by' => $user->id,
         ]);
     }
+    public function test_phone_normalization_and_raw_http_middleware_boundary(): void
+    {
+        $user = $this->createActiveUser(); Sanctum::actingAs($user);
+        $this->postJson('/api/customers', ['type'=>'individual','category'=>'buyer','name'=>'مطبع','phone'=>"\t٠٥٠١٢٣٤٥٦٧ "])
+            ->assertCreated()->assertJsonPath('data.customer.phone','0501234567');
+        foreach (["\0".'0501234567', "0501234567\0", "0501234567\u{00A0}", '+966501234567'] as $phone) {
+            $this->postJson('/api/customers', ['type'=>'individual','category'=>'buyer','name'=>'غير صالح','phone'=>$phone])
+                ->assertUnprocessable()->assertJsonValidationErrors('phone');
+        }
+        $customer = app(CreateCustomerAction::class)->execute($this->tenantIdFor($user), $user->id,
+            ['type'=>'individual','category'=>'buyer','name'=>'فارسي','phone'=>'۰۵۰۱۲۳۴۵۶۸']);
+        self::assertSame('0501234568', $customer->phone);
+    }
 
     public function test_authenticated_user_can_create_company_customer(): void
     {
@@ -139,7 +153,7 @@ final class CustomersApiTest extends ApiTestCase
             'category' => 'investor',
             'status' => 'customer',
             'name' => 'شركة المدار العقارية',
-            'phone' => '0110000001',
+            'phone' => '0550000001',
             'email' => 'info@almadar.example',
             'commercial_registration_number' => '1010999999',
             'city' => 'الرياض',
@@ -233,7 +247,7 @@ final class CustomersApiTest extends ApiTestCase
             'type' => 'company',
             'category' => 'investor',
             'name' => 'شركة اختبار',
-            'phone' => '0110000002',
+            'phone' => '0550000002',
             'national_id' => '1010000002',
         ])
             ->assertUnprocessable()
@@ -273,7 +287,7 @@ final class CustomersApiTest extends ApiTestCase
             'type' => 'company',
             'category' => 'owner',
             'name' => 'الشركة الأولى',
-            'phone' => '0110000003',
+            'phone' => '0550000003',
             'commercial_registration_number' => '1010000003',
         ])->assertCreated();
 
@@ -281,7 +295,7 @@ final class CustomersApiTest extends ApiTestCase
             'type' => 'company',
             'category' => 'broker',
             'name' => 'الشركة الثانية',
-            'phone' => '0110000004',
+            'phone' => '0550000004',
             'commercial_registration_number' => '1010000003',
         ])
             ->assertUnprocessable()
@@ -389,7 +403,7 @@ final class CustomersApiTest extends ApiTestCase
             'category' => 'investor',
             'status' => 'customer',
             'name' => 'شركة النخبة للاستثمار',
-            'phone' => '0115550001',
+            'phone' => '0555550001',
             'email' => 'elite@example.com',
             'national_id' => null,
             'commercial_registration_number' => '7000000001',
@@ -524,7 +538,7 @@ final class CustomersApiTest extends ApiTestCase
             [
                 'type' => 'company',
                 'name' => 'شركة للتحويل',
-                'phone' => '0110000012',
+                'phone' => '0550000012',
                 'national_id' => null,
                 'commercial_registration_number' => '1010000012',
             ]

@@ -7,12 +7,21 @@ namespace App\Modules\Customers\Requests;
 use App\Modules\Customers\Enums\CustomerCategory;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Enums\CustomerType;
+use App\Modules\Shared\Phone\InvalidSaudiMobileNumberException;
+use App\Modules\Shared\Phone\Rules\SaudiMobileRule;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class UpdateCustomerRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->exists('phone')) return;
+        try { $this->merge(['phone' => app(SaudiMobileNormalizer::class)->normalizeRequired($this->input('phone'))]); }
+        catch (InvalidSaudiMobileNumberException) { /* Preserve invalid input for the rule. */ }
+    }
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -58,7 +67,7 @@ final class UpdateCustomerRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                'max:30',
+                new SaudiMobileRule(app(SaudiMobileNormalizer::class), required: true),
                 Rule::unique('customers', 'phone')
                     ->where(
                         fn ($query) => $query->where(
@@ -150,4 +159,5 @@ final class UpdateCustomerRequest extends FormRequest
 
         return $this->string('type')->toString();
     }
+    public function messages(): array { return ['phone.required' => 'رقم الجوال مطلوب.', 'phone.string' => 'صيغة رقم الجوال غير صحيحة. استخدم رقمًا محليًا من 10 أرقام يبدأ بـ 05.']; }
 }

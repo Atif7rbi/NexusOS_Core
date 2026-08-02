@@ -6,15 +6,18 @@ namespace App\Modules\Customers\Actions;
 
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use Illuminate\Support\Facades\DB;
 
 final class CreateCustomerAction
 {
+    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) {}
     public function execute(
         string $tenantId,
         int|string $actorId,
         array $data,
     ): Customer {
+        $data['phone'] = $this->phoneNormalizer->normalizeRequired($data['phone'] ?? null);
         return DB::transaction(function () use (
             $tenantId,
             $actorId,

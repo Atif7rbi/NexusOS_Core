@@ -1,11 +1,20 @@
 <?php
 
 namespace App\Http\Requests;
+use App\Modules\Shared\Phone\InvalidSaudiMobileNumberException;
+use App\Modules\Shared\Phone\Rules\SaudiMobileRule;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateSystemSettingRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->exists('phone')) return;
+        try { $this->merge(['phone' => app(SaudiMobileNormalizer::class)->normalizeNullable($this->input('phone'))]); }
+        catch (InvalidSaudiMobileNumberException) { /* Preserve invalid input for the rule. */ }
+    }
     public function authorize(): bool
     {
         return true;
@@ -54,7 +63,7 @@ class UpdateSystemSettingRequest extends FormRequest
             'currency' => ['sometimes', 'required', 'string', 'size:3'],
             'date_format' => ['sometimes', 'required', 'string', 'max:30'],
 
-            'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'phone' => ['sometimes', 'nullable', 'string', new SaudiMobileRule(app(SaudiMobileNormalizer::class), required: false)],
             'email' => ['sometimes', 'nullable', 'email', 'max:254'],
             'website' => ['sometimes', 'nullable', 'url:http,https', 'max:255'],
             'address' => ['sometimes', 'nullable', 'string', 'max:2000'],
@@ -88,6 +97,7 @@ class UpdateSystemSettingRequest extends FormRequest
             'currency.size' => 'رمز العملة يجب أن يتكون من ثلاثة أحرف.',
             'email.email' => 'البريد الإلكتروني غير صحيح.',
             'website.url' => 'رابط الموقع الإلكتروني غير صحيح.',
+            'phone.string' => 'صيغة رقم الجوال غير صحيحة. استخدم رقمًا محليًا من 10 أرقام يبدأ بـ 05.',
         ];
     }
 }

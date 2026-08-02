@@ -71,6 +71,16 @@ class TenantUsersApiTest extends TestCase
             'status' => TenantUser::STATUS_ACTIVE,
         ]);
     }
+    public function test_user_phone_normalization_and_raw_http_boundary(): void
+    {
+        [$administrator] = $this->createCompanyAdministrator(); Sanctum::actingAs($administrator);
+        $response = $this->postJson('/api/users', ['name'=>'هاتف','email'=>'phone@example.com','phone'=>"\t۰۵۰۱۲۳۴۵۶۷ ",'role'=>User::ROLE_EMPLOYEE,'password'=>'Password8','password_confirmation'=>'Password8']);
+        $response->assertCreated()->assertJsonPath('data.user.user.phone','0501234567');
+        foreach (["\0".'0501234567', "0501234567\0", "0501234567\u{00A0}", '+966501234567'] as $i=>$phone) {
+            $this->postJson('/api/users', ['name'=>'غير صالح','email'=>"bad{$i}@example.com",'phone'=>$phone,'role'=>User::ROLE_EMPLOYEE,'password'=>'Password8','password_confirmation'=>'Password8'])
+                ->assertUnprocessable()->assertJsonValidationErrors('phone');
+        }
+    }
 
     public function test_password_requires_uppercase_lowercase_and_number(): void
     {

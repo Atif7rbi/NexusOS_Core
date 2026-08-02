@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Modules\Shared\Phone\Rules\SaudiMobileRule;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -13,12 +15,13 @@ class CreateAdminUser extends Command
     protected $signature = 'ufq:create-admin';
 
     protected $description = 'Create the first administrator account safely';
+    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) { parent::__construct(); }
 
     public function handle(): int
     {
         $name = trim((string) $this->ask('الاسم الكامل'));
         $email = mb_strtolower(trim((string) $this->ask('البريد الإلكتروني')));
-        $phone = trim((string) $this->ask('رقم الجوال (اختياري)', ''));
+        $phone = (string) $this->ask('رقم الجوال (اختياري)', '');
 
         $password = (string) $this->secret('كلمة المرور');
         $passwordConfirmation = (string) $this->secret('تأكيد كلمة المرور');
@@ -27,7 +30,7 @@ class CreateAdminUser extends Command
             [
                 'name' => $name,
                 'email' => $email,
-                'phone' => $phone !== '' ? $phone : null,
+                'phone' => $phone,
                 'password' => $password,
                 'password_confirmation' => $passwordConfirmation,
             ],
@@ -39,7 +42,7 @@ class CreateAdminUser extends Command
                     'max:254',
                     'unique:users,email',
                 ],
-                'phone' => ['nullable', 'string', 'max:30'],
+                'phone' => ['nullable', 'string', new SaudiMobileRule($this->phoneNormalizer, required: false)],
                 'password' => [
                     'required',
                     'confirmed',
@@ -67,10 +70,11 @@ class CreateAdminUser extends Command
             return self::FAILURE;
         }
 
+        $canonicalPhone = $this->phoneNormalizer->normalizeNullable($phone);
         $user = User::query()->create([
             'name' => $name,
             'email' => $email,
-            'phone' => $phone !== '' ? $phone : null,
+            'phone' => $canonicalPhone,
             'role' => User::ROLE_ADMINISTRATOR,
             'status' => User::STATUS_ACTIVE,
             'email_verified_at' => now(),

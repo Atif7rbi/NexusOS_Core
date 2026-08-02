@@ -7,16 +7,19 @@ namespace App\Modules\Customers\Actions;
 use App\Modules\Customers\Enums\CustomerType;
 use App\Modules\Customers\Exceptions\ArchivedCustomerCannotBeUpdatedException;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use Illuminate\Support\Facades\DB;
 
 final class UpdateCustomerAction
 {
+    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) {}
     public function execute(
         string $tenantId,
         string $customerId,
         int|string $actorId,
         array $data,
     ): Customer {
+        if (array_key_exists('phone', $data)) $data['phone'] = $this->phoneNormalizer->normalizeRequired($data['phone']);
         return DB::transaction(function () use (
             $tenantId,
             $customerId,
