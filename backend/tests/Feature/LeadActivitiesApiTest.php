@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Leads\Enums\ActivityType;
 use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Models\LeadActivity;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CreatesLeadFixtures;
@@ -16,16 +17,22 @@ final class LeadActivitiesApiTest extends ApiTestCase
 {
     use CreatesLeadFixtures;
 
+    private string $originalTimezone = 'UTC';
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        Carbon::setTestNow('2026-08-02 12:00:00 UTC');
+        $this->originalTimezone = date_default_timezone_get();
+        date_default_timezone_set('UTC');
+        $this->freezeTime(CarbonImmutable::parse('2026-08-02T12:00:00Z'));
     }
 
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+        CarbonImmutable::setTestNow();
+        date_default_timezone_set($this->originalTimezone);
 
         parent::tearDown();
     }
@@ -72,7 +79,8 @@ final class LeadActivitiesApiTest extends ApiTestCase
         $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
         $lead = $this->createLead($tenant, $sales);
         Sanctum::actingAs($sales);
-        Carbon::setTestNow('2026-08-02 13:30:00 UTC');
+        $updatedAt = CarbonImmutable::parse('2026-08-02T13:30:00Z');
+        $this->freezeTime($updatedAt);
 
         $response = $this->postJson("/api/leads/{$lead->id}/notes", [
             'body' => '  Customer requested a second viewing.  ',
@@ -86,7 +94,7 @@ final class LeadActivitiesApiTest extends ApiTestCase
 
         $lead->refresh();
         $this->assertSame($sales->id, $lead->updated_by);
-        $this->assertSame('2026-08-02T13:30:00.000000Z', $lead->updated_at?->toISOString());
+        $this->assertSame($updatedAt->toISOString(), $lead->updated_at?->toISOString());
         $this->assertDatabaseHas('lead_activities', [
             'lead_id' => $lead->id,
             'type' => ActivityType::Note->value,
@@ -174,7 +182,7 @@ final class LeadActivitiesApiTest extends ApiTestCase
 
         $this->patchJson("/api/leads/{$lead->id}/stage", ['stage' => 'qualified'])
             ->assertOk();
-        Carbon::setTestNow('2026-08-02 12:01:00 UTC');
+        $this->freezeTime(CarbonImmutable::parse('2026-08-02T12:01:00Z'));
         $this->patchJson("/api/leads/{$lead->id}/lose", [
             'lost_reason' => 'not_ready',
         ])->assertOk();
@@ -216,5 +224,11 @@ final class LeadActivitiesApiTest extends ApiTestCase
         $this->getJson("/api/leads/{$lead->id}/activities?archived=true")
             ->assertOk()
             ->assertJsonPath('data.pagination.total', 1);
+    }
+
+    private function freezeTime(CarbonImmutable $time): void
+    {
+        Carbon::setTestNow($time);
+        CarbonImmutable::setTestNow($time);
     }
 }

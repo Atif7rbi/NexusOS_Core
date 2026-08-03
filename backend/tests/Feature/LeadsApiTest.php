@@ -13,6 +13,7 @@ use App\Modules\Leads\Enums\LeadSource;
 use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Enums\LostReason;
 use App\Modules\Leads\Models\Lead;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CreatesLeadFixtures;
@@ -21,16 +22,22 @@ final class LeadsApiTest extends ApiTestCase
 {
     use CreatesLeadFixtures;
 
+    private string $originalTimezone = 'UTC';
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        Carbon::setTestNow('2026-08-02 12:00:00 UTC');
+        $this->originalTimezone = date_default_timezone_get();
+        date_default_timezone_set('UTC');
+        $this->freezeTime(CarbonImmutable::parse('2026-08-02T12:00:00Z'));
     }
 
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+        CarbonImmutable::setTestNow();
+        date_default_timezone_set($this->originalTimezone);
 
         parent::tearDown();
     }
@@ -376,10 +383,11 @@ final class LeadsApiTest extends ApiTestCase
         )['user'];
         $project = $this->createLeadProject($tenant, $administrator);
 
+        $overdueAt = CarbonImmutable::now('UTC')->subMinute();
         $overdue = $this->createLead($tenant, $administrator, [
             'name' => 'Overdue Search Lead',
             'source' => LeadSource::PhoneCall,
-            'next_follow_up_at' => now()->subMinute(),
+            'next_follow_up_at' => $overdueAt,
             'project_id' => $project->id,
         ]);
         $target = $this->createLead($tenant, $administrator, [
@@ -510,7 +518,8 @@ final class LeadsApiTest extends ApiTestCase
             'unit_id' => $unit->id,
         ]);
         Sanctum::actingAs($sales);
-        Carbon::setTestNow('2026-08-02 13:00:00 UTC');
+        $updatedAt = CarbonImmutable::parse('2026-08-02T13:00:00Z');
+        $this->freezeTime($updatedAt);
 
         $this->patchJson("/api/leads/{$lead->id}", [
             'name' => 'Updated Lead',
@@ -525,7 +534,7 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('data.lead.updated_by', $sales->id);
 
         $lead->refresh();
-        $this->assertSame('2026-08-02T13:00:00.000000Z', $lead->updated_at?->toISOString());
+        $this->assertSame($updatedAt->toISOString(), $lead->updated_at?->toISOString());
     }
 
     public function test_update_is_blocked_for_unassigned_closed_and_archived_leads(): void
@@ -668,7 +677,7 @@ final class LeadsApiTest extends ApiTestCase
             User::ROLE_ADMINISTRATOR,
         )['user'];
         $salesContext = $this->createLeadUser($tenant, User::ROLE_SALES);
-        $followUp = now()->addDays(2);
+        $followUp = CarbonImmutable::now('UTC')->addDays(2);
         $lead = $this->createLead($tenant, $salesContext['user'], [
             'stage' => LeadStage::Qualified,
             'next_follow_up_at' => $followUp,
@@ -789,5 +798,11 @@ final class LeadsApiTest extends ApiTestCase
         return (int) \App\Modules\Leads\Models\LeadActivity::query()
             ->where('type', $type->value)
             ->count();
+    }
+
+    private function freezeTime(CarbonImmutable $time): void
+    {
+        Carbon::setTestNow($time);
+        CarbonImmutable::setTestNow($time);
     }
 }
