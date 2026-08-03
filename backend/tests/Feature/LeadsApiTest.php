@@ -30,7 +30,7 @@ final class LeadsApiTest extends ApiTestCase
 
         $this->originalTimezone = date_default_timezone_get();
         date_default_timezone_set('UTC');
-        $this->freezeTime(CarbonImmutable::parse('2026-08-02T12:00:00Z'));
+        $this->freezeCrmClock(CarbonImmutable::parse('2026-08-02T12:00:00Z'));
     }
 
     protected function tearDown(): void
@@ -519,7 +519,7 @@ final class LeadsApiTest extends ApiTestCase
         ]);
         Sanctum::actingAs($sales);
         $updatedAt = CarbonImmutable::parse('2026-08-02T13:00:00Z');
-        $this->freezeTime($updatedAt);
+        $this->freezeCrmClock($updatedAt);
 
         $this->patchJson("/api/leads/{$lead->id}", [
             'name' => 'Updated Lead',
@@ -800,7 +800,7 @@ final class LeadsApiTest extends ApiTestCase
             ->count();
     }
 
-    private function freezeTime(CarbonImmutable $time): void
+    private function freezeCrmClock(CarbonImmutable $time): void
     {
         Carbon::setTestNow($time);
         CarbonImmutable::setTestNow($time);
