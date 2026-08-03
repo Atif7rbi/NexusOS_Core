@@ -49,6 +49,7 @@ describe("LeadDetailsView authorization-aware actions", () => {
         can_add_note: true,
         can_archive: true,
         can_restore: true,
+        can_convert: true,
       },
     });
 

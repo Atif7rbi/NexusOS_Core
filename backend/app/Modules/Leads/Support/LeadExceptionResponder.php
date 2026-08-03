@@ -6,11 +6,15 @@ namespace App\Modules\Leads\Support;
 
 use App\Modules\Leads\Exceptions\LeadActionNotAuthorizedException;
 use App\Modules\Leads\Exceptions\LeadAlreadyArchivedException;
+use App\Modules\Leads\Exceptions\LeadAlreadyConvertedException;
 use App\Modules\Leads\Exceptions\LeadAlreadyLostException;
 use App\Modules\Leads\Exceptions\LeadAlreadyWonException;
 use App\Modules\Leads\Exceptions\LeadAssigneeNotActiveException;
 use App\Modules\Leads\Exceptions\LeadAssigneeRoleNotEligibleException;
 use App\Modules\Leads\Exceptions\LeadClaimConflictException;
+use App\Modules\Leads\Exceptions\LeadConversionCustomerArchivedException;
+use App\Modules\Leads\Exceptions\LeadConversionCustomerChangedException;
+use App\Modules\Leads\Exceptions\LeadConversionNewCustomerConflictException;
 use App\Modules\Leads\Exceptions\LeadIsArchivedException;
 use App\Modules\Leads\Exceptions\LeadNotArchivedException;
 use App\Modules\Leads\Exceptions\LeadNotFoundException;
@@ -43,6 +47,10 @@ final class LeadExceptionResponder
             $exception instanceof LeadNotArchivedException => [409, 'lead_not_archived'],
             $exception instanceof LeadIsArchivedException => [409, 'lead_is_archived'],
             $exception instanceof LeadWonCannotBeArchivedException => [409, 'lead_won_cannot_be_archived'],
+            $exception instanceof LeadAlreadyConvertedException => [409, 'lead_already_converted'],
+            $exception instanceof LeadConversionCustomerArchivedException => [409, 'lead_conversion_customer_archived'],
+            $exception instanceof LeadConversionCustomerChangedException => [409, 'lead_conversion_customer_changed'],
+            $exception instanceof LeadConversionNewCustomerConflictException => [409, 'lead_conversion_new_customer_conflict'],
             $exception instanceof LeadClaimConflictException => [409, 'lead_claim_conflict'],
             $exception instanceof LeadPhoneDuplicateDetectedException => [409, 'lead_phone_duplicate_detected'],
             $exception instanceof UserHasOpenAssignedLeadsException => [409, 'user_has_open_assigned_leads'],
@@ -63,6 +71,13 @@ final class LeadExceptionResponder
             'code' => $code,
             'message' => $exception->getMessage(),
         ];
+
+        if ($exception instanceof LeadConversionNewCustomerConflictException) {
+            $error['conflicting_customer'] = [
+                'id'     => $exception->conflictingCustomerId,
+                'status' => $exception->conflictingCustomerStatus,
+            ];
+        }
 
         if ($exception instanceof LeadPhoneDuplicateDetectedException) {
             $error['matches'] = $exception->matches

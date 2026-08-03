@@ -161,6 +161,11 @@ export function LeadDetailsView({
               {t("crm.actions.restore")}
             </Button>
           ) : null}
+          {actions.can_convert ? (
+            <Button type="button" size="sm" variant="primary" onClick={() => onAction("convert")}>
+              {t("crm.actions.convert")}
+            </Button>
+          ) : null}
         </div>
       </div>
 

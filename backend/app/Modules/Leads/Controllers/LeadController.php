@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Modules\Leads\Actions\ArchiveLeadAction;
 use App\Modules\Leads\Actions\AssignLeadAction;
 use App\Modules\Leads\Actions\ClaimLeadAction;
+use App\Modules\Leads\Actions\ConvertLeadToCustomerAction;
 use App\Modules\Leads\Actions\CreateLeadAction;
 use App\Modules\Leads\Actions\MoveLeadStageAction;
 use App\Modules\Leads\Actions\MoveLeadToLostAction;
@@ -21,9 +22,11 @@ use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Enums\LostReason;
 use App\Modules\Leads\Exceptions\LeadNotFoundException;
 use App\Modules\Leads\Models\Lead;
+use App\Modules\Leads\Exceptions\LeadActionNotAuthorizedException;
 use App\Modules\Leads\Requests\ArchiveLeadRequest;
 use App\Modules\Leads\Requests\AssignLeadRequest;
 use App\Modules\Leads\Requests\ClaimLeadRequest;
+use App\Modules\Leads\Requests\ConvertLeadRequest;
 use App\Modules\Leads\Requests\IndexLeadRequest;
 use App\Modules\Leads\Requests\MoveLeadStageRequest;
 use App\Modules\Leads\Requests\MoveLeadToLostRequest;
@@ -260,6 +263,41 @@ final class LeadController extends Controller
         }
 
         return $actor;
+    }
+
+    public function convert(
+        ConvertLeadRequest $request,
+        string $lead,
+        ConvertLeadToCustomerAction $action,
+    ): JsonResponse {
+        $membership = $this->membership($request);
+        $actor      = $this->actor($request);
+
+        // Authorization: administrator, or sales/employee on own Lead
+        if ($actor->role !== User::ROLE_ADMINISTRATOR) {
+            $leadRecord = Lead::query()
+                ->where('tenant_id', (string) $membership->tenant_id)
+                ->whereKey($lead)
+                ->first();
+
+            if ($leadRecord === null || $leadRecord->assigned_to !== $actor->id) {
+                throw new LeadActionNotAuthorizedException;
+            }
+        }
+
+        $record = $action->execute(
+            tenantId: (string) $membership->tenant_id,
+            leadId: $lead,
+            actorId: $actor->id,
+            conversionIntent: (string) $request->input('conversion_intent'),
+            existingCustomerId: $request->input('existing_customer_id'),
+            customerData: array_filter([
+                'type'     => $request->input('type'),
+                'category' => $request->input('category'),
+            ]),
+        );
+
+        return $this->success($request, $record, 'تم تحويل العميل المحتمل إلى عميل بنجاح.');
     }
 
     private function success(

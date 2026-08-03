@@ -318,6 +318,55 @@ final class LeadsDatabaseTest extends ApiTestCase
     }
 
     /**
+     * Milestone B — verifies that the new leads_conversion_mode_check constraint
+     * (applied by 2026_08_02_200000_update_leads_conversion_mode_check.php)
+     * accepts the three valid values and rejects any other string.
+     */
+    public function test_conversion_mode_check_accepts_valid_values_and_rejects_invalid(): void
+    {
+        [$lead, $tenant, $actor] = $this->leadContext();
+
+        $customer = $this->createLeadCustomer($tenant, $actor);
+        $wonBase  = [
+            'stage'        => 'won',
+            'customer_id'  => $customer->id,
+            'converted_at' => now(),
+            'converted_by' => $actor->id,
+        ];
+
+        // --- accepted values ---
+
+        foreach (['created', 'linked_existing', 'linked_and_promoted'] as $mode) {
+            DB::table('leads')->where('id', $lead->id)->update(
+                array_merge($wonBase, ['conversion_mode' => $mode])
+            );
+            $this->assertSame(
+                $mode,
+                DB::table('leads')->where('id', $lead->id)->value('conversion_mode'),
+                "Expected conversion_mode '{$mode}' to be accepted by the constraint."
+            );
+
+            // Reset back to open stage for next iteration
+            DB::table('leads')->where('id', $lead->id)->update([
+                'stage'           => 'new',
+                'customer_id'     => null,
+                'converted_at'    => null,
+                'converted_by'    => null,
+                'conversion_mode' => null,
+            ]);
+        }
+
+        // --- rejected values ---
+
+        foreach (['linked', 'CREATED', 'other', ''] as $invalid) {
+            $this->assertLeadUpdateFails(
+                $lead,
+                array_merge($wonBase, ['conversion_mode' => $invalid]),
+            );
+        }
+    }
+
+    /**
      * @return array{0: Lead, 1: \App\Models\Tenant, 2: User}
      */
     private function leadContext(): array

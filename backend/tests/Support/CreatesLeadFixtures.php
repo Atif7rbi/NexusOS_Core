@@ -211,7 +211,7 @@ trait CreatesLeadFixtures
                 'customer_id' => $customer->id,
                 'converted_at' => $now,
                 'converted_by' => $actor->id,
-                'conversion_mode' => ConversionMode::Linked,
+                'conversion_mode' => ConversionMode::LinkedExisting,
             ]);
         }
 

@@ -32,10 +32,12 @@ import {
   archiveLead,
   assignLead,
   claimLead,
+  convertLead,
   createLead,
   fetchLead,
   fetchLeadActivities,
   fetchLeads,
+  LeadConversionConflictError,
   LeadDuplicateError,
   moveLeadStage,
   moveLeadToLost,
@@ -422,22 +424,36 @@ export function CrmLeadsPage() {
             return archiveLead(token, lead.id, payload.reason, payload.detail);
           case "restore":
             return restoreLead(token, lead.id);
+          case "convert":
+            return convertLead(token, lead.id, payload.intent === "create_new"
+              ? { conversion_intent: "create_new", type: payload.type, category: payload.category }
+              : { conversion_intent: "link_existing", existing_customer_id: payload.existingCustomerId }
+            );
         }
       })();
 
       setDialogAction(null);
-      setSuccessMessage(t("crm.success.action"));
-      if (payload.action === "archive" || payload.action === "restore") {
+      if (payload.action === "convert") {
+        setSuccessMessage(t("crm.success.converted"));
+        setLead(updated);
+        void loadActivities(updated.id, archivedMode);
+      } else if (payload.action === "archive" || payload.action === "restore") {
+        setSuccessMessage(t("crm.success.action"));
         closeLead();
       } else {
+        setSuccessMessage(t("crm.success.action"));
         setLead(updated);
         void loadActivities(updated.id, archivedMode);
       }
       refresh();
     } catch (caughtError) {
-      setActionError(
-        caughtError instanceof Error ? caughtError.message : t("crm.genericError")
-      );
+      if (caughtError instanceof LeadConversionConflictError) {
+        setActionError(caughtError.message);
+      } else {
+        setActionError(
+          caughtError instanceof Error ? caughtError.message : t("crm.genericError")
+        );
+      }
     } finally {
       setActionProcessing(false);
     }

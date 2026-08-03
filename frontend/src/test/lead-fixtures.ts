@@ -11,6 +11,7 @@ export const noLeadActions: LeadAllowedActions = {
   can_add_note: false,
   can_archive: false,
   can_restore: false,
+  can_convert: false,
 };
 
 export function leadFixture(overrides: Partial<Lead> = {}): Lead {

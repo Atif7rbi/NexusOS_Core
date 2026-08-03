@@ -45,7 +45,7 @@ export type LeadActivityType =
 
 export type LeadConversionMode =
   | "created"
-  | "linked"
+  | "linked_existing"
   | "linked_and_promoted";
 
 export type LeadAllowedActions = {
@@ -59,6 +59,7 @@ export type LeadAllowedActions = {
   can_add_note: boolean;
   can_archive: boolean;
   can_restore: boolean;
+  can_convert: boolean;
 };
 
 export type LeadAssignee = {
@@ -229,4 +230,24 @@ export type LeadDuplicateMatch = {
   } | null;
   archived: boolean;
   updated_at: string | null;
+};
+
+export type ConvertLeadCreateNewPayload = {
+  conversion_intent: "create_new";
+  type: "individual" | "company";
+  category: "investor" | "buyer" | "broker" | "owner" | "other";
+};
+
+export type ConvertLeadLinkExistingPayload = {
+  conversion_intent: "link_existing";
+  existing_customer_id: string;
+};
+
+export type ConvertLeadPayload =
+  | ConvertLeadCreateNewPayload
+  | ConvertLeadLinkExistingPayload;
+
+export type LeadConversionConflict = {
+  id: string;
+  status: string;
 };

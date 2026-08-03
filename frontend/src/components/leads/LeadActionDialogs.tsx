@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, RotateCcw, Route, UserCheck, UserRoundCog, UserX } from "lucide-react";
+import { Archive, ArrowLeftRight, RotateCcw, Route, UserCheck, UserRoundCog, UserX } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -22,6 +22,7 @@ import type {
   LeadLostReason,
   OpenLeadStage,
 } from "@/types/lead";
+import type { TranslationKey } from "@/i18n/types";
 import type { TenantUser } from "@/types/tenant-user";
 
 export type LeadDialogAction =
@@ -31,7 +32,8 @@ export type LeadDialogAction =
   | "lost"
   | "reopen"
   | "archive"
-  | "restore";
+  | "restore"
+  | "convert";
 
 export type LeadDialogPayload =
   | { action: "claim" | "reopen" | "restore" }
@@ -46,6 +48,17 @@ export type LeadDialogPayload =
       action: "archive";
       reason: LeadArchiveReason;
       detail: string | null;
+    }
+  | {
+      action: "convert";
+      intent: "create_new";
+      type: "individual" | "company";
+      category: "investor" | "buyer" | "broker" | "owner" | "other";
+    }
+  | {
+      action: "convert";
+      intent: "link_existing";
+      existingCustomerId: string;
     };
 
 type LeadActionDialogsProps = {
@@ -289,6 +302,17 @@ export function LeadActionDialogs({
     );
   }
 
+  if (action === "convert") {
+    return (
+      <ConvertLeadDialog
+        lead={lead}
+        base={base}
+        onConfirm={onConfirm}
+        t={t}
+      />
+    );
+  }
+
   return (
     <ConfirmationDialog
       {...base}
@@ -298,6 +322,82 @@ export function LeadActionDialogs({
       icon={<DialogIcon icon={RotateCcw} tone="info" />}
       onConfirm={() => onConfirm({ action: "restore" })}
     />
+  );
+}
+
+function ConvertLeadDialog({
+  lead,
+  base,
+  onConfirm,
+  t,
+}: {
+  lead: Lead;
+  base: Record<string, unknown>;
+  onConfirm: (payload: LeadDialogPayload) => void;
+  t: (key: TranslationKey) => string;
+}) {
+  const [type, setType] = useState<"individual" | "company">("individual");
+  const [category, setCategory] = useState<
+    "investor" | "buyer" | "broker" | "owner" | "other"
+  >("buyer");
+
+  return (
+    <ConfirmationDialog
+      {...(base as Parameters<typeof ConfirmationDialog>[0])}
+      title={t("crm.dialog.convertTitle")}
+      description={t("crm.dialog.convertDescription")}
+      confirmLabel={t("crm.actions.convert")}
+      icon={<DialogIcon icon={ArrowLeftRight} tone="info" />}
+      onConfirm={() =>
+        onConfirm({
+          action: "convert",
+          intent: "create_new",
+          type,
+          category,
+        })
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-[var(--text-secondary)]">
+          {t("crm.dialog.convertLeadInfo")}
+          <span className="font-semibold text-[var(--text-primary)]">
+            {" "}{lead.name}
+          </span>
+        </p>
+        <Select
+          name="customer_type"
+          label={t("crm.form.customerType")}
+          value={type}
+          onChange={(e) => setType(e.target.value as "individual" | "company")}
+          options={[
+            { value: "individual", label: t("crm.customerType.individual") },
+            { value: "company", label: t("crm.customerType.company") },
+          ]}
+        />
+        <Select
+          name="customer_category"
+          label={t("crm.form.customerCategory")}
+          value={category}
+          onChange={(e) =>
+            setCategory(
+              e.target.value as
+                | "investor"
+                | "buyer"
+                | "broker"
+                | "owner"
+                | "other"
+            )
+          }
+          options={[
+            { value: "buyer", label: t("crm.customerCategory.buyer") },
+            { value: "investor", label: t("crm.customerCategory.investor") },
+            { value: "broker", label: t("crm.customerCategory.broker") },
+            { value: "owner", label: t("crm.customerCategory.owner") },
+            { value: "other", label: t("crm.customerCategory.other") },
+          ]}
+        />
+      </div>
+    </ConfirmationDialog>
   );
 }
 
