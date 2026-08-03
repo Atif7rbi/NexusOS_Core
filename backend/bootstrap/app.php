@@ -4,6 +4,8 @@ use App\Http\Middleware\EnsureActiveTenantMembership;
 use App\Modules\Collections\Http\Middleware\AuthorizeCollectionScheduleCommand;
 use App\Modules\Collections\Http\Middleware\ResolveCollectionScheduleContract;
 use App\Modules\Collections\Support\CollectionScheduleExceptionResponder;
+use App\Modules\Leads\Exceptions\UserHasOpenAssignedLeadsException;
+use App\Modules\Leads\Support\LeadExceptionResponder;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -26,10 +28,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'collections.authorize' => AuthorizeCollectionScheduleCommand::class,
         ]);
 
-})
+    })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (AuthenticationException $exception, Request $request) {
-            if (! $request->is('api/contracts/*/collection-schedule*')) {
+            if (
+                ! $request->is('api/contracts/*/collection-schedule*')
+                && ! $request->is('api/leads*')
+            ) {
                 return null;
             }
 
@@ -48,5 +53,16 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return app(CollectionScheduleExceptionResponder::class)->from($exception);
+        });
+
+        $exceptions->render(function (\Throwable $exception, Request $request) {
+            if (
+                ! $request->is('api/leads*')
+                && ! ($exception instanceof UserHasOpenAssignedLeadsException)
+            ) {
+                return null;
+            }
+
+            return app(LeadExceptionResponder::class)->from($exception);
         });
     })->create();
