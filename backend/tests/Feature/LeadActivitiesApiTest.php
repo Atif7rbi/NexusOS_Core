@@ -25,7 +25,7 @@ final class LeadActivitiesApiTest extends ApiTestCase
 
         $this->originalTimezone = date_default_timezone_get();
         date_default_timezone_set('UTC');
-        $this->freezeTime(CarbonImmutable::parse('2026-08-02T12:00:00Z'));
+        $this->freezeCrmClock(CarbonImmutable::parse('2026-08-02T12:00:00Z'));
     }
 
     protected function tearDown(): void
@@ -80,7 +80,7 @@ final class LeadActivitiesApiTest extends ApiTestCase
         $lead = $this->createLead($tenant, $sales);
         Sanctum::actingAs($sales);
         $updatedAt = CarbonImmutable::parse('2026-08-02T13:30:00Z');
-        $this->freezeTime($updatedAt);
+        $this->freezeCrmClock($updatedAt);
 
         $response = $this->postJson("/api/leads/{$lead->id}/notes", [
             'body' => '  Customer requested a second viewing.  ',
@@ -182,7 +182,7 @@ final class LeadActivitiesApiTest extends ApiTestCase
 
         $this->patchJson("/api/leads/{$lead->id}/stage", ['stage' => 'qualified'])
             ->assertOk();
-        $this->freezeTime(CarbonImmutable::parse('2026-08-02T12:01:00Z'));
+        $this->freezeCrmClock(CarbonImmutable::parse('2026-08-02T12:01:00Z'));
         $this->patchJson("/api/leads/{$lead->id}/lose", [
             'lost_reason' => 'not_ready',
         ])->assertOk();
@@ -226,7 +226,7 @@ final class LeadActivitiesApiTest extends ApiTestCase
             ->assertJsonPath('data.pagination.total', 1);
     }
 
-    private function freezeTime(CarbonImmutable $time): void
+    private function freezeCrmClock(CarbonImmutable $time): void
     {
         Carbon::setTestNow($time);
         CarbonImmutable::setTestNow($time);
