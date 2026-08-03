@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Modules\Leads\Actions\ClaimLeadAction;
 use App\Modules\Leads\Exceptions\LeadClaimConflictException;
+use App\Modules\Leads\Exceptions\LeadNotFoundException;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -50,7 +51,11 @@ try {
         'actor_id' => $actor->id,
         'assigned_to' => $lead->assigned_to,
     ], JSON_THROW_ON_ERROR);
-} catch (LeadClaimConflictException $exception) {
+} catch (LeadClaimConflictException|LeadNotFoundException $exception) {
+    // In this isolated race, the losing worker may observe the Lead only after
+    // the winner commits. The visibility contract then hides the now-assigned
+    // Lead with LeadNotFoundException, which is still the same claim conflict
+    // outcome for this concurrently coordinated worker pair.
     echo json_encode([
         'ok' => false,
         'status' => 409,
