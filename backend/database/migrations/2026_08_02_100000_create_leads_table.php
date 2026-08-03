@@ -90,7 +90,7 @@ return new class extends Migration
                 $table->foreignId('updated_by')
                     ->nullable()
                     ->constrained('users')
-                    ->restrictOnDelete();
+                    ->nullOnDelete();
 
                 $table->timestampsTz();
 

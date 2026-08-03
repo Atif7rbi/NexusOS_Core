@@ -225,7 +225,7 @@ final class LeadsDatabaseTest extends ApiTestCase
         }
     }
 
-    public function test_all_lead_and_activity_foreign_keys_use_on_delete_restrict(): void
+    public function test_lead_and_activity_foreign_keys_use_the_frozen_delete_actions(): void
     {
         $foreignKeys = collect(DB::select(<<<'SQL'
             SELECT conrelid::regclass::text AS table_name, conname, confdeltype
@@ -236,7 +236,21 @@ final class LeadsDatabaseTest extends ApiTestCase
         SQL));
 
         $this->assertCount(14, $foreignKeys);
-        $this->assertTrue($foreignKeys->every(
+        $updatedByForeignKey = $foreignKeys->first(
+            static fn (object $foreignKey): bool => $foreignKey->table_name === 'leads'
+                && $foreignKey->conname === 'leads_updated_by_foreign',
+        );
+
+        $this->assertNotNull($updatedByForeignKey);
+        $this->assertSame('n', $updatedByForeignKey->confdeltype);
+
+        $restrictForeignKeys = $foreignKeys->reject(
+            static fn (object $foreignKey): bool => $foreignKey->table_name === 'leads'
+                && $foreignKey->conname === 'leads_updated_by_foreign',
+        );
+
+        $this->assertCount(13, $restrictForeignKeys);
+        $this->assertTrue($restrictForeignKeys->every(
             static fn (object $foreignKey): bool => $foreignKey->confdeltype === 'r',
         ));
     }
