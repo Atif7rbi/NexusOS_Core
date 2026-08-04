@@ -2,7 +2,9 @@ import {
   Archive,
   CalendarClock,
   CircleCheckBig,
+  Columns3,
   Filter,
+  List,
   Plus,
   RefreshCw,
   Search,
@@ -11,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { FollowUpQueueTabs } from "@/components/leads/FollowUpQueueTabs";
+import { LeadsPipelineView } from "@/components/leads/LeadsPipelineView";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 import {
   leadSources,
@@ -47,6 +50,7 @@ type QueryChange = Record<
 
 type LeadsIndexViewProps = {
   query: LeadsIndexQuery;
+  viewMode: "list" | "pipeline";
   index: LeadsIndexResponse["data"] | null;
   projects: Project[];
   assignees: TenantUser[];
@@ -59,6 +63,7 @@ type LeadsIndexViewProps = {
   hasFilters: boolean;
   onSearchInput: (value: string) => void;
   onQueryChange: (changes: QueryChange) => void;
+  onViewChange: (view: "list" | "pipeline") => void;
   onCreate: () => void;
   onRefresh: () => void;
   onReset: () => void;
@@ -67,6 +72,7 @@ type LeadsIndexViewProps = {
 
 export function LeadsIndexView({
   query,
+  viewMode,
   index,
   projects,
   assignees,
@@ -79,6 +85,7 @@ export function LeadsIndexView({
   hasFilters,
   onSearchInput,
   onQueryChange,
+  onViewChange,
   onCreate,
   onRefresh,
   onReset,
@@ -143,6 +150,27 @@ export function LeadsIndexView({
           />
         </section>
       ) : null}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={viewMode === "list" ? "primary" : "secondary"}
+          leadingIcon={<List size={16} />}
+          onClick={() => onViewChange("list")}
+        >
+          {t("crm.view.list")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={viewMode === "pipeline" ? "primary" : "secondary"}
+          leadingIcon={<Columns3 size={16} />}
+          onClick={() => onViewChange("pipeline")}
+        >
+          {t("crm.view.pipeline")}
+        </Button>
+      </div>
 
       <FollowUpQueueTabs
         activeBucket={query.follow_up_bucket ?? ""}
@@ -326,6 +354,8 @@ export function LeadsIndexView({
               ) : undefined
             }
           />
+        ) : viewMode === "pipeline" ? (
+          <LeadsPipelineView leads={leads} onOpen={onOpen} />
         ) : (
           <LeadsTable leads={leads} now={renderedAt} onOpen={onOpen} />
         )}

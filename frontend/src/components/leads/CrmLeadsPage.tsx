@@ -94,6 +94,7 @@ export function CrmLeadsPage() {
   const { t } = useTranslation();
   const isAdministrator = user?.role === "administrator";
   const selectedLeadId = searchParams.get("lead");
+  const viewMode = searchParams.get("view") === "pipeline" ? "pipeline" : "list";
   const archivedMode = isAdministrator && searchParams.get("archived") === "true";
 
   const query = useMemo<LeadsIndexQuery>(() => {
@@ -104,7 +105,7 @@ export function CrmLeadsPage() {
 
     return {
       page: positiveInteger(searchParams.get("page"), 1),
-      per_page: 20,
+      per_page: viewMode === "pipeline" ? 100 : 20,
       search: searchParams.get("search") ?? "",
       stage: leadStages.includes(stage as LeadStage) ? (stage as LeadStage) : "",
       source: leadSources.includes(source as LeadSource)
@@ -120,7 +121,7 @@ export function CrmLeadsPage() {
       overdue: searchParams.get("overdue") === "true",
       archived: archivedMode,
     };
-  }, [archivedMode, searchParams]);
+  }, [archivedMode, searchParams, viewMode]);
 
   const [searchInput, setSearchInput] = useState(query.search ?? "");
   const [index, setIndex] = useState<LeadsIndexResponse["data"] | null>(null);
@@ -680,6 +681,7 @@ export function CrmLeadsPage() {
         ) : (
           <LeadsIndexView
             query={query}
+            viewMode={viewMode}
             index={index}
             projects={projects}
             assignees={assignees}
@@ -692,6 +694,13 @@ export function CrmLeadsPage() {
             hasFilters={hasFilters}
             onSearchInput={setSearchInput}
             onQueryChange={updateUrl}
+            onViewChange={(nextView) =>
+              updateUrl({
+                view: nextView === "pipeline" ? "pipeline" : null,
+                page: 1,
+                lead: null,
+              })
+            }
             onCreate={() => {
               setEditingLead(null);
               setFormOpen(true);
