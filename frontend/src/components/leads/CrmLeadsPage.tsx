@@ -18,6 +18,11 @@ import {
 import { LeadDetailsView } from "@/components/leads/LeadDetailsView";
 import { LeadDuplicateDialog } from "@/components/leads/LeadDuplicateDialog";
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
+import {
+  LeadFollowUpDialog,
+  type LeadFollowUpDialogAction,
+  type LeadFollowUpDialogPayload,
+} from "@/components/leads/LeadFollowUpDialog";
 import { LeadsIndexView } from "@/components/leads/LeadsIndexView";
 import {
   leadSources,
@@ -32,7 +37,9 @@ import {
   addLeadNote,
   archiveLead,
   assignLead,
+  cancelLeadFollowUp,
   claimLead,
+  completeLeadFollowUp,
   convertLead,
   createLead,
   fetchLead,
@@ -43,7 +50,9 @@ import {
   moveLeadStage,
   moveLeadToLost,
   reopenLead,
+  rescheduleLeadFollowUp,
   restoreLead,
+  scheduleLeadFollowUp,
   updateLead,
 } from "@/services/leads";
 import { fetchProjects } from "@/services/projects";
@@ -143,6 +152,8 @@ export function CrmLeadsPage() {
   const [conversionSuccessName, setConversionSuccessName] = useState<string | null>(null);
 
   const [dialogAction, setDialogAction] = useState<LeadDialogAction | null>(null);
+  const [followUpDialogAction, setFollowUpDialogAction] =
+    useState<LeadFollowUpDialogAction | null>(null);
   const [actionProcessing, setActionProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState(false);
@@ -346,6 +357,7 @@ export function CrmLeadsPage() {
 
   const closeLead = (): void => {
     setDialogAction(null);
+    setFollowUpDialogAction(null);
     setFormOpen(false);
     setConversionConflict(null);
     setConversionSuccessName(null);
@@ -505,6 +517,62 @@ export function CrmLeadsPage() {
     }
   };
 
+  const executeFollowUpAction = async (
+    payload: LeadFollowUpDialogPayload
+  ): Promise<void> => {
+    if (!token || !lead) {
+      return;
+    }
+
+    setActionProcessing(true);
+    setActionError(null);
+
+    try {
+      const updated = await (async (): Promise<Lead> => {
+        switch (payload.action) {
+          case "schedule_follow_up":
+            return scheduleLeadFollowUp(token, lead.id, {
+              next_follow_up_at: payload.nextFollowUpAt,
+              next_action_type: payload.nextActionType,
+              next_action_note: payload.nextActionNote,
+            });
+
+          case "reschedule_follow_up":
+            return rescheduleLeadFollowUp(token, lead.id, {
+              next_follow_up_at: payload.nextFollowUpAt,
+              next_action_type: payload.nextActionType,
+              next_action_note: payload.nextActionNote,
+            });
+
+          case "complete_follow_up":
+            return completeLeadFollowUp(token, lead.id, {
+              note: payload.note,
+            });
+
+          case "cancel_follow_up":
+            return cancelLeadFollowUp(token, lead.id, {
+              note: payload.note,
+            });
+        }
+      })();
+
+      setFollowUpDialogAction(null);
+      setLead(updated);
+      setSuccessMessage(t("crm.success.followUp"));
+      setConversionSuccessName(null);
+      void loadActivities(updated.id, archivedMode);
+      refresh();
+    } catch (caughtError) {
+      setActionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("crm.genericError")
+      );
+    } finally {
+      setActionProcessing(false);
+    }
+  };
+
   const submitNote = async (body: string): Promise<void> => {
     if (!token || !lead) {
       return;
@@ -603,6 +671,10 @@ export function CrmLeadsPage() {
               }
               setDialogAction(action);
             }}
+            onFollowUpAction={(action) => {
+              setActionError(null);
+              setFollowUpDialogAction(action);
+            }}
             onAddNote={submitNote}
           />
         ) : (
@@ -648,6 +720,23 @@ export function CrmLeadsPage() {
             }
           }}
           onSubmit={submitForm}
+        />
+      ) : null}
+
+      {lead && followUpDialogAction ? (
+        <LeadFollowUpDialog
+          key={`${lead.id}:${followUpDialogAction}`}
+          action={followUpDialogAction}
+          lead={lead}
+          isProcessing={actionProcessing}
+          error={actionError}
+          onClose={() => {
+            if (!actionProcessing) {
+              setFollowUpDialogAction(null);
+              setActionError(null);
+            }
+          }}
+          onConfirm={(payload) => void executeFollowUpAction(payload)}
         />
       ) : null}
 
