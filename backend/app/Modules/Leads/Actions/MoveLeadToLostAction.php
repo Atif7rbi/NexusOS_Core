@@ -28,39 +28,23 @@ final class MoveLeadToLostAction
     ) {
     }
 
-    public function execute(
-        string $tenantId,
-        string $leadId,
-        User $actor,
-        LostReason $reason,
-        ?string $reasonDetail,
-    ): Lead {
-        return DB::transaction(function () use (
-            $tenantId,
-            $leadId,
-            $actor,
-            $reason,
-            $reasonDetail,
-        ): Lead {
+    public function execute(string $tenantId, string $leadId, User $actor, LostReason $reason, ?string $reasonDetail): Lead
+    {
+        return DB::transaction(function () use ($tenantId, $leadId, $actor, $reason, $reasonDetail): Lead {
             $lead = $this->leads->lockVisible($tenantId, $leadId, $actor);
 
             if ($lead->isArchived()) {
                 throw new LeadIsArchivedException();
             }
-
             if ($lead->stage === LeadStage::Won) {
                 throw new LeadAlreadyWonException();
             }
-
             if ($lead->stage === LeadStage::Lost) {
                 throw new LeadAlreadyLostException();
             }
 
             $this->authorization->assertCanModify($lead, $actor);
-
-            $normalizedDetail = $reason === LostReason::Other
-                ? trim((string) $reasonDetail)
-                : null;
+            $normalizedDetail = $reason === LostReason::Other ? trim((string) $reasonDetail) : null;
 
             if ($reason === LostReason::Other && $normalizedDetail === '') {
                 throw new LeadValidationException(
@@ -71,7 +55,10 @@ final class MoveLeadToLostAction
 
             $fromStage = $lead->stage;
             $previousFollowUp = $lead->next_follow_up_at?->toISOString();
+            $previousActionType = $lead->next_action_type?->value;
+            $previousActionNote = $lead->next_action_note;
             $now = CarbonImmutable::now();
+
             $lead->forceFill([
                 'stage' => LeadStage::Lost,
                 'lost_reason' => $reason,
@@ -79,6 +66,8 @@ final class MoveLeadToLostAction
                 'lost_at' => $now,
                 'lost_by' => $actor->id,
                 'next_follow_up_at' => null,
+                'next_action_type' => null,
+                'next_action_note' => null,
                 'updated_by' => $actor->id,
                 'updated_at' => $now,
             ])->save();
@@ -88,19 +77,12 @@ final class MoveLeadToLostAction
                 'to_stage' => LeadStage::Lost->value,
                 'lost_reason' => $reason->value,
                 'lost_reason_detail' => $normalizedDetail,
+                'previous_next_follow_up_at' => $previousFollowUp,
+                'previous_next_action_type' => $previousActionType,
+                'previous_next_action_note' => $previousActionNote,
             ];
 
-            if ($previousFollowUp !== null) {
-                $payload['previous_next_follow_up_at'] = $previousFollowUp;
-            }
-
-            $this->activities->automatic(
-                lead: $lead,
-                type: ActivityType::StageChange,
-                payload: $payload,
-                actorId: $actor->id,
-                occurredAt: $now,
-            );
+            $this->activities->automatic($lead, ActivityType::StageChange, $payload, $actor->id, $now);
 
             return $lead->refresh();
         }, 3);
