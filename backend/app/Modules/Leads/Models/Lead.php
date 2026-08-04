@@ -12,6 +12,7 @@ use App\Modules\Leads\Enums\ConversionMode;
 use App\Modules\Leads\Enums\LeadSource;
 use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Enums\LostReason;
+use App\Modules\Leads\Enums\NextActionType;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Units\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +39,8 @@ final class Lead extends Model
         'stage',
         'assigned_to',
         'next_follow_up_at',
+        'next_action_type',
+        'next_action_note',
         'lost_reason',
         'lost_reason_detail',
         'lost_at',
@@ -63,6 +66,7 @@ final class Lead extends Model
             'stage' => LeadStage::class,
             'assigned_to' => 'integer',
             'next_follow_up_at' => 'datetime',
+            'next_action_type' => NextActionType::class,
             'lost_reason' => LostReason::class,
             'lost_at' => 'datetime',
             'lost_by' => 'integer',
