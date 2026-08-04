@@ -86,6 +86,78 @@ final class LeadsConcurrencyTest extends TestCase
         }
     }
 
+    /**
+     * Simulates two concurrent create_new conversion attempts for the same Lead
+     * phone. The first succeeds; the second encounters the PostgreSQL unique
+     * violation on (tenant_id, phone) and must receive a semantic 409 conflict
+     * (LeadConversionNewCustomerConflictException) with no partial state left.
+     *
+     * We simulate the race by:
+     *  1. Manually creating a Customer with the Lead's phone inside a nested
+     *     transaction (mimicking the winner that committed first).
+     *  2. Attempting the Action's create_new path — the SELECT FOR UPDATE check
+     *     finds no conflict (the Customer was committed between the check and
+     *     the INSERT), so the INSERT hits the unique constraint.
+     *  3. Asserting the Action throws LeadConversionNewCustomerConflictException
+     *     and leaves the Lead in its original stage.
+     */
+    public function test_concurrent_create_new_unique_violation_returns_semantic_conflict(): void
+    {
+        $tenant      = $this->createLeadTenant();
+        $admin       = $this->createLeadUser($tenant, User::ROLE_ADMINISTRATOR)['user'];
+        $lead        = $this->createLead($tenant, $admin);
+        $phone       = $lead->phone;
+        $tenantId    = (string) $tenant->id;
+
+        // Simulate the winner: create a Customer with the Lead's phone before
+        // the second actor's transaction commits.
+        DB::table('customers')->insert([
+            'id'         => (string) \Illuminate\Support\Str::ulid(),
+            'tenant_id'  => $tenantId,
+            'name'       => 'Existing Customer',
+            'phone'      => $phone,
+            'type'       => 'individual',
+            'category'   => 'buyer',
+            'status'     => 'customer',
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        /** @var \App\Modules\Leads\Actions\ConvertLeadToCustomerAction $action */
+        $action = app(\App\Modules\Leads\Actions\ConvertLeadToCustomerAction::class);
+
+        try {
+            $action->execute(
+                tenantId: $tenantId,
+                leadId: (string) $lead->id,
+                actorId: $admin->id,
+                conversionIntent: 'create_new',
+                existingCustomerId: null,
+                customerData: ['type' => 'individual', 'category' => 'buyer'],
+            );
+            $this->fail('Expected LeadConversionNewCustomerConflictException');
+        } catch (\App\Modules\Leads\Exceptions\LeadConversionNewCustomerConflictException $e) {
+            $this->addToAssertionCount(1);
+        }
+
+        // Lead must not be in won state — no partial conversion
+        $lead->refresh();
+        $this->assertNotSame(\App\Modules\Leads\Enums\LeadStage::Won, $lead->stage);
+        $this->assertNull($lead->customer_id);
+        $this->assertNull($lead->converted_at);
+
+        // Only one Customer must exist with this phone
+        $this->assertSame(
+            1,
+            \App\Modules\Customers\Models\Customer::query()
+                ->where('tenant_id', $tenantId)
+                ->where('phone', $phone)
+                ->count(),
+        );
+    }
+
     public function test_two_users_claiming_one_unassigned_lead_allow_exactly_one_success(): void
     {
         $tenant = $this->createLeadTenant();

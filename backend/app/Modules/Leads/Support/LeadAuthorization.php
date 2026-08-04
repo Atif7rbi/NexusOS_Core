@@ -115,6 +115,9 @@ final class LeadAuthorization
                 && ! $archived
                 && $lead->stage !== LeadStage::Won,
             'can_restore' => $administrator && $archived,
+            'can_convert' => ! $archived
+                && $open
+                && ($administrator || $assignedToActor),
         ];
     }
 }

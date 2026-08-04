@@ -6,11 +6,13 @@ import {
 } from "@/lib/http";
 import { ApiRequestError, parseApiError } from "@/lib/api-error";
 import type {
+  ConvertLeadPayload,
   CreateLeadPayload,
   Lead,
   LeadActivitiesResponse,
   LeadActivityResponse,
   LeadArchiveReason,
+  LeadConversionConflict,
   LeadDuplicateMatch,
   LeadLostReason,
   LeadResponse,
@@ -28,6 +30,64 @@ export class LeadDuplicateError extends ApiRequestError {
     super(message, {}, 409, "lead_phone_duplicate_detected");
     this.name = "LeadDuplicateError";
   }
+}
+
+export class LeadConversionConflictError extends ApiRequestError {
+  constructor(
+    message: string,
+    public readonly conflictingCustomer: LeadConversionConflict
+  ) {
+    super(message, {}, 409, "lead_conversion_new_customer_conflict");
+    this.name = "LeadConversionConflictError";
+  }
+}
+
+export async function convertLead(
+  token: string,
+  leadId: string,
+  payload: ConvertLeadPayload
+): Promise<Lead> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/leads/${leadId}/convert`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    // For the conflict case we need the full body, so we parse it ourselves
+    // before delegating to parseApiError for other errors.
+    if (response.status === 409) {
+      let body: Record<string, unknown>;
+      try {
+        body = (await response.json()) as Record<string, unknown>;
+      } catch {
+        throw await parseApiError(new Response(null, { status: 409 }));
+      }
+      const errorObj = body.error as Record<string, unknown> | undefined;
+      if (errorObj?.code === "lead_conversion_new_customer_conflict") {
+        const conflicting = errorObj.conflicting_customer as LeadConversionConflict;
+        throw new LeadConversionConflictError(
+          (errorObj.message as string) ?? "تعارض في التحويل",
+          conflicting
+        );
+      }
+      // For other 409s, re-construct a Response to feed parseApiError
+      const err = new ApiRequestError(
+        (errorObj?.message as string) ?? "تعذر إكمال العملية.",
+        {},
+        409,
+        (errorObj?.code as string) ?? null
+      );
+      throw err;
+    }
+    throw await parseApiError(response);
+  }
+
+  const result = (await response.json()) as LeadResponse;
+  return result.data.lead;
 }
 
 export async function fetchLeads(

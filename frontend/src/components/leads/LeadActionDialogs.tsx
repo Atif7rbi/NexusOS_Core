@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, RotateCcw, Route, UserCheck, UserRoundCog, UserX } from "lucide-react";
+import { Archive, ArrowLeftRight, RotateCcw, Route, UserCheck, UserRoundCog, UserX } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -16,9 +16,11 @@ import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useTranslation } from "@/hooks/useTranslation";
+import type { TranslationKey } from "@/i18n/types";
 import type {
   Lead,
   LeadArchiveReason,
+  LeadConversionConflict,
   LeadLostReason,
   OpenLeadStage,
 } from "@/types/lead";
@@ -31,7 +33,8 @@ export type LeadDialogAction =
   | "lost"
   | "reopen"
   | "archive"
-  | "restore";
+  | "restore"
+  | "convert";
 
 export type LeadDialogPayload =
   | { action: "claim" | "reopen" | "restore" }
@@ -46,6 +49,17 @@ export type LeadDialogPayload =
       action: "archive";
       reason: LeadArchiveReason;
       detail: string | null;
+    }
+  | {
+      action: "convert";
+      intent: "create_new";
+      type: "individual" | "company";
+      category: "investor" | "buyer" | "broker" | "owner" | "other";
+    }
+  | {
+      action: "convert";
+      intent: "link_existing";
+      existingCustomerId: string;
     };
 
 type LeadActionDialogsProps = {
@@ -56,6 +70,7 @@ type LeadActionDialogsProps = {
   error: string | null;
   onClose: () => void;
   onConfirm: (payload: LeadDialogPayload) => void;
+  conversionConflict?: LeadConversionConflict | null;
 };
 
 export function LeadActionDialogs({
@@ -66,6 +81,7 @@ export function LeadActionDialogs({
   error,
   onClose,
   onConfirm,
+  conversionConflict,
 }: LeadActionDialogsProps) {
   const { t } = useTranslation();
   const stageOptions = useMemo(() => {
@@ -289,6 +305,18 @@ export function LeadActionDialogs({
     );
   }
 
+  if (action === "convert") {
+    return (
+      <ConvertLeadDialog
+        lead={lead}
+        base={base}
+        onConfirm={onConfirm}
+        conversionConflict={conversionConflict ?? null}
+        t={t}
+      />
+    );
+  }
+
   return (
     <ConfirmationDialog
       {...base}
@@ -298,6 +326,132 @@ export function LeadActionDialogs({
       icon={<DialogIcon icon={RotateCcw} tone="info" />}
       onConfirm={() => onConfirm({ action: "restore" })}
     />
+  );
+}
+
+function ConvertLeadDialog({
+  lead,
+  base,
+  onConfirm,
+  conversionConflict,
+  t,
+}: {
+  lead: Lead;
+  base: Record<string, unknown>;
+  onConfirm: (payload: LeadDialogPayload) => void;
+  conversionConflict: LeadConversionConflict | null;
+  t: (key: TranslationKey) => string;
+}) {
+  const [type, setType] = useState<"individual" | "company">("individual");
+  const [category, setCategory] = useState<
+    "investor" | "buyer" | "broker" | "owner" | "other"
+  >("buyer");
+  const match = conversionConflict;
+
+  if (match?.status === "archived") {
+    return (
+      <ConfirmationDialog
+        {...(base as Parameters<typeof ConfirmationDialog>[0])}
+        title={t("crm.dialog.convertTitle")}
+        confirmLabel={t("crm.dialog.convertViewCustomers")}
+        icon={<DialogIcon icon={ArrowLeftRight} tone="danger" />}
+        onConfirm={() => {
+          window.location.href = "/customers/";
+        }}
+      >
+        <p className="text-sm text-[var(--text-secondary)]">
+          {t("crm.dialog.convertArchivedBlocked")}
+        </p>
+      </ConfirmationDialog>
+    );
+  }
+
+  if (match) {
+    const statusLabel = match.status === "customer"
+      ? t("crm.dialog.convertMatchStatus.customer")
+      : match.status === "inactive"
+        ? t("crm.dialog.convertMatchStatus.inactive")
+        : match.status === "lead"
+          ? t("crm.dialog.convertMatchStatus.lead")
+          : match.status;
+
+    return (
+      <ConfirmationDialog
+        {...(base as Parameters<typeof ConfirmationDialog>[0])}
+        title={t("crm.dialog.convertTitle")}
+        description={t("crm.dialog.convertMatchFound")}
+        confirmLabel={t("crm.dialog.convertLinkConfirm")}
+        icon={<DialogIcon icon={ArrowLeftRight} tone="info" />}
+        onConfirm={() =>
+          onConfirm({
+            action: "convert",
+            intent: "link_existing",
+            existingCustomerId: match.id,
+          })
+        }
+      >
+        <div className="rounded-md border border-[var(--border)] p-3 text-sm">
+          {match.name ? (
+            <p className="font-semibold text-[var(--text-primary)]">{match.name}</p>
+          ) : null}
+          <p className="text-[var(--text-secondary)]">{statusLabel}</p>
+        </div>
+      </ConfirmationDialog>
+    );
+  }
+
+  return (
+    <ConfirmationDialog
+      {...(base as Parameters<typeof ConfirmationDialog>[0])}
+      title={t("crm.dialog.convertTitle")}
+      description={t("crm.dialog.convertDescription")}
+      confirmLabel={t("crm.actions.convert")}
+      icon={<DialogIcon icon={ArrowLeftRight} tone="info" />}
+      onConfirm={() =>
+        onConfirm({
+          action: "convert",
+          intent: "create_new",
+          type,
+          category,
+        })
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-[var(--text-secondary)]">
+          {t("crm.dialog.convertLeadInfo")}
+          <span className="font-semibold text-[var(--text-primary)]">
+            {" "}{lead.name}
+          </span>
+        </p>
+        <Select
+          name="customer_type"
+          label={t("crm.form.customerType")}
+          value={type}
+          onChange={(event) => setType(event.target.value as "individual" | "company")}
+          options={[
+            { value: "individual", label: t("crm.customerType.individual") },
+            { value: "company", label: t("crm.customerType.company") },
+          ]}
+        />
+        <Select
+          name="customer_category"
+          label={t("crm.form.customerCategory")}
+          value={category}
+          onChange={(event) =>
+            setCategory(
+              event.target.value as "investor" | "buyer" | "broker" | "owner" | "other"
+            )
+          }
+          options={[
+            { value: "buyer", label: t("crm.customerCategory.buyer") },
+            { value: "investor", label: t("crm.customerCategory.investor") },
+            { value: "broker", label: t("crm.customerCategory.broker") },
+            { value: "owner", label: t("crm.customerCategory.owner") },
+            { value: "other", label: t("crm.customerCategory.other") },
+          ]}
+        />
+      </div>
+    </ConfirmationDialog>
   );
 }
 

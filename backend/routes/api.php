@@ -105,6 +105,8 @@ Route::middleware([
         ->name('leads.archive');
     Route::patch('/leads/{lead}/restore', [LeadController::class, 'restore'])
         ->name('leads.restore');
+    Route::post('/leads/{lead}/convert', [LeadController::class, 'convert'])
+        ->name('leads.convert');
     Route::get('/leads/{lead}/activities', [LeadActivityController::class, 'index'])
         ->name('leads.activities.index');
     Route::post('/leads/{lead}/notes', [LeadActivityController::class, 'store'])

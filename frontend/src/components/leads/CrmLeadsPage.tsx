@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -32,10 +33,12 @@ import {
   archiveLead,
   assignLead,
   claimLead,
+  convertLead,
   createLead,
   fetchLead,
   fetchLeadActivities,
   fetchLeads,
+  LeadConversionConflictError,
   LeadDuplicateError,
   moveLeadStage,
   moveLeadToLost,
@@ -49,6 +52,7 @@ import type {
   CreateLeadPayload,
   Lead,
   LeadActivity,
+  LeadConversionConflict,
   LeadDuplicateMatch,
   LeadSource,
   LeadStage,
@@ -121,11 +125,13 @@ export function CrmLeadsPage() {
   const [duplicatePayload, setDuplicatePayload] = useState<CreateLeadPayload | null>(null);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [conversionSuccessName, setConversionSuccessName] = useState<string | null>(null);
 
   const [dialogAction, setDialogAction] = useState<LeadDialogAction | null>(null);
   const [actionProcessing, setActionProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState(false);
+  const [conversionConflict, setConversionConflict] = useState<LeadConversionConflict | null>(null);
 
   const updateUrl = useCallback(
     (
@@ -209,27 +215,23 @@ export function CrmLeadsPage() {
     void Promise.allSettled([
       fetchProjects(token, { page: 1, perPage: 100 }),
       fetchTenantUsers(token, { page: 1, perPage: 100 }),
-    ])
-      .then(([projectResult, userResult]) => {
-        if (!active) {
-          return;
-        }
+    ]).then(([projectResult, userResult]) => {
+      if (!active) {
+        return;
+      }
 
-        setProjects(
-          projectResult.status === "fulfilled"
-            ? projectResult.value.data.data
-            : []
-        );
-        setAssignees(
-          userResult.status === "fulfilled"
-            ? userResult.value.data.users.data.filter(
-                (membership) =>
-                  membership.status === "active" &&
-                  crmRoles.includes(membership.user.role)
-              )
-            : []
-        );
-      });
+      setProjects(
+        projectResult.status === "fulfilled" ? projectResult.value.data.data : []
+      );
+      setAssignees(
+        userResult.status === "fulfilled"
+          ? userResult.value.data.users.data.filter(
+              (membership) =>
+                membership.status === "active" && crmRoles.includes(membership.user.role)
+            )
+          : []
+      );
+    });
 
     return () => {
       active = false;
@@ -314,17 +316,24 @@ export function CrmLeadsPage() {
     if (!successMessage) {
       return;
     }
-    const timeout = window.setTimeout(() => setSuccessMessage(null), 3500);
+    const timeout = window.setTimeout(() => {
+      setSuccessMessage(null);
+      setConversionSuccessName(null);
+    }, 3500);
     return () => window.clearTimeout(timeout);
   }, [successMessage]);
 
   const openLead = (record: Lead): void => {
+    setConversionConflict(null);
+    setConversionSuccessName(null);
     updateUrl({ lead: record.id });
   };
 
   const closeLead = (): void => {
     setDialogAction(null);
     setFormOpen(false);
+    setConversionConflict(null);
+    setConversionSuccessName(null);
     updateUrl({ lead: null });
   };
 
@@ -347,6 +356,7 @@ export function CrmLeadsPage() {
         setFormOpen(false);
         setEditingLead(null);
         setSuccessMessage(t("crm.success.updated"));
+        setConversionSuccessName(null);
         refresh();
         return;
       }
@@ -355,6 +365,7 @@ export function CrmLeadsPage() {
         const created = await createLead(token, payload as CreateLeadPayload);
         setFormOpen(false);
         setSuccessMessage(t("crm.success.created"));
+        setConversionSuccessName(null);
         updateUrl({ lead: created.id });
         refresh();
       } catch (caughtError) {
@@ -387,6 +398,7 @@ export function CrmLeadsPage() {
       setDuplicateMatches([]);
       setFormOpen(false);
       setSuccessMessage(t("crm.success.created"));
+      setConversionSuccessName(null);
       updateUrl({ lead: created.id });
       refresh();
     } catch (caughtError) {
@@ -422,22 +434,57 @@ export function CrmLeadsPage() {
             return archiveLead(token, lead.id, payload.reason, payload.detail);
           case "restore":
             return restoreLead(token, lead.id);
+          case "convert":
+            return convertLead(
+              token,
+              lead.id,
+              payload.intent === "create_new"
+                ? {
+                    conversion_intent: "create_new",
+                    type: payload.type,
+                    category: payload.category,
+                  }
+                : {
+                    conversion_intent: "link_existing",
+                    existing_customer_id: payload.existingCustomerId,
+                  }
+            );
         }
       })();
 
       setDialogAction(null);
-      setSuccessMessage(t("crm.success.action"));
-      if (payload.action === "archive" || payload.action === "restore") {
+      if (payload.action === "convert") {
+        const customerName = updated.customer?.name ?? "";
+        setSuccessMessage(
+          customerName
+            ? `${t("crm.success.converted")} ${customerName}`
+            : t("crm.success.converted")
+        );
+        setConversionSuccessName(customerName || t("crm.success.converted"));
+        setConversionConflict(null);
+        setLead(updated);
+        void loadActivities(updated.id, archivedMode);
+      } else if (payload.action === "archive" || payload.action === "restore") {
+        setSuccessMessage(t("crm.success.action"));
+        setConversionSuccessName(null);
         closeLead();
       } else {
+        setSuccessMessage(t("crm.success.action"));
+        setConversionSuccessName(null);
         setLead(updated);
         void loadActivities(updated.id, archivedMode);
       }
       refresh();
     } catch (caughtError) {
-      setActionError(
-        caughtError instanceof Error ? caughtError.message : t("crm.genericError")
-      );
+      if (caughtError instanceof LeadConversionConflictError) {
+        setConversionConflict(caughtError.conflictingCustomer);
+        setDialogAction("convert");
+        setActionError(null);
+      } else {
+        setActionError(
+          caughtError instanceof Error ? caughtError.message : t("crm.genericError")
+        );
+      }
     } finally {
       setActionProcessing(false);
     }
@@ -453,6 +500,7 @@ export function CrmLeadsPage() {
       const response = await addLeadNote(token, lead.id, body);
       setActivities((current) => [response.data.activity, ...current]);
       setSuccessMessage(t("crm.success.action"));
+      setConversionSuccessName(null);
     } finally {
       setAddingNote(false);
     }
@@ -495,9 +543,17 @@ export function CrmLeadsPage() {
         {selectedLeadId && successMessage ? (
           <div
             role="status"
-            className="rounded-xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-4 py-3 text-sm font-semibold text-[var(--success)]"
+            className="flex items-center justify-between gap-4 rounded-xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-4 py-3 text-sm font-semibold text-[var(--success)]"
           >
-            {successMessage}
+            <span>{successMessage}</span>
+            {conversionSuccessName ? (
+              <Link
+                href="/customers/"
+                className="shrink-0 underline underline-offset-2 hover:opacity-80"
+              >
+                {t("crm.dialog.convertViewCustomers")}
+              </Link>
+            ) : null}
           </div>
         ) : null}
         {selectedLeadId ? (
@@ -525,6 +581,9 @@ export function CrmLeadsPage() {
             }}
             onAction={(action) => {
               setActionError(null);
+              if (action === "convert") {
+                setConversionConflict(null);
+              }
               setDialogAction(action);
             }}
             onAddNote={submitNote}
@@ -600,9 +659,11 @@ export function CrmLeadsPage() {
             if (!actionProcessing) {
               setDialogAction(null);
               setActionError(null);
+              setConversionConflict(null);
             }
           }}
           onConfirm={(payload) => void executeAction(payload)}
+          conversionConflict={conversionConflict}
         />
       ) : null}
     </AppShell>
