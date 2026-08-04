@@ -39,6 +39,11 @@ final class IndexLeadRequest extends LeadRequest
             'source' => ['sometimes', 'nullable', Rule::enum(LeadSource::class)],
             'assigned_to' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'project_id' => ['sometimes', 'nullable', 'string', 'ulid'],
+            'follow_up_bucket' => [
+                'sometimes',
+                'nullable',
+                Rule::in(['overdue', 'today', 'tomorrow', 'this_week', 'unscheduled']),
+            ],
             'overdue' => ['sometimes', 'boolean'],
             'archived' => ['sometimes', 'boolean'],
             'page' => ['sometimes', 'integer', 'min:1'],
