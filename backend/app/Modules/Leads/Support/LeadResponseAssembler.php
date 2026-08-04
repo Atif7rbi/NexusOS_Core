@@ -61,6 +61,8 @@ final class LeadResponseAssembler
                         ], true),
                 ],
             'next_follow_up_at' => $lead->next_follow_up_at?->toISOString(),
+            'next_action_type' => $lead->next_action_type?->value,
+            'next_action_note' => $lead->next_action_note,
             'lost_reason' => $lead->lost_reason?->value,
             'lost_reason_detail' => $lead->lost_reason_detail,
             'lost_at' => $lead->lost_at?->toISOString(),
