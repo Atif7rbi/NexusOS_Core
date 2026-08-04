@@ -1,10 +1,10 @@
 # CRM Leads v1 — Milestone C Database & Domain Contract
 
-**Project:** NexusOS Pilot  
-**Module:** CRM / Leads v1  
-**Milestone:** C — Sales Follow-up & Pipeline Completion  
-**Version:** 1.0  
-**Status:** FROZEN  
+**Project:** NexusOS Pilot
+**Module:** CRM / Leads v1
+**Milestone:** C — Sales Follow-up & Pipeline Completion
+**Version:** 1.0
+**Status:** FROZEN
 **Repository:** `Atif7rbi/ufq-pilot`
 
 ---
