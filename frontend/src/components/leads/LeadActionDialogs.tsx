@@ -69,6 +69,7 @@ type LeadActionDialogsProps = {
   error: string | null;
   onClose: () => void;
   onConfirm: (payload: LeadDialogPayload) => void;
+  conversionConflict?: { id: string; status: string; name?: string } | null;
 };
 
 export function LeadActionDialogs({
@@ -79,6 +80,7 @@ export function LeadActionDialogs({
   error,
   onClose,
   onConfirm,
+  conversionConflict,
 }: LeadActionDialogsProps) {
   const { t } = useTranslation();
   const stageOptions = useMemo(() => {
@@ -116,6 +118,7 @@ export function LeadActionDialogs({
     cancelLabel: t("crm.dialog.cancel"),
     processingLabel: t("crm.actions.processing"),
     onCancel: onClose,
+    conflictMatch: conversionConflict,
   };
 
   if (action === "claim") {
@@ -341,6 +344,83 @@ function ConvertLeadDialog({
     "investor" | "buyer" | "broker" | "owner" | "other"
   >("buyer");
 
+  // Phase 2: a matching customer was surfaced (conflict from backend)
+  const [matchedCustomer, setMatchedCustomer] = useState<{
+    id: string;
+    status: string;
+    name?: string;
+  } | null>(null);
+
+  const isArchivedMatch = matchedCustomer?.status === "archived";
+
+  // Called by CrmLeadsPage when a conflict error is caught after create_new
+  // attempt. The parent must expose the match for the dialog to show.
+  // We expose this via the base props extension pattern below.
+  const conflictMatch = (base as { conflictMatch?: typeof matchedCustomer }).conflictMatch;
+
+  // Sync conflict match from parent (passed via base props extension)
+  if (conflictMatch && conflictMatch !== matchedCustomer) {
+    setMatchedCustomer(conflictMatch);
+  }
+
+  if (matchedCustomer) {
+    // Phase 2: show the matched customer and offer explicit link or abort
+    if (isArchivedMatch) {
+      return (
+        <ConfirmationDialog
+          {...(base as Parameters<typeof ConfirmationDialog>[0])}
+          title={t("crm.dialog.convertTitle")}
+          confirmLabel={t("crm.dialog.convertViewCustomers")}
+          icon={<DialogIcon icon={ArrowLeftRight} tone="danger" />}
+          onConfirm={() => {
+            window.location.href = "/customers/";
+          }}
+        >
+          <p className="text-sm text-[var(--text-secondary)]">
+            {t("crm.dialog.convertArchivedBlocked")}
+          </p>
+        </ConfirmationDialog>
+      );
+    }
+
+    const statusLabel = (() => {
+      const s = matchedCustomer.status;
+      if (s === "customer") return t("crm.dialog.convertMatchStatus.customer");
+      if (s === "inactive") return t("crm.dialog.convertMatchStatus.inactive");
+      if (s === "lead")     return t("crm.dialog.convertMatchStatus.lead");
+      return matchedCustomer.status;
+    })();
+
+    return (
+      <ConfirmationDialog
+        {...(base as Parameters<typeof ConfirmationDialog>[0])}
+        title={t("crm.dialog.convertTitle")}
+        description={t("crm.dialog.convertMatchFound")}
+        confirmLabel={t("crm.dialog.convertLinkConfirm")}
+        icon={<DialogIcon icon={ArrowLeftRight} tone="info" />}
+        onConfirm={() =>
+          onConfirm({
+            action: "convert",
+            intent: "link_existing",
+            existingCustomerId: matchedCustomer.id,
+          })
+        }
+      >
+        <div className="space-y-3">
+          <div className="rounded-md border border-[var(--border)] p-3 text-sm">
+            {matchedCustomer.name && (
+              <p className="font-semibold text-[var(--text-primary)]">
+                {matchedCustomer.name}
+              </p>
+            )}
+            <p className="text-[var(--text-secondary)]">{statusLabel}</p>
+          </div>
+        </div>
+      </ConfirmationDialog>
+    );
+  }
+
+  // Phase 1: create_new — collect type and category
   return (
     <ConfirmationDialog
       {...(base as Parameters<typeof ConfirmationDialog>[0])}
