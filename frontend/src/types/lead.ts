@@ -53,6 +53,8 @@ export type FollowUpState =
   | "scheduled_later"
   | "unscheduled";
 
+export type FollowUpBucket = Exclude<FollowUpState, "scheduled_later">;
+
 export type LeadActivityType =
   | "note"
   | "stage_change"
@@ -225,6 +227,7 @@ export type LeadsIndexQuery = {
   source?: LeadSource | "";
   assigned_to?: number | null;
   project_id?: string;
+  follow_up_bucket?: FollowUpBucket | "";
   overdue?: boolean;
   archived?: boolean;
   page?: number;
