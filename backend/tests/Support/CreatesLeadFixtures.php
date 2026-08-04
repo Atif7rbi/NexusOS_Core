@@ -17,6 +17,7 @@ use App\Modules\Leads\Enums\ConversionMode;
 use App\Modules\Leads\Enums\LeadSource;
 use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Enums\LostReason;
+use App\Modules\Leads\Enums\NextActionType;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadActivity;
 use App\Modules\Projects\Enums\ProjectStatus;
@@ -167,6 +168,7 @@ trait CreatesLeadFixtures
             ? $sourceValue
             : LeadSource::from((string) $sourceValue);
         $now = now();
+        $hasDefaultFollowUp = $stage->isOpen();
         $values = [
             'tenant_id' => $tenant->id,
             'name' => 'CRM Lead '.Str::lower(Str::random(8)),
@@ -178,7 +180,9 @@ trait CreatesLeadFixtures
             'unit_id' => null,
             'stage' => $stage,
             'assigned_to' => $actor->id,
-            'next_follow_up_at' => $stage->isOpen() ? $now->copy()->addDay() : null,
+            'next_follow_up_at' => $hasDefaultFollowUp ? $now->copy()->addDay() : null,
+            'next_action_type' => $hasDefaultFollowUp ? NextActionType::WaitingResponse : null,
+            'next_action_note' => null,
             'lost_reason' => null,
             'lost_reason_detail' => null,
             'lost_at' => null,
@@ -223,7 +227,16 @@ trait CreatesLeadFixtures
             ]);
         }
 
-        return Lead::query()->create(array_merge($values, $attributes));
+        $values = array_merge($values, $attributes);
+
+        if ($values['next_follow_up_at'] === null) {
+            $values['next_action_type'] = null;
+            $values['next_action_note'] = null;
+        } elseif (! array_key_exists('next_action_type', $attributes)) {
+            $values['next_action_type'] = NextActionType::WaitingResponse;
+        }
+
+        return Lead::query()->create($values);
     }
 
     protected function createLeadActivity(
