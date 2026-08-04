@@ -54,6 +54,7 @@ import type {
   LeadActivity,
   LeadConversionConflict,
   LeadDuplicateMatch,
+  FollowUpBucket,
   LeadSource,
   LeadStage,
   LeadsIndexQuery,
@@ -64,6 +65,14 @@ import type { Project } from "@/types/project";
 import type { TenantUser } from "@/types/tenant-user";
 
 const crmRoles = ["administrator", "sales", "employee"];
+
+const followUpBuckets: FollowUpBucket[] = [
+  "overdue",
+  "today",
+  "tomorrow",
+  "this_week",
+  "unscheduled",
+];
 
 function positiveInteger(value: string | null, fallback: number): number {
   const parsed = Number(value);
@@ -82,6 +91,7 @@ export function CrmLeadsPage() {
     const stage = searchParams.get("stage");
     const source = searchParams.get("source");
     const assignedTo = searchParams.get("assigned_to");
+    const followUpBucket = searchParams.get("follow_up_bucket");
 
     return {
       page: positiveInteger(searchParams.get("page"), 1),
@@ -93,6 +103,11 @@ export function CrmLeadsPage() {
         : "",
       assigned_to: assignedTo ? positiveInteger(assignedTo, 0) || undefined : undefined,
       project_id: searchParams.get("project_id") ?? "",
+      follow_up_bucket: followUpBuckets.includes(
+        followUpBucket as FollowUpBucket
+      )
+        ? (followUpBucket as FollowUpBucket)
+        : "",
       overdue: searchParams.get("overdue") === "true",
       archived: archivedMode,
     };
@@ -515,6 +530,7 @@ export function CrmLeadsPage() {
       "source",
       "assigned_to",
       "project_id",
+      "follow_up_bucket",
       "overdue",
       "archived",
       "page",
@@ -533,6 +549,7 @@ export function CrmLeadsPage() {
       query.source ||
       query.assigned_to ||
       query.project_id ||
+      query.follow_up_bucket ||
       query.overdue ||
       query.archived
   );

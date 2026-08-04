@@ -10,6 +10,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { FollowUpQueueTabs } from "@/components/leads/FollowUpQueueTabs";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 import {
   leadSources,
@@ -143,6 +144,27 @@ export function LeadsIndexView({
         </section>
       ) : null}
 
+      <FollowUpQueueTabs
+        activeBucket={query.follow_up_bucket ?? ""}
+        title={t("crm.queue.title")}
+        allLabel={t("crm.queue.all")}
+        items={[
+          { value: "overdue", label: t("crm.queue.overdue") },
+          { value: "today", label: t("crm.queue.today") },
+          { value: "tomorrow", label: t("crm.queue.tomorrow") },
+          { value: "this_week", label: t("crm.queue.thisWeek") },
+          { value: "unscheduled", label: t("crm.queue.unscheduled") },
+        ]}
+        onChange={(followUpBucket) =>
+          onQueryChange({
+            follow_up_bucket: followUpBucket,
+            overdue: null,
+            archived: null,
+            page: 1,
+          })
+        }
+      />
+
       <CrudSection>
         <FilterBar
           title={t("crm.filters.title")}
@@ -224,17 +246,6 @@ export function LeadsIndexView({
                   })),
               ]}
             />
-
-            <label className="flex h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={Boolean(query.overdue)}
-                onChange={(event) =>
-                  onQueryChange({ overdue: event.target.checked, page: 1 })
-                }
-              />
-              {t("crm.filters.overdue")}
-            </label>
 
             {isAdministrator ? (
               <label className="flex h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-secondary)]">
