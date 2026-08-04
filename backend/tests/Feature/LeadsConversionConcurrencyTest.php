@@ -62,12 +62,14 @@ final class LeadsConversionConcurrencyTest extends TestCase
                 PERFORM pg_sleep(0.75);
                 RETURN NEW;
             END;
-            $$;
+            $$
+        SQL);
 
+        DB::unprepared(<<<'SQL'
             CREATE TRIGGER delay_customer_insert_for_conversion_test
             BEFORE INSERT ON customers
             FOR EACH ROW
-            EXECUTE FUNCTION delay_customer_insert_for_conversion_test();
+            EXECUTE PROCEDURE delay_customer_insert_for_conversion_test()
         SQL);
     }
 
