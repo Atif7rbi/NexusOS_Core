@@ -25,19 +25,33 @@ final class ArchiveLeadAction
     ) {
     }
 
-    public function execute(string $tenantId, string $leadId, User $actor, ArchiveReason $reason, ?string $reasonDetail): Lead
-    {
-        return DB::transaction(function () use ($tenantId, $leadId, $actor, $reason, $reasonDetail): Lead {
+    public function execute(
+        string $tenantId,
+        string $leadId,
+        User $actor,
+        ArchiveReason $reason,
+        ?string $reasonDetail,
+    ): Lead {
+        return DB::transaction(function () use (
+            $tenantId,
+            $leadId,
+            $actor,
+            $reason,
+            $reasonDetail,
+        ): Lead {
             $lead = $this->leads->lockForAdministrator($tenantId, $leadId, $actor);
 
             if ($lead->isArchived()) {
                 throw new LeadAlreadyArchivedException();
             }
+
             if ($lead->stage === LeadStage::Won) {
                 throw new LeadWonCannotBeArchivedException();
             }
 
-            $normalizedDetail = $reason === ArchiveReason::Other ? trim((string) $reasonDetail) : null;
+            $normalizedDetail = $reason === ArchiveReason::Other
+                ? trim((string) $reasonDetail)
+                : null;
 
             if ($reason === ArchiveReason::Other && $normalizedDetail === '') {
                 throw new LeadValidationException(
@@ -46,9 +60,6 @@ final class ArchiveLeadAction
                 );
             }
 
-            $previousFollowUp = $lead->next_follow_up_at?->toISOString();
-            $previousActionType = $lead->next_action_type?->value;
-            $previousActionNote = $lead->next_action_note;
             $now = CarbonImmutable::now();
 
             $lead->forceFill([
@@ -56,21 +67,21 @@ final class ArchiveLeadAction
                 'archived_by' => $actor->id,
                 'archive_reason' => $reason,
                 'archive_reason_detail' => $normalizedDetail,
-                'next_follow_up_at' => null,
-                'next_action_type' => null,
-                'next_action_note' => null,
                 'updated_by' => $actor->id,
                 'updated_at' => $now,
             ])->save();
 
-            $this->activities->automatic($lead, ActivityType::Archive, [
-                'stage' => $lead->stage->value,
-                'archive_reason' => $reason->value,
-                'archive_reason_detail' => $normalizedDetail,
-                'previous_next_follow_up_at' => $previousFollowUp,
-                'previous_next_action_type' => $previousActionType,
-                'previous_next_action_note' => $previousActionNote,
-            ], $actor->id, $now);
+            $this->activities->automatic(
+                lead: $lead,
+                type: ActivityType::Archive,
+                payload: [
+                    'stage' => $lead->stage->value,
+                    'archive_reason' => $reason->value,
+                    'archive_reason_detail' => $normalizedDetail,
+                ],
+                actorId: $actor->id,
+                occurredAt: $now,
+            );
 
             return $lead->refresh();
         }, 3);
