@@ -16,13 +16,14 @@ import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useTranslation } from "@/hooks/useTranslation";
+import type { TranslationKey } from "@/i18n/types";
 import type {
   Lead,
   LeadArchiveReason,
+  LeadConversionConflict,
   LeadLostReason,
   OpenLeadStage,
 } from "@/types/lead";
-import type { TranslationKey } from "@/i18n/types";
 import type { TenantUser } from "@/types/tenant-user";
 
 export type LeadDialogAction =
@@ -69,7 +70,7 @@ type LeadActionDialogsProps = {
   error: string | null;
   onClose: () => void;
   onConfirm: (payload: LeadDialogPayload) => void;
-  conversionConflict?: { id: string; status: string; name?: string } | null;
+  conversionConflict?: LeadConversionConflict | null;
 };
 
 export function LeadActionDialogs({
@@ -118,7 +119,6 @@ export function LeadActionDialogs({
     cancelLabel: t("crm.dialog.cancel"),
     processingLabel: t("crm.actions.processing"),
     onCancel: onClose,
-    conflictMatch: conversionConflict,
   };
 
   if (action === "claim") {
@@ -311,6 +311,7 @@ export function LeadActionDialogs({
         lead={lead}
         base={base}
         onConfirm={onConfirm}
+        conversionConflict={conversionConflict ?? null}
         t={t}
       />
     );
@@ -332,64 +333,47 @@ function ConvertLeadDialog({
   lead,
   base,
   onConfirm,
+  conversionConflict,
   t,
 }: {
   lead: Lead;
   base: Record<string, unknown>;
   onConfirm: (payload: LeadDialogPayload) => void;
+  conversionConflict: LeadConversionConflict | null;
   t: (key: TranslationKey) => string;
 }) {
   const [type, setType] = useState<"individual" | "company">("individual");
   const [category, setCategory] = useState<
     "investor" | "buyer" | "broker" | "owner" | "other"
   >("buyer");
+  const match = conversionConflict;
 
-  // Phase 2: a matching customer was surfaced (conflict from backend)
-  const [matchedCustomer, setMatchedCustomer] = useState<{
-    id: string;
-    status: string;
-    name?: string;
-  } | null>(null);
-
-  const isArchivedMatch = matchedCustomer?.status === "archived";
-
-  // Called by CrmLeadsPage when a conflict error is caught after create_new
-  // attempt. The parent must expose the match for the dialog to show.
-  // We expose this via the base props extension pattern below.
-  const conflictMatch = (base as { conflictMatch?: typeof matchedCustomer }).conflictMatch;
-
-  // Sync conflict match from parent (passed via base props extension)
-  if (conflictMatch && conflictMatch !== matchedCustomer) {
-    setMatchedCustomer(conflictMatch);
+  if (match?.status === "archived") {
+    return (
+      <ConfirmationDialog
+        {...(base as Parameters<typeof ConfirmationDialog>[0])}
+        title={t("crm.dialog.convertTitle")}
+        confirmLabel={t("crm.dialog.convertViewCustomers")}
+        icon={<DialogIcon icon={ArrowLeftRight} tone="danger" />}
+        onConfirm={() => {
+          window.location.href = "/customers/";
+        }}
+      >
+        <p className="text-sm text-[var(--text-secondary)]">
+          {t("crm.dialog.convertArchivedBlocked")}
+        </p>
+      </ConfirmationDialog>
+    );
   }
 
-  if (matchedCustomer) {
-    // Phase 2: show the matched customer and offer explicit link or abort
-    if (isArchivedMatch) {
-      return (
-        <ConfirmationDialog
-          {...(base as Parameters<typeof ConfirmationDialog>[0])}
-          title={t("crm.dialog.convertTitle")}
-          confirmLabel={t("crm.dialog.convertViewCustomers")}
-          icon={<DialogIcon icon={ArrowLeftRight} tone="danger" />}
-          onConfirm={() => {
-            window.location.href = "/customers/";
-          }}
-        >
-          <p className="text-sm text-[var(--text-secondary)]">
-            {t("crm.dialog.convertArchivedBlocked")}
-          </p>
-        </ConfirmationDialog>
-      );
-    }
-
-    const statusLabel = (() => {
-      const s = matchedCustomer.status;
-      if (s === "customer") return t("crm.dialog.convertMatchStatus.customer");
-      if (s === "inactive") return t("crm.dialog.convertMatchStatus.inactive");
-      if (s === "lead")     return t("crm.dialog.convertMatchStatus.lead");
-      return matchedCustomer.status;
-    })();
+  if (match) {
+    const statusLabel = match.status === "customer"
+      ? t("crm.dialog.convertMatchStatus.customer")
+      : match.status === "inactive"
+        ? t("crm.dialog.convertMatchStatus.inactive")
+        : match.status === "lead"
+          ? t("crm.dialog.convertMatchStatus.lead")
+          : match.status;
 
     return (
       <ConfirmationDialog
@@ -402,25 +386,20 @@ function ConvertLeadDialog({
           onConfirm({
             action: "convert",
             intent: "link_existing",
-            existingCustomerId: matchedCustomer.id,
+            existingCustomerId: match.id,
           })
         }
       >
-        <div className="space-y-3">
-          <div className="rounded-md border border-[var(--border)] p-3 text-sm">
-            {matchedCustomer.name && (
-              <p className="font-semibold text-[var(--text-primary)]">
-                {matchedCustomer.name}
-              </p>
-            )}
-            <p className="text-[var(--text-secondary)]">{statusLabel}</p>
-          </div>
+        <div className="rounded-md border border-[var(--border)] p-3 text-sm">
+          {match.name ? (
+            <p className="font-semibold text-[var(--text-primary)]">{match.name}</p>
+          ) : null}
+          <p className="text-[var(--text-secondary)]">{statusLabel}</p>
         </div>
       </ConfirmationDialog>
     );
   }
 
-  // Phase 1: create_new — collect type and category
   return (
     <ConfirmationDialog
       {...(base as Parameters<typeof ConfirmationDialog>[0])}
@@ -448,7 +427,7 @@ function ConvertLeadDialog({
           name="customer_type"
           label={t("crm.form.customerType")}
           value={type}
-          onChange={(e) => setType(e.target.value as "individual" | "company")}
+          onChange={(event) => setType(event.target.value as "individual" | "company")}
           options={[
             { value: "individual", label: t("crm.customerType.individual") },
             { value: "company", label: t("crm.customerType.company") },
@@ -458,14 +437,9 @@ function ConvertLeadDialog({
           name="customer_category"
           label={t("crm.form.customerCategory")}
           value={category}
-          onChange={(e) =>
+          onChange={(event) =>
             setCategory(
-              e.target.value as
-                | "investor"
-                | "buyer"
-                | "broker"
-                | "owner"
-                | "other"
+              event.target.value as "investor" | "buyer" | "broker" | "owner" | "other"
             )
           }
           options={[

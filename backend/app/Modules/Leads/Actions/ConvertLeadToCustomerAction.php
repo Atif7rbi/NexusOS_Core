@@ -21,110 +21,116 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Converts a Lead to a Customer (Milestone B — Lead → Customer Conversion).
+ * Converts a Lead to a Customer atomically.
  *
- * Two conversion intents are supported:
- *
- * Intent A — create_new:
- *   No existing_customer_id. The Action creates a new Customer from the
- *   Lead's data. If a Customer with the same phone appears inside the
- *   transaction, a LeadConversionNewCustomerConflictException is thrown
- *   and the frontend must re-present the conflict for explicit confirmation.
- *   No automatic linking occurs under any race condition.
- *
- * Intent B — link_existing:
- *   An existing_customer_id is provided. The Action locks and re-validates
- *   the Customer before linking. Behaviour by Customer status:
- *     customer  → link, no status change
- *     inactive  → link, no status change
- *     lead      → link + promote to customer (atomic)
- *     archived  → reject with LeadConversionCustomerArchivedException
- *
- * The entire operation is wrapped in a single database transaction.
- * Lead and Customer rows are locked (SELECT FOR UPDATE) in a fixed order
- * to prevent deadlocks.
+ * The main transaction owns every mutation. A PostgreSQL unique violation
+ * aborts that transaction, so conflict translation happens only after
+ * DB::transaction() has rolled it back and re-thrown the QueryException.
  */
 final class ConvertLeadToCustomerAction
 {
+    private const CUSTOMERS_PHONE_UNIQUE_CONSTRAINT = 'customers_tenant_phone_unique';
+
     public function __construct(
         private readonly SaudiMobileNormalizer $phoneNormalizer,
     ) {
     }
 
     /**
-     * @param  array{
-     *   type: string,
-     *   category: string,
-     * }  $customerData  Required only for create_new intent.
-     *
-     * @throws LeadNotInOpenStageException
-     * @throws LeadAlreadyConvertedException
-     * @throws LeadIsArchivedException
-     * @throws LeadConversionCustomerArchivedException
-     * @throws LeadConversionCustomerChangedException
-     * @throws LeadConversionNewCustomerConflictException
+     * @param  array{type: string, category: string}  $customerData
      */
     public function execute(
         string $tenantId,
         string $leadId,
         int $actorId,
-        string $conversionIntent,    // 'create_new' | 'link_existing'
+        string $conversionIntent,
         ?string $existingCustomerId,
-        array $customerData = [],    // type + category for create_new
+        array $customerData = [],
     ): Lead {
-        return DB::transaction(function () use (
-            $tenantId,
-            $leadId,
-            $actorId,
-            $conversionIntent,
-            $existingCustomerId,
-            $customerData,
-        ): Lead {
-            // Lock Lead first (fixed order: Lead before Customer)
-            $lead = Lead::query()
-                ->where('tenant_id', $tenantId)
-                ->whereKey($leadId)
-                ->lockForUpdate()
-                ->firstOrFail();
+        try {
+            return DB::transaction(function () use (
+                $tenantId,
+                $leadId,
+                $actorId,
+                $conversionIntent,
+                $existingCustomerId,
+                $customerData,
+            ): Lead {
+                $lead = Lead::query()
+                    ->where('tenant_id', $tenantId)
+                    ->whereKey($leadId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            // Guard: Lead must be in an open stage
-            if (! $lead->isOpen()) {
-                if ($lead->stage === LeadStage::Won) {
-                    throw new LeadAlreadyConvertedException;
+                if (! $lead->isOpen()) {
+                    if ($lead->stage === LeadStage::Won) {
+                        throw new LeadAlreadyConvertedException;
+                    }
+
+                    throw new LeadNotInOpenStageException;
                 }
-                throw new LeadNotInOpenStageException;
-            }
 
-            // Guard: Lead must not be archived
-            if ($lead->isArchived()) {
-                throw new LeadIsArchivedException;
-            }
+                if ($lead->isArchived()) {
+                    throw new LeadIsArchivedException;
+                }
 
-            // Normalize phone now that we have the Lead row
-            $normalizedPhone = $this->phoneNormalizer->normalizeRequired($lead->phone);
+                $normalizedPhone = $this->phoneNormalizer->normalizeRequired($lead->phone);
 
-            if ($conversionIntent === 'create_new') {
-                return $this->handleCreateNew(
+                if ($conversionIntent === 'create_new') {
+                    return $this->handleCreateNew(
+                        $lead,
+                        $tenantId,
+                        $actorId,
+                        $normalizedPhone,
+                        $customerData,
+                    );
+                }
+
+                return $this->handleLinkExisting(
                     $lead,
                     $tenantId,
                     $actorId,
+                    $existingCustomerId,
                     $normalizedPhone,
-                    $customerData,
                 );
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isCustomersPhoneUniqueViolation($exception)) {
+                throw $exception;
             }
 
-            return $this->handleLinkExisting(
-                $lead,
-                $tenantId,
-                $actorId,
-                $existingCustomerId,
-                $normalizedPhone,
+            // The failed transaction has already been rolled back here.
+            $leadPhone = Lead::query()
+                ->where('tenant_id', $tenantId)
+                ->whereKey($leadId)
+                ->value('phone');
+
+            if (! is_string($leadPhone) || $leadPhone === '') {
+                throw $exception;
+            }
+
+            $normalizedPhone = $this->phoneNormalizer->normalizeRequired($leadPhone);
+            $conflict = Customer::query()
+                ->where('tenant_id', $tenantId)
+                ->where('phone', $normalizedPhone)
+                ->first();
+
+            if ($conflict === null) {
+                throw $exception;
+            }
+
+            throw new LeadConversionNewCustomerConflictException(
+                conflictingCustomerId: (string) $conflict->id,
+                conflictingCustomerStatus: $conflict->status->value,
+                conflictingCustomerName: $conflict->name,
+                conflictSource: LeadConversionNewCustomerConflictException::SOURCE_UNIQUE_VIOLATION,
             );
-        });
+        }
     }
 
-    // -------------------------------------------------------------------------
-
+    /**
+     * @param  array{type: string, category: string}  $customerData
+     */
     private function handleCreateNew(
         Lead $lead,
         string $tenantId,
@@ -132,7 +138,6 @@ final class ConvertLeadToCustomerAction
         string $normalizedPhone,
         array $customerData,
     ): Lead {
-        // Re-check for a matching Customer inside the transaction
         $conflict = Customer::query()
             ->where('tenant_id', $tenantId)
             ->where('phone', $normalizedPhone)
@@ -140,45 +145,25 @@ final class ConvertLeadToCustomerAction
             ->first();
 
         if ($conflict !== null) {
-            // A Customer appeared since the preview — surface the conflict.
-            // Never link automatically.
             throw new LeadConversionNewCustomerConflictException(
                 conflictingCustomerId: (string) $conflict->id,
                 conflictingCustomerStatus: $conflict->status->value,
+                conflictingCustomerName: $conflict->name,
+                conflictSource: LeadConversionNewCustomerConflictException::SOURCE_PRECHECK,
             );
         }
 
-        // SELECT FOR UPDATE cannot lock a non-existent row, so a concurrent
-        // create_new may still race past the pre-check above. Catch the
-        // PostgreSQL unique violation on (tenant_id, phone) and surface it
-        // as the same semantic conflict error.
-        try {
-            $customer = Customer::query()->create([
-                'tenant_id'  => $tenantId,
-                'name'       => $lead->name,
-                'phone'      => $normalizedPhone,
-                'email'      => $lead->email,
-                'type'       => $customerData['type'],
-                'category'   => $customerData['category'],
-                'status'     => CustomerStatus::Customer->value,
-                'created_by' => $actorId,
-                'updated_by' => $actorId,
-            ]);
-        } catch (QueryException $e) {
-            // PostgreSQL unique violation SQLSTATE 23505
-            if ($e->errorInfo[0] === '23505') {
-                $conflict = Customer::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('phone', $normalizedPhone)
-                    ->first();
-
-                throw new LeadConversionNewCustomerConflictException(
-                    conflictingCustomerId: $conflict ? (string) $conflict->id : 'unknown',
-                    conflictingCustomerStatus: $conflict?->status->value ?? 'unknown',
-                );
-            }
-            throw $e;
-        }
+        $customer = Customer::query()->create([
+            'tenant_id' => $tenantId,
+            'name' => $lead->name,
+            'phone' => $normalizedPhone,
+            'email' => $lead->email,
+            'type' => $customerData['type'],
+            'category' => $customerData['category'],
+            'status' => CustomerStatus::Customer->value,
+            'created_by' => $actorId,
+            'updated_by' => $actorId,
+        ]);
 
         return $this->finalise(
             $lead,
@@ -197,7 +182,6 @@ final class ConvertLeadToCustomerAction
         ?string $existingCustomerId,
         string $normalizedPhone,
     ): Lead {
-        // Lock Customer second (fixed order prevents deadlock)
         $customer = Customer::query()
             ->where('tenant_id', $tenantId)
             ->whereKey($existingCustomerId)
@@ -208,23 +192,20 @@ final class ConvertLeadToCustomerAction
             throw new LeadConversionCustomerChangedException;
         }
 
-        // Re-validate that phone still matches (data may have changed)
         $customerPhone = $this->phoneNormalizer->normalizeRequired($customer->phone);
         if ($customerPhone !== $normalizedPhone) {
             throw new LeadConversionCustomerChangedException;
         }
 
-        // Reject archived
         if ($customer->status === CustomerStatus::Archived) {
             throw new LeadConversionCustomerArchivedException;
         }
 
         $previousStatus = $customer->status;
 
-        // Promote legacy lead → customer
         if ($customer->status === CustomerStatus::Lead) {
             $customer->update([
-                'status'     => CustomerStatus::Customer->value,
+                'status' => CustomerStatus::Customer->value,
                 'updated_by' => $actorId,
             ]);
             $customer->refresh();
@@ -239,7 +220,6 @@ final class ConvertLeadToCustomerAction
             );
         }
 
-        // customer or inactive — link without modifying status
         return $this->finalise(
             $lead,
             $customer,
@@ -261,34 +241,43 @@ final class ConvertLeadToCustomerAction
         $fromStage = $lead->stage->value;
 
         $lead->update([
-            'stage'            => LeadStage::Won->value,
-            'customer_id'      => $customer->id,
-            'converted_at'     => now(),
-            'converted_by'     => $actorId,
-            'conversion_mode'  => $mode->value,
-            'next_follow_up_at'=> null,
-            'updated_by'       => $actorId,
+            'stage' => LeadStage::Won->value,
+            'customer_id' => $customer->id,
+            'converted_at' => now(),
+            'converted_by' => $actorId,
+            'conversion_mode' => $mode->value,
+            'next_follow_up_at' => null,
+            'updated_by' => $actorId,
         ]);
 
         LeadActivity::query()->create([
-            'tenant_id'  => $lead->tenant_id,
-            'lead_id'    => $lead->id,
-            'type'       => 'stage_change',
-            'body'       => null,
-            'payload'    => [
-                'from_stage'               => $fromStage,
-                'to_stage'                 => LeadStage::Won->value,
-                'customer_id'              => $customer->id,
-                'conversion_mode'          => $mode->value,
+            'tenant_id' => $lead->tenant_id,
+            'lead_id' => $lead->id,
+            'type' => 'stage_change',
+            'body' => null,
+            'payload' => [
+                'from_stage' => $fromStage,
+                'to_stage' => LeadStage::Won->value,
+                'customer_id' => $customer->id,
+                'conversion_mode' => $mode->value,
                 'previous_customer_status' => $previousStatus?->value,
-                'new_customer_status'      => $newStatus->value,
+                'new_customer_status' => $newStatus->value,
             ],
             'occurred_at' => now(),
-            'created_by'  => $actorId,
+            'created_by' => $actorId,
         ]);
 
         $lead->refresh();
 
         return $lead;
+    }
+
+    private function isCustomersPhoneUniqueViolation(QueryException $exception): bool
+    {
+        $sqlState = $exception->errorInfo[0] ?? null;
+        $details = (string) ($exception->errorInfo[2] ?? $exception->getMessage());
+
+        return $sqlState === '23505'
+            && str_contains($details, self::CUSTOMERS_PHONE_UNIQUE_CONSTRAINT);
     }
 }

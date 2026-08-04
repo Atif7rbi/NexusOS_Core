@@ -74,8 +74,9 @@ final class LeadExceptionResponder
 
         if ($exception instanceof LeadConversionNewCustomerConflictException) {
             $error['conflicting_customer'] = [
-                'id'     => $exception->conflictingCustomerId,
+                'id' => $exception->conflictingCustomerId,
                 'status' => $exception->conflictingCustomerStatus,
+                'name' => $exception->conflictingCustomerName,
             ];
         }
 
