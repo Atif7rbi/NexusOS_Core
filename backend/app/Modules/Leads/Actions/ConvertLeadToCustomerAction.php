@@ -20,25 +20,14 @@ use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Converts a Lead to a Customer atomically.
- *
- * The main transaction owns every mutation. A PostgreSQL unique violation
- * aborts that transaction, so conflict translation happens only after
- * DB::transaction() has rolled it back and re-thrown the QueryException.
- */
 final class ConvertLeadToCustomerAction
 {
     private const CUSTOMERS_PHONE_UNIQUE_CONSTRAINT = 'customers_tenant_phone_unique';
 
-    public function __construct(
-        private readonly SaudiMobileNormalizer $phoneNormalizer,
-    ) {
+    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer)
+    {
     }
 
-    /**
-     * @param  array{type: string, category: string}  $customerData
-     */
     public function execute(
         string $tenantId,
         string $leadId,
@@ -48,14 +37,7 @@ final class ConvertLeadToCustomerAction
         array $customerData = [],
     ): Lead {
         try {
-            return DB::transaction(function () use (
-                $tenantId,
-                $leadId,
-                $actorId,
-                $conversionIntent,
-                $existingCustomerId,
-                $customerData,
-            ): Lead {
+            return DB::transaction(function () use ($tenantId, $leadId, $actorId, $conversionIntent, $existingCustomerId, $customerData): Lead {
                 $lead = Lead::query()
                     ->where('tenant_id', $tenantId)
                     ->whereKey($leadId)
@@ -77,43 +59,24 @@ final class ConvertLeadToCustomerAction
                 $normalizedPhone = $this->phoneNormalizer->normalizeRequired($lead->phone);
 
                 if ($conversionIntent === 'create_new') {
-                    return $this->handleCreateNew(
-                        $lead,
-                        $tenantId,
-                        $actorId,
-                        $normalizedPhone,
-                        $customerData,
-                    );
+                    return $this->handleCreateNew($lead, $tenantId, $actorId, $normalizedPhone, $customerData);
                 }
 
-                return $this->handleLinkExisting(
-                    $lead,
-                    $tenantId,
-                    $actorId,
-                    $existingCustomerId,
-                    $normalizedPhone,
-                );
+                return $this->handleLinkExisting($lead, $tenantId, $actorId, $existingCustomerId, $normalizedPhone);
             });
         } catch (QueryException $exception) {
             if (! $this->isCustomersPhoneUniqueViolation($exception)) {
                 throw $exception;
             }
 
-            // The failed transaction has already been rolled back here.
-            $leadPhone = Lead::query()
-                ->where('tenant_id', $tenantId)
-                ->whereKey($leadId)
-                ->value('phone');
+            $leadPhone = Lead::query()->where('tenant_id', $tenantId)->whereKey($leadId)->value('phone');
 
             if (! is_string($leadPhone) || $leadPhone === '') {
                 throw $exception;
             }
 
             $normalizedPhone = $this->phoneNormalizer->normalizeRequired($leadPhone);
-            $conflict = Customer::query()
-                ->where('tenant_id', $tenantId)
-                ->where('phone', $normalizedPhone)
-                ->first();
+            $conflict = Customer::query()->where('tenant_id', $tenantId)->where('phone', $normalizedPhone)->first();
 
             if ($conflict === null) {
                 throw $exception;
@@ -128,16 +91,8 @@ final class ConvertLeadToCustomerAction
         }
     }
 
-    /**
-     * @param  array{type: string, category: string}  $customerData
-     */
-    private function handleCreateNew(
-        Lead $lead,
-        string $tenantId,
-        int $actorId,
-        string $normalizedPhone,
-        array $customerData,
-    ): Lead {
+    private function handleCreateNew(Lead $lead, string $tenantId, int $actorId, string $normalizedPhone, array $customerData): Lead
+    {
         $conflict = Customer::query()
             ->where('tenant_id', $tenantId)
             ->where('phone', $normalizedPhone)
@@ -165,23 +120,11 @@ final class ConvertLeadToCustomerAction
             'updated_by' => $actorId,
         ]);
 
-        return $this->finalise(
-            $lead,
-            $customer,
-            $actorId,
-            ConversionMode::Created,
-            previousStatus: null,
-            newStatus: CustomerStatus::Customer,
-        );
+        return $this->finalise($lead, $customer, $actorId, ConversionMode::Created, null, CustomerStatus::Customer);
     }
 
-    private function handleLinkExisting(
-        Lead $lead,
-        string $tenantId,
-        int $actorId,
-        ?string $existingCustomerId,
-        string $normalizedPhone,
-    ): Lead {
+    private function handleLinkExisting(Lead $lead, string $tenantId, int $actorId, ?string $existingCustomerId, string $normalizedPhone): Lead
+    {
         $customer = Customer::query()
             ->where('tenant_id', $tenantId)
             ->whereKey($existingCustomerId)
@@ -192,8 +135,7 @@ final class ConvertLeadToCustomerAction
             throw new LeadConversionCustomerChangedException;
         }
 
-        $customerPhone = $this->phoneNormalizer->normalizeRequired($customer->phone);
-        if ($customerPhone !== $normalizedPhone) {
+        if ($this->phoneNormalizer->normalizeRequired($customer->phone) !== $normalizedPhone) {
             throw new LeadConversionCustomerChangedException;
         }
 
@@ -204,10 +146,7 @@ final class ConvertLeadToCustomerAction
         $previousStatus = $customer->status;
 
         if ($customer->status === CustomerStatus::Lead) {
-            $customer->update([
-                'status' => CustomerStatus::Customer->value,
-                'updated_by' => $actorId,
-            ]);
+            $customer->update(['status' => CustomerStatus::Customer->value, 'updated_by' => $actorId]);
             $customer->refresh();
 
             return $this->finalise(
@@ -215,8 +154,8 @@ final class ConvertLeadToCustomerAction
                 $customer,
                 $actorId,
                 ConversionMode::LinkedAndPromoted,
-                previousStatus: $previousStatus,
-                newStatus: CustomerStatus::Customer,
+                $previousStatus,
+                CustomerStatus::Customer,
             );
         }
 
@@ -225,8 +164,8 @@ final class ConvertLeadToCustomerAction
             $customer,
             $actorId,
             ConversionMode::LinkedExisting,
-            previousStatus: $previousStatus,
-            newStatus: $previousStatus,
+            $previousStatus,
+            $previousStatus,
         );
     }
 
@@ -239,14 +178,20 @@ final class ConvertLeadToCustomerAction
         CustomerStatus $newStatus,
     ): Lead {
         $fromStage = $lead->stage->value;
+        $previousFollowUp = $lead->next_follow_up_at?->toISOString();
+        $previousActionType = $lead->next_action_type?->value;
+        $previousActionNote = $lead->next_action_note;
+        $now = now();
 
         $lead->update([
             'stage' => LeadStage::Won->value,
             'customer_id' => $customer->id,
-            'converted_at' => now(),
+            'converted_at' => $now,
             'converted_by' => $actorId,
             'conversion_mode' => $mode->value,
             'next_follow_up_at' => null,
+            'next_action_type' => null,
+            'next_action_note' => null,
             'updated_by' => $actorId,
         ]);
 
@@ -262,14 +207,15 @@ final class ConvertLeadToCustomerAction
                 'conversion_mode' => $mode->value,
                 'previous_customer_status' => $previousStatus?->value,
                 'new_customer_status' => $newStatus->value,
+                'previous_next_follow_up_at' => $previousFollowUp,
+                'previous_next_action_type' => $previousActionType,
+                'previous_next_action_note' => $previousActionNote,
             ],
-            'occurred_at' => now(),
+            'occurred_at' => $now,
             'created_by' => $actorId,
         ]);
 
-        $lead->refresh();
-
-        return $lead;
+        return $lead->refresh();
     }
 
     private function isCustomersPhoneUniqueViolation(QueryException $exception): bool
