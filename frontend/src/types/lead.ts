@@ -36,12 +36,33 @@ export type LeadArchiveReason =
   | "created_by_mistake"
   | "other";
 
+export type NextActionType =
+  | "call"
+  | "whatsapp"
+  | "meeting"
+  | "site_visit"
+  | "send_offer"
+  | "waiting_response"
+  | "other";
+
+export type FollowUpState =
+  | "overdue"
+  | "today"
+  | "tomorrow"
+  | "this_week"
+  | "scheduled_later"
+  | "unscheduled";
+
 export type LeadActivityType =
   | "note"
   | "stage_change"
   | "assignment"
   | "archive"
-  | "restore";
+  | "restore"
+  | "follow_up_scheduled"
+  | "follow_up_rescheduled"
+  | "follow_up_completed"
+  | "follow_up_cancelled";
 
 export type LeadConversionMode =
   | "created"
@@ -60,6 +81,10 @@ export type LeadAllowedActions = {
   can_archive: boolean;
   can_restore: boolean;
   can_convert: boolean;
+  can_schedule_follow_up: boolean;
+  can_reschedule_follow_up: boolean;
+  can_complete_follow_up: boolean;
+  can_cancel_follow_up: boolean;
 };
 
 export type LeadAssignee = {
@@ -105,6 +130,9 @@ export type Lead = {
   stage: LeadStage;
   assigned_to: LeadAssignee | null;
   next_follow_up_at: string | null;
+  next_action_type: NextActionType | null;
+  next_action_note: string | null;
+  follow_up_state: FollowUpState | null;
   lost_reason: LeadLostReason | null;
   lost_reason_detail: string | null;
   lost_at: string | null;
@@ -219,6 +247,16 @@ export type CreateLeadPayload = {
 export type UpdateLeadPayload = Partial<
   Omit<CreateLeadPayload, "assigned_to" | "acknowledge_duplicate">
 >;
+
+export type WriteLeadFollowUpPayload = {
+  next_follow_up_at: string;
+  next_action_type: NextActionType;
+  next_action_note?: string | null;
+};
+
+export type CloseLeadFollowUpPayload = {
+  note?: string | null;
+};
 
 export type LeadDuplicateMatch = {
   id: string;
