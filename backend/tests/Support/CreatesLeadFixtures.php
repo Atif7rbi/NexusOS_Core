@@ -168,7 +168,6 @@ trait CreatesLeadFixtures
             ? $sourceValue
             : LeadSource::from((string) $sourceValue);
         $now = now();
-        $hasDefaultFollowUp = $stage->isOpen();
         $values = [
             'tenant_id' => $tenant->id,
             'name' => 'CRM Lead '.Str::lower(Str::random(8)),
@@ -180,8 +179,8 @@ trait CreatesLeadFixtures
             'unit_id' => null,
             'stage' => $stage,
             'assigned_to' => $actor->id,
-            'next_follow_up_at' => $hasDefaultFollowUp ? $now->copy()->addDay() : null,
-            'next_action_type' => $hasDefaultFollowUp ? NextActionType::WaitingResponse : null,
+            'next_follow_up_at' => null,
+            'next_action_type' => null,
             'next_action_note' => null,
             'lost_reason' => null,
             'lost_reason_detail' => null,
