@@ -40,6 +40,15 @@ return new class extends Migration
     {
         DB::statement('ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_conversion_mode_check');
 
+        // Atomically rename any linked_existing values back to linked before
+        // the old constraint (which only accepts 'linked') is re-added.
+        // This prevents the constraint from being violated by existing rows.
+        DB::statement("
+            UPDATE leads
+            SET conversion_mode = 'linked'
+            WHERE conversion_mode = 'linked_existing'
+        ");
+
         DB::statement("
             ALTER TABLE leads
             ADD CONSTRAINT leads_conversion_mode_check
