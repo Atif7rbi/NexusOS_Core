@@ -125,7 +125,12 @@ describe("CrmLeadsPage conversion workflow", () => {
   it("shows the customer name and customers CTA after successful conversion", async () => {
     services.convertLead.mockResolvedValue(leadFixture({
       stage: "won",
-      customer: { id: "01CUSTOMER00000000000000000", name: "Converted Customer" },
+      customer: {
+        id: "01CUSTOMER00000000000000000",
+        name: "Converted Customer",
+        status: "customer",
+        archived_at: null,
+      },
     }));
 
     render(<CrmLeadsPage />);
@@ -134,9 +139,10 @@ describe("CrmLeadsPage conversion workflow", () => {
     fireEvent.click(screen.getByText("confirm create"));
 
     expect(await screen.findByText(/Converted Customer/)).toBeTruthy();
-    expect(screen.getByRole("link", {
+    const customersLink = screen.getByRole("link", {
       name: "crm.dialog.convertViewCustomers",
-    })).toHaveAttribute("href", "/customers/");
+    });
+    expect(customersLink.getAttribute("href")).toBe("/customers/");
   });
 
   it("clears a surfaced conflict when the dialog closes before a new attempt", async () => {
