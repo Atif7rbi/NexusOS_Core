@@ -87,12 +87,44 @@ return new class extends Migration
                     )
                 )
             SQL);
+
+            DB::statement(
+                'ALTER TABLE lead_activities DROP CONSTRAINT IF EXISTS lead_activities_type_check'
+            );
+
+            DB::statement(<<<'SQL'
+                ALTER TABLE lead_activities
+                ADD CONSTRAINT lead_activities_type_check
+                CHECK (
+                    type IN (
+                        'note',
+                        'stage_change',
+                        'assignment',
+                        'archive',
+                        'restore',
+                        'follow_up_scheduled',
+                        'follow_up_rescheduled',
+                        'follow_up_completed',
+                        'follow_up_cancelled'
+                    )
+                )
+            SQL);
         }, 1);
     }
 
     public function down(): void
     {
         DB::transaction(function (): void {
+            DB::statement(
+                'ALTER TABLE lead_activities DROP CONSTRAINT IF EXISTS lead_activities_type_check'
+            );
+
+            DB::statement(<<<'SQL'
+                ALTER TABLE lead_activities
+                ADD CONSTRAINT lead_activities_type_check
+                CHECK (type IN ('note', 'stage_change', 'assignment', 'archive', 'restore'))
+            SQL);
+
             DB::statement(
                 'ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_next_action_note_check'
             );
