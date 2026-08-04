@@ -128,6 +128,9 @@ export function CrmLeadsPage() {
   const [actionProcessing, setActionProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState(false);
+  const [conversionConflict, setConversionConflict] = useState<{
+    id: string; status: string; name?: string;
+  } | null>(null);
 
   const updateUrl = useCallback(
     (
@@ -434,7 +437,13 @@ export function CrmLeadsPage() {
 
       setDialogAction(null);
       if (payload.action === "convert") {
-        setSuccessMessage(t("crm.success.converted"));
+        const customerName = updated.customer?.name ?? "";
+        setSuccessMessage(
+          customerName
+            ? `${t("crm.success.converted")} ${customerName}`
+            : t("crm.success.converted")
+        );
+        setConversionConflict(null);
         setLead(updated);
         void loadActivities(updated.id, archivedMode);
       } else if (payload.action === "archive" || payload.action === "restore") {
@@ -448,7 +457,10 @@ export function CrmLeadsPage() {
       refresh();
     } catch (caughtError) {
       if (caughtError instanceof LeadConversionConflictError) {
-        setActionError(caughtError.message);
+        // Re-present the dialog showing the matched customer
+        setConversionConflict(caughtError.conflictingCustomer);
+        setDialogAction("convert");
+        setActionError(null);
       } else {
         setActionError(
           caughtError instanceof Error ? caughtError.message : t("crm.genericError")
@@ -619,6 +631,7 @@ export function CrmLeadsPage() {
             }
           }}
           onConfirm={(payload) => void executeAction(payload)}
+          conversionConflict={conversionConflict}
         />
       ) : null}
     </AppShell>
