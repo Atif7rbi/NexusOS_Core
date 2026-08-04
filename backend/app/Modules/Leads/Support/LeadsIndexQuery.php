@@ -51,7 +51,7 @@ final class LeadsIndexQuery
             'customer:id,name,status,archived_at',
         ]);
 
-        $this->applyFilters($query, $filters);
+        $this->applyFilters($query, $filters, $tenantTimezone);
 
         $paginator = $query
             ->orderByDesc('updated_at')
@@ -126,8 +126,11 @@ final class LeadsIndexQuery
     /**
      * @param array<string, mixed> $filters
      */
-    private function applyFilters(Builder $query, array $filters): void
-    {
+    private function applyFilters(
+        Builder $query,
+        array $filters,
+        string $tenantTimezone,
+    ): void {
         if (isset($filters['search']) && trim((string) $filters['search']) !== '') {
             $search = trim((string) $filters['search']);
             $query->where(function (Builder $nested) use ($search): void {
@@ -143,11 +146,53 @@ final class LeadsIndexQuery
             }
         }
 
+        if (isset($filters['follow_up_bucket'])) {
+            $this->applyFollowUpBucket(
+                $query,
+                (string) $filters['follow_up_bucket'],
+                $tenantTimezone,
+            );
+
+            return;
+        }
+
         if (($filters['overdue'] ?? false) === true) {
             $query->whereNotNull('next_follow_up_at')
                 ->where('next_follow_up_at', '<', CarbonImmutable::now('UTC'))
                 ->whereIn('stage', LeadStage::openValues())
                 ->whereNull('archived_at');
         }
+    }
+
+    private function applyFollowUpBucket(
+        Builder $query,
+        string $bucket,
+        string $tenantTimezone,
+    ): void {
+        $todayStart = CarbonImmutable::now($tenantTimezone)->startOfDay();
+        $tomorrowStart = $todayStart->addDay();
+        $dayAfterTomorrowStart = $tomorrowStart->addDay();
+        $weekEndExclusive = $todayStart->endOfWeek()->addMicrosecond();
+
+        $query
+            ->whereIn('stage', LeadStage::openValues())
+            ->whereNull('archived_at');
+
+        match ($bucket) {
+            'overdue' => $query
+                ->whereNotNull('next_follow_up_at')
+                ->where('next_follow_up_at', '<', $todayStart->utc()),
+            'today' => $query
+                ->where('next_follow_up_at', '>=', $todayStart->utc())
+                ->where('next_follow_up_at', '<', $tomorrowStart->utc()),
+            'tomorrow' => $query
+                ->where('next_follow_up_at', '>=', $tomorrowStart->utc())
+                ->where('next_follow_up_at', '<', $dayAfterTomorrowStart->utc()),
+            'this_week' => $query
+                ->where('next_follow_up_at', '>=', $dayAfterTomorrowStart->utc())
+                ->where('next_follow_up_at', '<', $weekEndExclusive->utc()),
+            'unscheduled' => $query->whereNull('next_follow_up_at'),
+            default => null,
+        };
     }
 }
