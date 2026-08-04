@@ -318,6 +318,61 @@ final class LeadsDatabaseTest extends ApiTestCase
     }
 
     /**
+     * Verifies the down() migration safely handles existing linked_existing rows:
+     * migrate-up → insert linked_existing → rollback → old value/constraint restored.
+     */
+    public function test_conversion_mode_migration_rollback_handles_linked_existing_data(): void
+    {
+        [$lead, $tenant, $actor] = $this->leadContext();
+        $customer = $this->createLeadCustomer($tenant, $actor);
+
+        // Run the Milestone B migration (it is already applied by RefreshDatabase,
+        // so we verify the constraint is present by inserting a linked_existing row)
+        DB::table('leads')->where('id', $lead->id)->update([
+            'stage'           => 'won',
+            'customer_id'     => $customer->id,
+            'converted_at'    => now(),
+            'converted_by'    => $actor->id,
+            'conversion_mode' => 'linked_existing',
+        ]);
+
+        $this->assertSame(
+            'linked_existing',
+            DB::table('leads')->where('id', $lead->id)->value('conversion_mode'),
+        );
+
+        // Run the migration down() — it must atomically rename linked_existing → linked
+        $migration = require database_path(
+            'migrations/2026_08_02_200000_update_leads_conversion_mode_check.php'
+        );
+        $migration->down();
+
+        // The row must now have 'linked' (renamed by the UPDATE in down())
+        $this->assertSame(
+            'linked',
+            DB::table('leads')->where('id', $lead->id)->value('conversion_mode'),
+        );
+
+        // The old constraint must now reject 'linked_existing'
+        $this->assertLeadUpdateFails($lead, [
+            'conversion_mode' => 'linked_existing',
+        ]);
+
+        // Reset the row to a neutral state before re-running up(), so the
+        // new constraint (which rejects 'linked') is not violated.
+        DB::table('leads')->where('id', $lead->id)->update([
+            'stage'           => 'new',
+            'customer_id'     => null,
+            'converted_at'    => null,
+            'converted_by'    => null,
+            'conversion_mode' => null,
+        ]);
+
+        // Restore to up state for clean teardown
+        $migration->up();
+    }
+
+    /**
      * Milestone B — verifies that the new leads_conversion_mode_check constraint
      * (applied by 2026_08_02_200000_update_leads_conversion_mode_check.php)
      * accepts the three valid values and rejects any other string.
