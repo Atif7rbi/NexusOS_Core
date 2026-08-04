@@ -9,11 +9,11 @@ use App\Modules\Leads\Enums\ActivityType;
 use App\Modules\Leads\Enums\NextActionType;
 use App\Modules\Leads\Exceptions\LeadAlreadyLostException;
 use App\Modules\Leads\Exceptions\LeadAlreadyWonException;
+use App\Modules\Leads\Exceptions\LeadFollowUpConflictException;
 use App\Modules\Leads\Exceptions\LeadIsArchivedException;
 use App\Modules\Leads\Models\Lead;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 final class LeadFollowUpService
 {
@@ -24,17 +24,11 @@ final class LeadFollowUpService
     ) {
     }
 
-    public function schedule(
-        string $tenantId,
-        string $leadId,
-        User $actor,
-        CarbonImmutable $followUpAt,
-        NextActionType $actionType,
-        ?string $actionNote,
-    ): Lead {
+    public function schedule(string $tenantId, string $leadId, User $actor, CarbonImmutable $followUpAt, NextActionType $actionType, ?string $actionNote): Lead
+    {
         return $this->write($tenantId, $leadId, $actor, function (Lead $lead, CarbonImmutable $now) use ($followUpAt, $actionType, $actionNote): void {
             if ($lead->next_follow_up_at !== null) {
-                throw new RuntimeException('A follow-up is already scheduled for this Lead.');
+                throw new LeadFollowUpConflictException('A follow-up is already scheduled for this Lead.');
             }
 
             $this->setFollowUp($lead, $followUpAt, $actionType, $actionNote, $now);
@@ -45,21 +39,15 @@ final class LeadFollowUpService
                 'new_action_type' => $actionType->value,
                 'previous_action_note' => null,
                 'new_action_note' => $actionNote,
-            ], $lead->updated_by, $now);
+            ], $actor->id, $now);
         });
     }
 
-    public function reschedule(
-        string $tenantId,
-        string $leadId,
-        User $actor,
-        CarbonImmutable $followUpAt,
-        NextActionType $actionType,
-        ?string $actionNote,
-    ): Lead {
+    public function reschedule(string $tenantId, string $leadId, User $actor, CarbonImmutable $followUpAt, NextActionType $actionType, ?string $actionNote): Lead
+    {
         return $this->write($tenantId, $leadId, $actor, function (Lead $lead, CarbonImmutable $now) use ($followUpAt, $actionType, $actionNote): void {
             if ($lead->next_follow_up_at === null) {
-                throw new RuntimeException('No follow-up is scheduled for this Lead.');
+                throw new LeadFollowUpConflictException('No follow-up is scheduled for this Lead.');
             }
 
             $previousAt = CarbonImmutable::instance($lead->next_follow_up_at);
@@ -67,7 +55,7 @@ final class LeadFollowUpService
             $previousNote = $lead->next_action_note;
 
             if ($previousAt->equalTo($followUpAt) && $previousType === $actionType && $previousNote === $actionNote) {
-                throw new RuntimeException('The requested follow-up values are unchanged.');
+                throw new LeadFollowUpConflictException('The requested follow-up values are unchanged.');
             }
 
             $this->setFollowUp($lead, $followUpAt, $actionType, $actionNote, $now);
@@ -78,7 +66,7 @@ final class LeadFollowUpService
                 'new_action_type' => $actionType->value,
                 'previous_action_note' => $previousNote,
                 'new_action_note' => $actionNote,
-            ], $lead->updated_by, $now);
+            ], $actor->id, $now);
         });
     }
 
@@ -96,7 +84,7 @@ final class LeadFollowUpService
     {
         return $this->write($tenantId, $leadId, $actor, function (Lead $lead, CarbonImmutable $now) use ($type, $note): void {
             if ($lead->next_follow_up_at === null) {
-                throw new RuntimeException('No follow-up is scheduled for this Lead.');
+                throw new LeadFollowUpConflictException('No follow-up is scheduled for this Lead.');
             }
 
             $previousAt = CarbonImmutable::instance($lead->next_follow_up_at);
@@ -107,6 +95,7 @@ final class LeadFollowUpService
                 'next_follow_up_at' => null,
                 'next_action_type' => null,
                 'next_action_note' => null,
+                'updated_by' => $actor->id,
                 'updated_at' => $now,
             ])->save();
 
@@ -118,7 +107,7 @@ final class LeadFollowUpService
                 'previous_action_note' => $previousNote,
                 'new_action_note' => null,
                 'note' => $note,
-            ], $lead->updated_by, $now);
+            ], $actor->id, $now);
         });
     }
 
@@ -138,7 +127,6 @@ final class LeadFollowUpService
             }
 
             $this->authorization->assertCanModify($lead, $actor);
-            $lead->updated_by = $actor->id;
             $mutation($lead, CarbonImmutable::now());
 
             return $lead->refresh();
