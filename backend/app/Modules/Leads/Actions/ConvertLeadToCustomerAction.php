@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Leads\Actions;
 
-use App\Models\User;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Leads\Enums\ConversionMode;
@@ -18,6 +17,7 @@ use App\Modules\Leads\Exceptions\LeadNotInOpenStageException;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadActivity;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -148,17 +148,37 @@ final class ConvertLeadToCustomerAction
             );
         }
 
-        $customer = Customer::query()->create([
-            'tenant_id'  => $tenantId,
-            'name'       => $lead->name,
-            'phone'      => $normalizedPhone,
-            'email'      => $lead->email,
-            'type'       => $customerData['type'],
-            'category'   => $customerData['category'],
-            'status'     => CustomerStatus::Customer->value,
-            'created_by' => $actorId,
-            'updated_by' => $actorId,
-        ]);
+        // SELECT FOR UPDATE cannot lock a non-existent row, so a concurrent
+        // create_new may still race past the pre-check above. Catch the
+        // PostgreSQL unique violation on (tenant_id, phone) and surface it
+        // as the same semantic conflict error.
+        try {
+            $customer = Customer::query()->create([
+                'tenant_id'  => $tenantId,
+                'name'       => $lead->name,
+                'phone'      => $normalizedPhone,
+                'email'      => $lead->email,
+                'type'       => $customerData['type'],
+                'category'   => $customerData['category'],
+                'status'     => CustomerStatus::Customer->value,
+                'created_by' => $actorId,
+                'updated_by' => $actorId,
+            ]);
+        } catch (QueryException $e) {
+            // PostgreSQL unique violation SQLSTATE 23505
+            if ($e->errorInfo[0] === '23505') {
+                $conflict = Customer::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('phone', $normalizedPhone)
+                    ->first();
+
+                throw new LeadConversionNewCustomerConflictException(
+                    conflictingCustomerId: $conflict ? (string) $conflict->id : 'unknown',
+                    conflictingCustomerStatus: $conflict?->status->value ?? 'unknown',
+                );
+            }
+            throw $e;
+        }
 
         return $this->finalise(
             $lead,
