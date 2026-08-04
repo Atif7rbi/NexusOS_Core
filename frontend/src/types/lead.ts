@@ -250,4 +250,5 @@ export type ConvertLeadPayload =
 export type LeadConversionConflict = {
   id: string;
   status: string;
+  name?: string;
 };
