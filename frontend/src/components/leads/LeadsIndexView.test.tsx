@@ -21,6 +21,7 @@ const data = {
 
 const baseProps = {
   query: { page: 2, per_page: 20 },
+  viewMode: "list" as const,
   index: data,
   projects: [],
   assignees: [],
@@ -33,6 +34,7 @@ const baseProps = {
   hasFilters: false,
   onSearchInput: vi.fn(),
   onQueryChange: vi.fn(),
+  onViewChange: vi.fn(),
   onCreate: vi.fn(),
   onRefresh: vi.fn(),
   onReset: vi.fn(),
@@ -85,6 +87,39 @@ describe("LeadsIndexView", () => {
     expect(onSearchInput).toHaveBeenCalledWith("Acme");
     expect(onQueryChange).toHaveBeenCalledWith({ stage: "qualified", page: 1 });
     expect(onQueryChange).toHaveBeenCalledWith({ page: 3 });
+  });
+
+  it("changes follow-up queue bucket and clears incompatible modes", () => {
+    const onQueryChange = vi.fn();
+    render(<LeadsIndexView {...baseProps} onQueryChange={onQueryChange} />);
+
+    fireEvent.click(screen.getByText("crm.queue.today"));
+
+    expect(onQueryChange).toHaveBeenCalledWith({
+      follow_up_bucket: "today",
+      overdue: null,
+      archived: null,
+      page: 1,
+    });
+  });
+
+  it("switches between list and pipeline views", () => {
+    const onViewChange = vi.fn();
+    const { rerender } = render(
+      <LeadsIndexView {...baseProps} onViewChange={onViewChange} />
+    );
+
+    fireEvent.click(screen.getByText("crm.view.pipeline"));
+    expect(onViewChange).toHaveBeenCalledWith("pipeline");
+
+    rerender(
+      <LeadsIndexView
+        {...baseProps}
+        viewMode="pipeline"
+        onViewChange={onViewChange}
+      />
+    );
+    expect(screen.getByTestId("leads-pipeline")).toBeTruthy();
   });
 
   it("shows archived mode only to administrators", () => {
