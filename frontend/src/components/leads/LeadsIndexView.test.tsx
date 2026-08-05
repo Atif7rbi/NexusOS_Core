@@ -11,11 +11,13 @@ vi.mock("@/hooks/useTranslation", () => ({
 const data = {
   leads: [leadFixture()],
   summary: {
-    active: 8,
-    unassigned: 3,
-    overdue: 2,
-    converted_this_month: 1,
-  },
+      open_leads: 12,
+      overdue_follow_ups: 2,
+      today_follow_ups: 5,
+      unassigned_leads: 3,
+      monthly_conversions: 4,
+      lost_leads_in_selected_period: 6,
+    },
   pagination: { current_page: 2, last_page: 3, per_page: 20, total: 41 },
 };
 
@@ -60,7 +62,7 @@ describe("LeadsIndexView", () => {
 
   it("renders summary values, leads, and pagination", () => {
     render(<LeadsIndexView {...baseProps} />);
-    ["8", "3", "2", "1"].forEach((value) =>
+    ["12", "2", "5", "3", "4", "6"].forEach((value) =>
       expect(screen.getByText(value)).toBeTruthy()
     );
     expect(screen.getAllByText("Test Lead").length).toBeGreaterThan(0);
@@ -93,10 +95,13 @@ describe("LeadsIndexView", () => {
     const onQueryChange = vi.fn();
     render(<LeadsIndexView {...baseProps} onQueryChange={onQueryChange} />);
 
-    fireEvent.click(screen.getByText("crm.queue.today"));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "crm.queue.today" })
+    );
 
     expect(onQueryChange).toHaveBeenCalledWith({
       follow_up_bucket: "today",
+      follow_up_state: null,
       overdue: null,
       archived: null,
       page: 1,
@@ -145,4 +150,72 @@ describe("LeadsIndexView", () => {
     fireEvent.click(screen.getAllByText("crm.resetFilters")[0]);
     expect(onReset).toHaveBeenCalled();
   });
+  it("emits final lifecycle follow-up and date filters", () => {
+    const onQueryChange = vi.fn();
+
+    render(
+      <LeadsIndexView
+        {...baseProps}
+        onQueryChange={onQueryChange}
+      />
+    );
+
+    fireEvent.change(
+      screen.getByLabelText("crm.filters.lifecycle"),
+      { target: { value: "lost" } }
+    );
+
+    expect(onQueryChange).toHaveBeenCalledWith({
+      lifecycle: "lost",
+      page: 1,
+    });
+
+    fireEvent.change(
+      screen.getByLabelText("crm.filters.followUpState"),
+      { target: { value: "scheduled_later" } }
+    );
+
+    expect(onQueryChange).toHaveBeenCalledWith({
+      follow_up_state: "scheduled_later",
+      follow_up_bucket: null,
+      overdue: null,
+      page: 1,
+    });
+
+    fireEvent.change(
+      screen.getByLabelText("crm.filters.dateFrom"),
+      { target: { value: "2026-08-05" } }
+    );
+
+    expect(onQueryChange).toHaveBeenCalledWith({
+      date_from: "2026-08-05",
+      page: 1,
+    });
+
+    fireEvent.change(
+      screen.getByLabelText("crm.filters.dateTo"),
+      { target: { value: "2026-08-07" } }
+    );
+
+    expect(onQueryChange).toHaveBeenCalledWith({
+      date_to: "2026-08-07",
+      page: 1,
+    });
+  });
+
+  it("renders the final operational summary contract", () => {
+    render(<LeadsIndexView {...baseProps} />);
+
+    expect(screen.getByText("crm.cards.openLeads")).toBeTruthy();
+    expect(screen.getByText("crm.cards.overdueFollowUps")).toBeTruthy();
+    expect(screen.getByText("crm.cards.todayFollowUps")).toBeTruthy();
+    expect(screen.getByText("crm.cards.unassignedLeads")).toBeTruthy();
+    expect(screen.getByText("crm.cards.monthlyConversions")).toBeTruthy();
+    expect(screen.getByText("crm.cards.lostInPeriod")).toBeTruthy();
+
+    ["12", "2", "5", "3", "4", "6"].forEach((value) => {
+      expect(screen.getByText(value)).toBeTruthy();
+    });
+  });
+
 });

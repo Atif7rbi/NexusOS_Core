@@ -160,10 +160,12 @@ export type Lead = {
 };
 
 export type LeadSummary = {
-  active: number;
-  unassigned: number;
-  overdue: number;
-  converted_this_month: number;
+  open_leads: number;
+  overdue_follow_ups: number;
+  today_follow_ups: number;
+  unassigned_leads: number;
+  monthly_conversions: number;
+  lost_leads_in_selected_period: number;
 };
 
 export type LeadPagination = {
@@ -228,6 +230,10 @@ export type LeadsIndexQuery = {
   assigned_to?: number | null;
   project_id?: string;
   follow_up_bucket?: FollowUpBucket | "";
+  follow_up_state?: FollowUpState | "";
+  lifecycle?: "open" | "won" | "lost" | "";
+  date_from?: string;
+  date_to?: string;
   overdue?: boolean;
   archived?: boolean;
   page?: number;

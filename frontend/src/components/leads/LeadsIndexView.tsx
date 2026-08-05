@@ -123,30 +123,42 @@ export function LeadsIndexView({
       ) : null}
 
       {summary ? (
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard
-            title={t("crm.cards.active")}
-            value={summary.active}
+            title={t("crm.cards.openLeads")}
+            value={summary.open_leads}
             icon={UsersRound}
             tone="gold"
           />
           <SummaryCard
-            title={t("crm.cards.unassigned")}
-            value={summary.unassigned}
-            icon={UserRoundCheck}
-            tone="info"
-          />
-          <SummaryCard
-            title={t("crm.cards.overdue")}
-            value={summary.overdue}
+            title={t("crm.cards.overdueFollowUps")}
+            value={summary.overdue_follow_ups}
             icon={CalendarClock}
             tone="gold"
           />
           <SummaryCard
-            title={t("crm.cards.convertedThisMonth")}
-            value={summary.converted_this_month}
+            title={t("crm.cards.todayFollowUps")}
+            value={summary.today_follow_ups}
+            icon={CalendarClock}
+            tone="info"
+          />
+          <SummaryCard
+            title={t("crm.cards.unassignedLeads")}
+            value={summary.unassigned_leads}
+            icon={UserRoundCheck}
+            tone="info"
+          />
+          <SummaryCard
+            title={t("crm.cards.monthlyConversions")}
+            value={summary.monthly_conversions}
             icon={CircleCheckBig}
             tone="success"
+          />
+          <SummaryCard
+            title={t("crm.cards.lostInPeriod")}
+            value={summary.lost_leads_in_selected_period}
+            icon={UsersRound}
+            tone="gold"
           />
         </section>
       ) : null}
@@ -186,6 +198,7 @@ export function LeadsIndexView({
         onChange={(followUpBucket) =>
           onQueryChange({
             follow_up_bucket: followUpBucket,
+            follow_up_state: null,
             overdue: null,
             archived: null,
             page: 1,
@@ -273,6 +286,62 @@ export function LeadsIndexView({
                     label: project.name,
                   })),
               ]}
+            />
+
+            <FilterSelect
+              label={t("crm.filters.lifecycle")}
+              value={query.lifecycle ?? ""}
+              onChange={(value) =>
+                onQueryChange({ lifecycle: value, page: 1 })
+              }
+              options={[
+                { value: "", label: t("crm.filters.allLifecycle") },
+                { value: "open", label: t("crm.lifecycle.open") },
+                { value: "won", label: t("crm.lifecycle.won") },
+                { value: "lost", label: t("crm.lifecycle.lost") },
+              ]}
+            />
+
+            <FilterSelect
+              label={t("crm.filters.followUpState")}
+              value={query.follow_up_state ?? ""}
+              onChange={(value) =>
+                onQueryChange({
+                  follow_up_state: value,
+                  follow_up_bucket: null,
+                  overdue: null,
+                  page: 1,
+                })
+              }
+              options={[
+                { value: "", label: t("crm.filters.allFollowUpStates") },
+                { value: "overdue", label: t("crm.queue.overdue") },
+                { value: "today", label: t("crm.queue.today") },
+                { value: "tomorrow", label: t("crm.queue.tomorrow") },
+                { value: "this_week", label: t("crm.queue.thisWeek") },
+                {
+                  value: "scheduled_later",
+                  label: t("crm.filters.scheduledLater"),
+                },
+                { value: "unscheduled", label: t("crm.queue.unscheduled") },
+              ]}
+            />
+
+            <FilterDate
+              label={t("crm.filters.dateFrom")}
+              value={query.date_from ?? ""}
+              onChange={(value) =>
+                onQueryChange({ date_from: value, page: 1 })
+              }
+            />
+
+            <FilterDate
+              label={t("crm.filters.dateTo")}
+              value={query.date_to ?? ""}
+              min={query.date_from || undefined}
+              onChange={(value) =>
+                onQueryChange({ date_to: value, page: 1 })
+              }
             />
 
             {isAdministrator ? (
@@ -381,6 +450,32 @@ export function LeadsIndexView({
         ) : null}
       </CrudSection>
     </>
+  );
+}
+
+function FilterDate({
+  label,
+  value,
+  min,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  min?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="sr-only">{label}</span>
+      <input
+        type="date"
+        aria-label={label}
+        value={value}
+        min={min}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-gold)]"
+      />
+    </label>
   );
 }
 

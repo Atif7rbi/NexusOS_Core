@@ -42,7 +42,11 @@ final class LeadsIndexQuery
             $baseQuery->activeOnly();
         }
 
-        $summary = $this->summary(clone $baseQuery, $tenantTimezone);
+        $summary = $this->summary(
+            clone $baseQuery,
+            $tenantTimezone,
+            $filters,
+        );
         $query = $baseQuery->with([
             'project:id,name,archived_at',
             'unit:id,project_id,unit_number,status,archived_at',
@@ -74,52 +78,90 @@ final class LeadsIndexQuery
     }
 
     /**
+     * @param array<string, mixed> $filters
      * @return array<string, int>
      */
-    private function summary(Builder $query, string $tenantTimezone): array
-    {
-        $monthStart = CarbonImmutable::now($tenantTimezone)
-            ->startOfMonth()
-            ->utc();
-        $nextMonthStart = $monthStart
-            ->setTimezone($tenantTimezone)
-            ->addMonth()
-            ->startOfMonth()
-            ->utc();
-        $now = CarbonImmutable::now('UTC');
+    private function summary(
+        Builder $query,
+        string $tenantTimezone,
+        array $filters,
+    ): array {
+        $now = CarbonImmutable::now($tenantTimezone);
+        $todayStart = $now->startOfDay();
+        $tomorrowStart = $todayStart->addDay();
+        $monthStart = $now->startOfMonth();
+        $nextMonthStart = $monthStart->addMonth()->startOfMonth();
+
+        [$selectedStart, $selectedEndExclusive] = $this->selectedDateRange(
+            $filters,
+            $tenantTimezone,
+        );
+
         $row = $query
             ->reorder()
-            ->selectRaw(<<<'SQL'
-                count(*) filter (
-                    where stage in ('new', 'qualified', 'viewing', 'negotiation')
-                ) as active
-            SQL)
-            ->selectRaw('count(*) filter (where assigned_to is null) as unassigned')
+            ->selectRaw(
+                <<<'SQL'
+                    count(*) filter (
+                        where stage in ('new', 'qualified', 'viewing', 'negotiation')
+                          and archived_at is null
+                    ) as open_leads
+                SQL,
+            )
             ->selectRaw(
                 <<<'SQL'
                     count(*) filter (
                         where next_follow_up_at < ?
                           and stage in ('new', 'qualified', 'viewing', 'negotiation')
                           and archived_at is null
-                    ) as overdue
+                    ) as overdue_follow_ups
                 SQL,
-                [$now],
+                [$todayStart->utc()],
+            )
+            ->selectRaw(
+                <<<'SQL'
+                    count(*) filter (
+                        where next_follow_up_at >= ?
+                          and next_follow_up_at < ?
+                          and stage in ('new', 'qualified', 'viewing', 'negotiation')
+                          and archived_at is null
+                    ) as today_follow_ups
+                SQL,
+                [$todayStart->utc(), $tomorrowStart->utc()],
+            )
+            ->selectRaw(
+                <<<'SQL'
+                    count(*) filter (
+                        where assigned_to is null
+                          and stage in ('new', 'qualified', 'viewing', 'negotiation')
+                          and archived_at is null
+                    ) as unassigned_leads
+                SQL,
             )
             ->selectRaw(
                 <<<'SQL'
                     count(*) filter (
                         where converted_at >= ? and converted_at < ?
-                    ) as converted_this_month
+                    ) as monthly_conversions
                 SQL,
-                [$monthStart, $nextMonthStart],
+                [$monthStart->utc(), $nextMonthStart->utc()],
+            )
+            ->selectRaw(
+                <<<'SQL'
+                    count(*) filter (
+                        where lost_at >= ? and lost_at < ?
+                    ) as lost_leads_in_selected_period
+                SQL,
+                [$selectedStart->utc(), $selectedEndExclusive->utc()],
             )
             ->firstOrFail();
 
         return [
-            'active' => (int) $row->active,
-            'unassigned' => (int) $row->unassigned,
-            'overdue' => (int) $row->overdue,
-            'converted_this_month' => (int) $row->converted_this_month,
+            'open_leads' => (int) $row->open_leads,
+            'overdue_follow_ups' => (int) $row->overdue_follow_ups,
+            'today_follow_ups' => (int) $row->today_follow_ups,
+            'unassigned_leads' => (int) $row->unassigned_leads,
+            'monthly_conversions' => (int) $row->monthly_conversions,
+            'lost_leads_in_selected_period' => (int) $row->lost_leads_in_selected_period,
         ];
     }
 
@@ -141,30 +183,44 @@ final class LeadsIndexQuery
         }
 
         foreach (['stage', 'source', 'assigned_to', 'project_id'] as $filter) {
-            if (array_key_exists($filter, $filters) && $filters[$filter] !== null) {
+            if (
+                array_key_exists($filter, $filters)
+                && $filters[$filter] !== null
+                && $filters[$filter] !== ''
+            ) {
                 $query->where($filter, $filters[$filter]);
             }
         }
 
-        if (isset($filters['follow_up_bucket'])) {
-            $this->applyFollowUpBucket(
+        $this->applyLifecycle($query, $filters['lifecycle'] ?? null);
+
+        $followUpState = $filters['follow_up_state']
+            ?? $filters['follow_up_bucket']
+            ?? null;
+
+        if ($followUpState !== null && $followUpState !== '') {
+            $this->applyFollowUpState(
                 $query,
-                (string) $filters['follow_up_bucket'],
+                (string) $followUpState,
                 $tenantTimezone,
             );
+        } elseif (($filters['overdue'] ?? false) === true) {
+            $todayStart = CarbonImmutable::now($tenantTimezone)->startOfDay();
 
-            return;
-        }
-
-        if (($filters['overdue'] ?? false) === true) {
             $query->whereNotNull('next_follow_up_at')
-                ->where('next_follow_up_at', '<', CarbonImmutable::now('UTC'))
+                ->where('next_follow_up_at', '<', $todayStart->utc())
                 ->whereIn('stage', LeadStage::openValues())
                 ->whereNull('archived_at');
         }
+
+        $this->applyOperationalDateRange(
+            $query,
+            $filters,
+            $tenantTimezone,
+        );
     }
 
-    private function applyFollowUpBucket(
+    private function applyFollowUpState(
         Builder $query,
         string $bucket,
         string $tenantTimezone,
@@ -191,8 +247,91 @@ final class LeadsIndexQuery
             'this_week' => $query
                 ->where('next_follow_up_at', '>=', $dayAfterTomorrowStart->utc())
                 ->where('next_follow_up_at', '<', $weekEndExclusive->utc()),
+            'scheduled_later' => $query
+                ->where('next_follow_up_at', '>=', $weekEndExclusive->utc()),
             'unscheduled' => $query->whereNull('next_follow_up_at'),
             default => null,
         };
+    }
+
+    private function applyLifecycle(Builder $query, mixed $lifecycle): void
+    {
+        match ($lifecycle) {
+            'open' => $query->whereIn('stage', LeadStage::openValues()),
+            'won' => $query->where('stage', LeadStage::Won->value),
+            'lost' => $query->where('stage', LeadStage::Lost->value),
+            default => null,
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    private function applyOperationalDateRange(
+        Builder $query,
+        array $filters,
+        string $tenantTimezone,
+    ): void {
+        if (
+            empty($filters['date_from'])
+            && empty($filters['date_to'])
+        ) {
+            return;
+        }
+
+        if (! empty($filters['date_from'])) {
+            $start = CarbonImmutable::createFromFormat(
+                'Y-m-d',
+                (string) $filters['date_from'],
+                $tenantTimezone,
+            )->startOfDay();
+
+            $query->where('next_follow_up_at', '>=', $start->utc());
+        }
+
+        if (! empty($filters['date_to'])) {
+            $endExclusive = CarbonImmutable::createFromFormat(
+                'Y-m-d',
+                (string) $filters['date_to'],
+                $tenantTimezone,
+            )->addDay()->startOfDay();
+
+            $query->where('next_follow_up_at', '<', $endExclusive->utc());
+        }
+    }
+
+    /**
+     * When no interval is selected, use the current Riyadh calendar month.
+     *
+     * @param array<string, mixed> $filters
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function selectedDateRange(
+        array $filters,
+        string $tenantTimezone,
+    ): array {
+        $now = CarbonImmutable::now($tenantTimezone);
+
+        $start = empty($filters['date_from'])
+            ? $now->startOfMonth()
+            : CarbonImmutable::createFromFormat(
+                'Y-m-d',
+                (string) $filters['date_from'],
+                $tenantTimezone,
+            )->startOfDay();
+
+        $endExclusive = empty($filters['date_to'])
+            ? (
+                empty($filters['date_from'])
+                    ? $now->addMonth()->startOfMonth()
+                    : $start->addDay()
+            )
+            : CarbonImmutable::createFromFormat(
+                'Y-m-d',
+                (string) $filters['date_to'],
+                $tenantTimezone,
+            )->addDay()->startOfDay();
+
+        return [$start, $endExclusive];
     }
 }

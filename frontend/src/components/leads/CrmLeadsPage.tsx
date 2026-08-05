@@ -102,6 +102,8 @@ export function CrmLeadsPage() {
     const source = searchParams.get("source");
     const assignedTo = searchParams.get("assigned_to");
     const followUpBucket = searchParams.get("follow_up_bucket");
+    const followUpState = searchParams.get("follow_up_state");
+    const lifecycle = searchParams.get("lifecycle");
 
     return {
       page: positiveInteger(searchParams.get("page"), 1),
@@ -118,6 +120,21 @@ export function CrmLeadsPage() {
       )
         ? (followUpBucket as FollowUpBucket)
         : "",
+      follow_up_state: [
+        "overdue",
+        "today",
+        "tomorrow",
+        "this_week",
+        "scheduled_later",
+        "unscheduled",
+      ].includes(followUpState ?? "")
+        ? (followUpState as LeadsIndexQuery["follow_up_state"])
+        : "",
+      lifecycle: ["open", "won", "lost"].includes(lifecycle ?? "")
+        ? (lifecycle as LeadsIndexQuery["lifecycle"])
+        : "",
+      date_from: searchParams.get("date_from") ?? "",
+      date_to: searchParams.get("date_to") ?? "",
       overdue: searchParams.get("overdue") === "true",
       archived: archivedMode,
     };
@@ -600,6 +617,10 @@ export function CrmLeadsPage() {
       "assigned_to",
       "project_id",
       "follow_up_bucket",
+      "follow_up_state",
+      "lifecycle",
+      "date_from",
+      "date_to",
       "overdue",
       "archived",
       "page",
@@ -619,6 +640,10 @@ export function CrmLeadsPage() {
       query.assigned_to ||
       query.project_id ||
       query.follow_up_bucket ||
+      query.follow_up_state ||
+      query.lifecycle ||
+      query.date_from ||
+      query.date_to ||
       query.overdue ||
       query.archived
   );
