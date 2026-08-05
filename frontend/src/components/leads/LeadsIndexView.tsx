@@ -310,6 +310,7 @@ export function LeadsIndexView({
                   follow_up_state: value,
                   follow_up_bucket: null,
                   overdue: null,
+                  archived: null,
                   page: 1,
                 })
               }
@@ -352,6 +353,9 @@ export function LeadsIndexView({
                   onChange={(event) =>
                     onQueryChange({
                       archived: event.target.checked,
+                      follow_up_bucket: null,
+                      follow_up_state: null,
+                      overdue: null,
                       page: 1,
                       lead: null,
                     })

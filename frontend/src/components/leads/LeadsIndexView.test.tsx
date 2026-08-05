@@ -179,6 +179,7 @@ describe("LeadsIndexView", () => {
       follow_up_state: "scheduled_later",
       follow_up_bucket: null,
       overdue: null,
+      archived: null,
       page: 1,
     });
 
@@ -200,6 +201,38 @@ describe("LeadsIndexView", () => {
     expect(onQueryChange).toHaveBeenCalledWith({
       date_to: "2026-08-07",
       page: 1,
+    });
+  });
+
+  it("clears follow-up filters when archived mode changes", () => {
+    const onQueryChange = vi.fn();
+
+    render(
+      <LeadsIndexView
+        {...baseProps}
+        query={{
+          ...baseProps.query,
+          archived: false,
+          follow_up_state: "today",
+        }}
+        isAdministrator
+        onQueryChange={onQueryChange}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "crm.filters.archived",
+      })
+    );
+
+    expect(onQueryChange).toHaveBeenCalledWith({
+      archived: true,
+      follow_up_bucket: null,
+      follow_up_state: null,
+      overdue: null,
+      page: 1,
+      lead: null,
     });
   });
 

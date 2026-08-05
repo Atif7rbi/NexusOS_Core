@@ -24,7 +24,9 @@ final class LeadFollowUpStateResolver
         $todayStart = $now->startOfDay();
         $tomorrowStart = $todayStart->addDay();
         $dayAfterTomorrowStart = $tomorrowStart->addDay();
-        $weekEnd = $todayStart->endOfWeek(CarbonImmutable::SUNDAY)->addSecond();
+        $nextWeekStart = $todayStart
+            ->startOfWeek(CarbonImmutable::MONDAY)
+            ->addWeek();
 
         if ($followUp->lessThan($todayStart)) {
             return 'overdue';
@@ -38,7 +40,7 @@ final class LeadFollowUpStateResolver
             return 'tomorrow';
         }
 
-        if ($followUp->lessThan($weekEnd)) {
+        if ($followUp->lessThan($nextWeekStart)) {
             return 'this_week';
         }
 

@@ -626,6 +626,90 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonValidationErrors('date_to');
     }
 
+    public function test_follow_up_filters_are_mutually_exclusive(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+
+        Sanctum::actingAs($administrator);
+
+        $this->getJson(
+            '/api/leads?follow_up_state=today&follow_up_bucket=overdue',
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'follow_up_state',
+                'follow_up_bucket',
+            ]);
+
+        $this->getJson(
+            '/api/leads?follow_up_state=today&overdue=true',
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'follow_up_state',
+                'overdue',
+            ]);
+
+        $this->getJson(
+            '/api/leads?follow_up_bucket=today&overdue=false',
+        )->assertOk();
+    }
+
+    public function test_follow_up_week_boundary_starts_at_monday_midnight_in_riyadh(): void
+    {
+        $this->freezeCrmClock(
+            CarbonImmutable::parse('2026-08-05T09:00:00+03:00'),
+        );
+
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+
+        $sundayLastSecond = $this->createLead(
+            $tenant,
+            $administrator,
+            [
+                'next_follow_up_at' => CarbonImmutable::parse(
+                    '2026-08-09T20:59:59.999999Z',
+                ),
+            ],
+        );
+
+        $mondayStart = $this->createLead(
+            $tenant,
+            $administrator,
+            [
+                'next_follow_up_at' => CarbonImmutable::parse(
+                    '2026-08-09T21:00:00Z',
+                ),
+            ],
+        );
+
+        Sanctum::actingAs($administrator);
+
+        $this->getJson('/api/leads?follow_up_state=this_week')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $sundayLastSecond->id,
+            );
+
+        $this->getJson('/api/leads?follow_up_state=scheduled_later')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $mondayStart->id,
+            );
+    }
+
     public function test_project_and_unit_interest_validation_is_tenant_safe(): void
     {
         $tenant = $this->createLeadTenant();

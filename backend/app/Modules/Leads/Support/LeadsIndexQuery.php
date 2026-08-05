@@ -228,7 +228,9 @@ final class LeadsIndexQuery
         $todayStart = CarbonImmutable::now($tenantTimezone)->startOfDay();
         $tomorrowStart = $todayStart->addDay();
         $dayAfterTomorrowStart = $tomorrowStart->addDay();
-        $weekEndExclusive = $todayStart->endOfWeek()->addMicrosecond();
+        $nextWeekStart = $todayStart
+            ->startOfWeek(CarbonImmutable::MONDAY)
+            ->addWeek();
 
         $query
             ->whereIn('stage', LeadStage::openValues())
@@ -246,9 +248,9 @@ final class LeadsIndexQuery
                 ->where('next_follow_up_at', '<', $dayAfterTomorrowStart->utc()),
             'this_week' => $query
                 ->where('next_follow_up_at', '>=', $dayAfterTomorrowStart->utc())
-                ->where('next_follow_up_at', '<', $weekEndExclusive->utc()),
+                ->where('next_follow_up_at', '<', $nextWeekStart->utc()),
             'scheduled_later' => $query
-                ->where('next_follow_up_at', '>=', $weekEndExclusive->utc()),
+                ->where('next_follow_up_at', '>=', $nextWeekStart->utc()),
             'unscheduled' => $query->whereNull('next_follow_up_at'),
             default => null,
         };

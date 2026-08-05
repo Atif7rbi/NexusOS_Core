@@ -28,6 +28,32 @@ final class IndexLeadRequest extends LeadRequest
         }
     }
 
+    protected function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $activeFilters = array_filter([
+                'follow_up_bucket' => $this->input('follow_up_bucket'),
+                'follow_up_state' => $this->input('follow_up_state'),
+                'overdue' => $this->boolean('overdue')
+                    ? true
+                    : null,
+            ], static fn (mixed $value): bool =>
+                $value !== null && $value !== ''
+            );
+
+            if (count($activeFilters) <= 1) {
+                return;
+            }
+
+            foreach (array_keys($activeFilters) as $field) {
+                $validator->errors()->add(
+                    $field,
+                    'Only one follow-up filter may be used at a time.',
+                );
+            }
+        });
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
@@ -42,7 +68,13 @@ final class IndexLeadRequest extends LeadRequest
             'follow_up_bucket' => [
                 'sometimes',
                 'nullable',
-                Rule::in(['overdue', 'today', 'tomorrow', 'this_week', 'unscheduled']),
+                Rule::in([
+                    'overdue',
+                    'today',
+                    'tomorrow',
+                    'this_week',
+                    'unscheduled',
+                ]),
             ],
             'follow_up_state' => [
                 'sometimes',
@@ -72,7 +104,10 @@ final class IndexLeadRequest extends LeadRequest
                 'date_format:Y-m-d',
                 'after_or_equal:date_from',
             ],
-            'overdue' => ['sometimes', 'boolean'],
+            'overdue' => [
+                'sometimes',
+                'boolean',
+            ],
             'archived' => ['sometimes', 'boolean'],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],

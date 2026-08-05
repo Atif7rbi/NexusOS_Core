@@ -145,7 +145,9 @@ export function CrmLeadsPage() {
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [renderedAt] = useState(() => Date.now());
+  const [renderedAt, setRenderedAt] = useState(
+    () => Date.now()
+  );
   const indexRequest = useRef(0);
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -383,6 +385,7 @@ export function CrmLeadsPage() {
   };
 
   const refresh = (): void => {
+    setRenderedAt(Date.now());
     setRefreshVersion((current) => current + 1);
   };
 
