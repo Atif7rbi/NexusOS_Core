@@ -531,7 +531,7 @@ database constraints
 authorization
 tenant isolation
 open/closed/archived eligibility
-conversion/loss/archive clearing
+conversion/loss clearing and archive preservation
 activity payloads
 Riyadh bucket boundaries
 UTC conversion
