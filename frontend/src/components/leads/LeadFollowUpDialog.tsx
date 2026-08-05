@@ -46,14 +46,44 @@ const nextActionTypes: NextActionType[] = [
   "other",
 ];
 
-function toLocalDateTime(value: string | null): string {
+const RIYADH_TIME_ZONE = "Asia/Riyadh";
+const RIYADH_UTC_OFFSET = "+03:00";
+
+function toRiyadhLocalDateTime(value: string | null): string {
   if (!value) {
     return "";
   }
 
   const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: RIYADH_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
+}
+
+function parseRiyadhLocalDateTime(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}:00${RIYADH_UTC_OFFSET}`);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export function LeadFollowUpDialog({
@@ -66,7 +96,9 @@ export function LeadFollowUpDialog({
 }: LeadFollowUpDialogProps) {
   const { t } = useTranslation();
   const isWrite = action === "schedule_follow_up" || action === "reschedule_follow_up";
-  const [dateTime, setDateTime] = useState(() => toLocalDateTime(lead.next_follow_up_at));
+  const [dateTime, setDateTime] = useState(() =>
+    toRiyadhLocalDateTime(lead.next_follow_up_at)
+  );
   const [actionType, setActionType] = useState<NextActionType>(
     lead.next_action_type ?? "call"
   );
@@ -143,8 +175,8 @@ export function LeadFollowUpDialog({
             return;
           }
 
-          const parsed = new Date(dateTime);
-          if (Number.isNaN(parsed.getTime())) {
+          const parsed = parseRiyadhLocalDateTime(dateTime);
+          if (!parsed) {
             setLocalError(t("crm.followUp.dateInvalid"));
             return;
           }

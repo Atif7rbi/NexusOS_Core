@@ -31,7 +31,14 @@ final class LeadFollowUpService
                 throw new LeadFollowUpConflictException('A follow-up is already scheduled for this Lead.');
             }
 
-            $this->setFollowUp($lead, $followUpAt, $actionType, $actionNote, $now);
+            $this->setFollowUp(
+                $lead,
+                $followUpAt,
+                $actionType,
+                $actionNote,
+                $actor->id,
+                $now,
+            );
             $this->activities->automatic($lead, ActivityType::FollowUpScheduled, [
                 'previous_follow_up_at' => null,
                 'new_follow_up_at' => $followUpAt->toISOString(),
@@ -58,7 +65,14 @@ final class LeadFollowUpService
                 throw new LeadFollowUpConflictException('The requested follow-up values are unchanged.');
             }
 
-            $this->setFollowUp($lead, $followUpAt, $actionType, $actionNote, $now);
+            $this->setFollowUp(
+                $lead,
+                $followUpAt,
+                $actionType,
+                $actionNote,
+                $actor->id,
+                $now,
+            );
             $this->activities->automatic($lead, ActivityType::FollowUpRescheduled, [
                 'previous_follow_up_at' => $previousAt->toISOString(),
                 'new_follow_up_at' => $followUpAt->toISOString(),
@@ -133,12 +147,19 @@ final class LeadFollowUpService
         }, 3);
     }
 
-    private function setFollowUp(Lead $lead, CarbonImmutable $followUpAt, NextActionType $actionType, ?string $actionNote, CarbonImmutable $now): void
-    {
+    private function setFollowUp(
+        Lead $lead,
+        CarbonImmutable $followUpAt,
+        NextActionType $actionType,
+        ?string $actionNote,
+        int $actorId,
+        CarbonImmutable $now,
+    ): void {
         $lead->forceFill([
             'next_follow_up_at' => $followUpAt,
             'next_action_type' => $actionType,
             'next_action_note' => $actionNote,
+            'updated_by' => $actorId,
             'updated_at' => $now,
         ])->save();
     }

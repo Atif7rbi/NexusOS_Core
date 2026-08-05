@@ -125,7 +125,9 @@ describe("LeadFollowUpDialog", () => {
 
     expect(onConfirm).toHaveBeenCalledWith({
       action: "schedule_follow_up",
-      nextFollowUpAt: new Date(localDateTime).toISOString(),
+      nextFollowUpAt: new Date(
+        `${localDateTime}:00+03:00`
+      ).toISOString(),
       nextActionType: "meeting",
       nextActionNote: "Discuss financing",
     });
