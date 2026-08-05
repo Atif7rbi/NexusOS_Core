@@ -375,7 +375,9 @@ Reopening does not restore a previous follow-up automatically.
 
 ### Restore Lead
 
-Restoring does not restore a previous follow-up automatically.
+Restore does not recreate, clear, or alter the follow-up fields retained during archive.
+
+The stored values remain unchanged through archive and restore. Follow-up operations become eligible again only after restore succeeds.
 
 ### Edit Lead
 
@@ -407,7 +409,9 @@ unscheduled
 
 `scheduled_later` is permitted as a read-model classification for a scheduled date beyond the current Riyadh week, even though the primary daily queue tabs are overdue, today, tomorrow, this week, and unscheduled.
 
-Closed or archived Leads may return `follow_up_state = null` in operational responses because domain constraints require no active follow-up state.
+Closed or archived Leads return `follow_up_state = null` in operational responses because `follow_up_state` is an operational queue classification and closed or archived Leads do not participate in operational follow-up queues.
+
+Archived Leads may still retain their stored follow-up fields as historical operational state.
 
 ---
 
@@ -431,7 +435,9 @@ This avoids overlap at exact midnight boundaries.
 
 `this_week` excludes today and tomorrow when those buckets are presented separately.
 
-The week boundary must follow the application's frozen Riyadh business-week convention. If no repository-wide convention exists, Milestone C uses the ISO week boundary for deterministic implementation and tests; this must be documented in code and API tests.
+The frozen week boundary is the ISO week boundary evaluated in `Asia/Riyadh`.
+
+The next week begins on Monday at `00:00:00 Asia/Riyadh`. `this_week` ends immediately before that boundary, and `scheduled_later` begins exactly at that boundary.
 
 ---
 
@@ -509,13 +515,18 @@ validate compatibility with rows where next_follow_up_at is already non-null
 
 Because production may contain existing rows with `next_follow_up_at` and no action type, the migration must include an explicit safe transition strategy before validating the final invariant.
 
-Approved transition principle:
+Approved transition decision:
 
 ```text
-Existing scheduled follow-ups are backfilled with a deterministic action type representing an unspecified legacy follow-up.
+Existing rows with next_follow_up_at set and next_action_type null
+are backfilled with next_action_type = waiting_response.
 ```
 
-The implementation must not invent `other` without a required note. The preferred compatible value is `waiting_response` only if product semantics accept it; otherwise the migration must introduce and freeze a dedicated compatibility value before implementation. No migration may be deployed until this legacy-data decision is verified against production data.
+`waiting_response` is the frozen compatibility value for an existing scheduled follow-up whose historical action type was not recorded.
+
+The migration must not use `other`, because `other` requires a non-empty note. The deterministic `waiting_response` backfill must run before the final follow-up-state constraints are validated.
+
+Deployment must verify the target database for affected legacy rows before migration execution and retain the resulting count in the deployment record. This verification is an operational deployment prerequisite and does not reopen the frozen compatibility-value decision.
 
 ---
 

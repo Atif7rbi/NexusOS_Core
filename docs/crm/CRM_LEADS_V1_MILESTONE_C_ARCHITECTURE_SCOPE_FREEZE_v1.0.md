@@ -237,13 +237,13 @@ next_follow_up_at falls within the current Riyadh calendar day
 next_follow_up_at falls within the next Riyadh calendar day
 
  this_week:
-next_follow_up_at is after tomorrow and not later than the end of the current Riyadh week
+next_follow_up_at is after tomorrow and before the next Monday at 00:00 in Asia/Riyadh
 
  unscheduled:
 next_follow_up_at is null
 ```
 
-Only open, non-archived Leads participate in operational follow-up buckets unless an explicit filter requests otherwise.
+Only open, non-archived Leads participate in operational follow-up buckets. Archived Leads are always excluded from these buckets, including when archived mode is requested.
 
 ---
 
@@ -285,13 +285,15 @@ view
 page
 search
 stage
-assignee
-project
+assigned_to
+project_id
 source
+follow_up_bucket
 follow_up_state
 date_from
 date_to
 lifecycle
+overdue
 archived
 lead
 ```
@@ -360,13 +362,17 @@ reassign Leads
 May:
 
 ```text
-view and manage assigned Leads only
-manage follow-ups for assigned Leads only
+view own assigned Leads
+view eligible unassigned open Leads as read-only
+claim an eligible unassigned open Lead
+manage only Leads assigned to the actor
+manage follow-ups only for Leads assigned to the actor
 ```
 
 May not:
 
 ```text
+modify an unassigned Lead before claiming it
 modify another employee's Lead
 access another tenant
 ```
