@@ -357,7 +357,17 @@ On successful loss, atomically clear the same fields.
 
 ### Archive Lead
 
-On successful archive, atomically clear the same fields.
+On successful archive, preserve:
+
+```text
+next_follow_up_at
+next_action_type
+next_action_note
+```
+
+Archived Leads are excluded from operational follow-up queues and cannot execute follow-up write commands.
+
+Restoring an archived Lead preserves these stored fields. Follow-up operations become eligible again only after restore succeeds.
 
 ### Reopen Lead
 

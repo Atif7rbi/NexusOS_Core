@@ -393,7 +393,11 @@ Reopened or restored Leads become eligible again only after the existing reopen 
 
 Lead conversion continues to clear `next_follow_up_at`; Milestone C also requires it to clear `next_action_type` and `next_action_note` atomically.
 
-Losing or archiving an open Lead must clear any current follow-up state atomically under the final domain contract.
+Losing an open Lead must clear any current follow-up state atomically.
+
+Archiving preserves the current follow-up fields as historical operational state. Archived Leads are excluded from operational follow-up queues and cannot schedule, reschedule, complete, or cancel follow-ups.
+
+Restoring an archived Lead preserves that stored follow-up state. Eligibility to operate on it resumes only after the restore command completes successfully.
 
 ---
 
