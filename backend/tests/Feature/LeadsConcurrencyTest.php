@@ -203,6 +203,189 @@ final class LeadsConcurrencyTest extends TestCase
         $this->assertSame('claim', $activities[0]->payload['reason']);
     }
 
+    public function test_competing_complete_and_cancel_allow_exactly_one_follow_up_mutation(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+
+        $lead = $this->createLead($tenant, $administrator, [
+            'next_follow_up_at' => now()->addDay(),
+            'next_action_type' => 'call',
+            'next_action_note' => 'Concurrent follow-up.',
+        ]);
+
+        $results = $this->runFollowUpWorkers(
+            $lead,
+            $administrator,
+            ['complete', 'cancel'],
+        );
+
+        $successes = array_values(array_filter(
+            $results,
+            static fn (array $result): bool =>
+                $result['result']['ok'] === true,
+        ));
+
+        $conflicts = array_values(array_filter(
+            $results,
+            static fn (array $result): bool =>
+                $result['result']['ok'] === false,
+        ));
+
+        $this->assertCount(1, $successes);
+        $this->assertCount(1, $conflicts);
+        $this->assertSame(0, $successes[0]['exit_code']);
+        $this->assertSame(1, $conflicts[0]['exit_code']);
+        $this->assertSame(409, $conflicts[0]['result']['status']);
+        $this->assertSame(
+            'lead_follow_up_conflict',
+            $conflicts[0]['result']['code'],
+        );
+
+        $lead->refresh();
+
+        $this->assertNull($lead->next_follow_up_at);
+        $this->assertNull($lead->next_action_type);
+        $this->assertNull($lead->next_action_note);
+        $this->assertSame($administrator->id, $lead->updated_by);
+
+        $activities = LeadActivity::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('lead_id', $lead->id)
+            ->whereIn('type', [
+                ActivityType::FollowUpCompleted->value,
+                ActivityType::FollowUpCancelled->value,
+            ])
+            ->get();
+
+        $this->assertCount(1, $activities);
+
+        $winningOperation = $successes[0]['result']['operation'];
+        $expectedType = $winningOperation === 'complete'
+            ? ActivityType::FollowUpCompleted->value
+            : ActivityType::FollowUpCancelled->value;
+
+        $this->assertSame($expectedType, $activities[0]->type->value);
+    }
+
+    /**
+     * @param list<'complete'|'cancel'> $operations
+     * @return list<array{result: array<string, mixed>, exit_code: int}>
+     */
+    private function runFollowUpWorkers(
+        Lead $lead,
+        User $actor,
+        array $operations,
+    ): array {
+        $barrier = tempnam(
+            sys_get_temp_dir(),
+            'lead-follow-up-barrier-',
+        );
+
+        if (! is_string($barrier)) {
+            $this->fail(
+                'Unable to allocate the Lead follow-up barrier.',
+            );
+        }
+
+        unlink($barrier);
+        $this->temporaryFiles[] = $barrier;
+
+        $script = base_path(
+            'tests/Support/lead_follow_up_worker.php',
+        );
+
+        $connectionName = DB::getDefaultConnection();
+        $connection = config(
+            "database.connections.{$connectionName}",
+        );
+
+        $environment = array_filter([
+            'APP_ENV' => 'testing',
+            'DB_CONNECTION' => $connectionName,
+            'DB_HOST' => $connection['host'] ?? null,
+            'DB_PORT' => isset($connection['port'])
+                ? (string) $connection['port']
+                : null,
+            'DB_DATABASE' => $connection['database'] ?? null,
+            'DB_USERNAME' => $connection['username'] ?? null,
+            'DB_PASSWORD' => $connection['password'] ?? null,
+            'DB_SSLMODE' => $connection['sslmode'] ?? null,
+            'DB_TIMEZONE' => $connection['timezone'] ?? null,
+            'LEADS_CONCURRENCY_SCHEMA' => $this->schema,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        $workers = [];
+
+        foreach ($operations as $operation) {
+            $payload = [
+                'tenant_id' => (string) $lead->tenant_id,
+                'lead_id' => (string) $lead->id,
+                'actor_id' => $actor->id,
+                'operation' => $operation,
+                'barrier' => $barrier,
+            ];
+
+            $process = proc_open(
+                [
+                    PHP_BINARY,
+                    $script,
+                    base64_encode(json_encode(
+                        $payload,
+                        JSON_THROW_ON_ERROR,
+                    )),
+                ],
+                [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w'],
+                ],
+                $pipes,
+                null,
+                $environment,
+            );
+
+            $this->assertIsResource($process);
+            fclose($pipes[0]);
+
+            $workers[] = [
+                'process' => $process,
+                'stdout' => $pipes[1],
+                'stderr' => $pipes[2],
+            ];
+        }
+
+        touch($barrier);
+
+        $results = [];
+
+        foreach ($workers as $worker) {
+            $stdout = stream_get_contents($worker['stdout']);
+            $stderr = stream_get_contents($worker['stderr']);
+
+            fclose($worker['stdout']);
+            fclose($worker['stderr']);
+
+            $exitCode = proc_close($worker['process']);
+            $result = json_decode($stdout, true);
+
+            $this->assertIsArray(
+                $result,
+                "Lead follow-up worker did not return JSON: {$stderr}",
+            );
+
+            $results[] = [
+                'result' => $result,
+                'exit_code' => $exitCode,
+            ];
+        }
+
+        return $results;
+    }
+
     /**
      * @param list<User> $actors
      * @return list<array{result: array<string, mixed>, exit_code: int}>

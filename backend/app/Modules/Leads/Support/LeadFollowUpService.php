@@ -26,22 +26,35 @@ final class LeadFollowUpService
 
     public function schedule(string $tenantId, string $leadId, User $actor, CarbonImmutable $followUpAt, NextActionType $actionType, ?string $actionNote): Lead
     {
-        return $this->write($tenantId, $leadId, $actor, function (Lead $lead, CarbonImmutable $now) use ($followUpAt, $actionType, $actionNote): void {
-            if ($lead->next_follow_up_at !== null) {
-                throw new LeadFollowUpConflictException('A follow-up is already scheduled for this Lead.');
-            }
-
-            $this->setFollowUp(
-                $lead,
+        return $this->write(
+            $tenantId,
+            $leadId,
+            $actor,
+            function (Lead $lead, CarbonImmutable $now) use (
                 $followUpAt,
                 $actionType,
                 $actionNote,
-                $actor->id,
-                $now,
-            );
-            $this->activities->automatic($lead, ActivityType::FollowUpScheduled, [
-                'previous_follow_up_at' => null,
-                'new_follow_up_at' => $followUpAt->toISOString(),
+                $actor,
+            ): void {
+                if ($lead->next_follow_up_at !== null) {
+                    throw new LeadFollowUpConflictException(
+                        'A follow-up is already scheduled for this Lead.',
+                    );
+                }
+
+                $normalizedFollowUpAt = $followUpAt->utc();
+
+                $this->setFollowUp(
+                    $lead,
+                    $normalizedFollowUpAt,
+                    $actionType,
+                    $actionNote,
+                    $actor->id,
+                    $now,
+                );
+                $this->activities->automatic($lead, ActivityType::FollowUpScheduled, [
+                    'previous_follow_up_at' => null,
+                    'new_follow_up_at' => $normalizedFollowUpAt->toISOString(),
                 'previous_action_type' => null,
                 'new_action_type' => $actionType->value,
                 'previous_action_note' => null,
@@ -52,30 +65,50 @@ final class LeadFollowUpService
 
     public function reschedule(string $tenantId, string $leadId, User $actor, CarbonImmutable $followUpAt, NextActionType $actionType, ?string $actionNote): Lead
     {
-        return $this->write($tenantId, $leadId, $actor, function (Lead $lead, CarbonImmutable $now) use ($followUpAt, $actionType, $actionNote): void {
-            if ($lead->next_follow_up_at === null) {
-                throw new LeadFollowUpConflictException('No follow-up is scheduled for this Lead.');
-            }
-
-            $previousAt = CarbonImmutable::instance($lead->next_follow_up_at);
-            $previousType = $lead->next_action_type;
-            $previousNote = $lead->next_action_note;
-
-            if ($previousAt->equalTo($followUpAt) && $previousType === $actionType && $previousNote === $actionNote) {
-                throw new LeadFollowUpConflictException('The requested follow-up values are unchanged.');
-            }
-
-            $this->setFollowUp(
-                $lead,
+        return $this->write(
+            $tenantId,
+            $leadId,
+            $actor,
+            function (Lead $lead, CarbonImmutable $now) use (
                 $followUpAt,
                 $actionType,
                 $actionNote,
-                $actor->id,
-                $now,
-            );
-            $this->activities->automatic($lead, ActivityType::FollowUpRescheduled, [
-                'previous_follow_up_at' => $previousAt->toISOString(),
-                'new_follow_up_at' => $followUpAt->toISOString(),
+                $actor,
+            ): void {
+                if ($lead->next_follow_up_at === null) {
+                    throw new LeadFollowUpConflictException(
+                        'No follow-up is scheduled for this Lead.',
+                    );
+                }
+
+                $previousAt = CarbonImmutable::instance(
+                    $lead->next_follow_up_at,
+                )->utc();
+                $normalizedFollowUpAt = $followUpAt->utc();
+                $previousType = $lead->next_action_type;
+                $previousNote = $lead->next_action_note;
+
+                if (
+                    $previousAt->equalTo($normalizedFollowUpAt)
+                    && $previousType === $actionType
+                    && $previousNote === $actionNote
+                ) {
+                    throw new LeadFollowUpConflictException(
+                        'The requested follow-up values are unchanged.',
+                    );
+                }
+
+                $this->setFollowUp(
+                    $lead,
+                    $normalizedFollowUpAt,
+                    $actionType,
+                    $actionNote,
+                    $actor->id,
+                    $now,
+                );
+                $this->activities->automatic($lead, ActivityType::FollowUpRescheduled, [
+                    'previous_follow_up_at' => $previousAt->toISOString(),
+                    'new_follow_up_at' => $normalizedFollowUpAt->toISOString(),
                 'previous_action_type' => $previousType?->value,
                 'new_action_type' => $actionType->value,
                 'previous_action_note' => $previousNote,
@@ -96,7 +129,15 @@ final class LeadFollowUpService
 
     private function clear(string $tenantId, string $leadId, User $actor, ActivityType $type, ?string $note): Lead
     {
-        return $this->write($tenantId, $leadId, $actor, function (Lead $lead, CarbonImmutable $now) use ($type, $note): void {
+        return $this->write(
+            $tenantId,
+            $leadId,
+            $actor,
+            function (Lead $lead, CarbonImmutable $now) use (
+                $type,
+                $note,
+                $actor,
+            ): void {
             if ($lead->next_follow_up_at === null) {
                 throw new LeadFollowUpConflictException('No follow-up is scheduled for this Lead.');
             }
