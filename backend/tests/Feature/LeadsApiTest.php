@@ -806,6 +806,34 @@ final class LeadsApiTest extends ApiTestCase
         $this->assertSame($updatedAt->toISOString(), $lead->updated_at?->toISOString());
     }
 
+    public function test_generic_update_rejects_follow_up_fields(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $lead = $this->createLead($tenant, $administrator);
+
+        Sanctum::actingAs($administrator);
+
+        $this->patchJson("/api/leads/{$lead->id}", [
+            'next_follow_up_at' => '2026-08-06T09:30:00+03:00',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'validation_error')
+            ->assertJsonPath(
+                'error.message',
+                'The request contains fields that are not defined by the CRM Leads v1 API contract.',
+            );
+
+        $lead->refresh();
+
+        $this->assertNull($lead->next_follow_up_at);
+        $this->assertNull($lead->next_action_type);
+        $this->assertNull($lead->next_action_note);
+    }
+
     public function test_update_is_blocked_for_unassigned_closed_and_archived_leads(): void
     {
         $tenant = $this->createLeadTenant();

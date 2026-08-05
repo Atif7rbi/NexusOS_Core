@@ -140,6 +140,25 @@ describe("CrmLeadsPage pipeline URL state", () => {
     );
   });
 
+  it("clears archived mode when switching to pipeline", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/crm/?archived=true&page=3"
+    );
+
+    const history = vi.spyOn(window.history, "pushState");
+
+    render(<CrmLeadsPage />);
+    fireEvent.click(screen.getByText("show pipeline"));
+
+    expect(history).toHaveBeenCalledWith(
+      null,
+      "",
+      "/crm/?page=1&view=pipeline"
+    );
+  });
+
   it("preserves pipeline state when opening and closing lead details", () => {
     window.history.replaceState(
       null,

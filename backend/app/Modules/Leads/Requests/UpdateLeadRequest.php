@@ -22,7 +22,6 @@ final class UpdateLeadRequest extends LeadRequest
             'source_detail',
             'project_id',
             'unit_id',
-            'next_follow_up_at',
         ]);
         $this->normalizeRequiredPhone();
     }
@@ -48,7 +47,6 @@ final class UpdateLeadRequest extends LeadRequest
             'source_detail' => ['sometimes', 'nullable', 'string'],
             'project_id' => ['sometimes', 'nullable', 'string', 'ulid'],
             'unit_id' => ['sometimes', 'nullable', 'string', 'ulid'],
-            'next_follow_up_at' => ['sometimes', 'nullable', 'date'],
         ];
     }
 

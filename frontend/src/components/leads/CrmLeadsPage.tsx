@@ -725,6 +725,7 @@ export function CrmLeadsPage() {
             onViewChange={(nextView) =>
               updateUrl({
                 view: nextView === "pipeline" ? "pipeline" : null,
+                archived: null,
                 page: 1,
                 lead: null,
               })

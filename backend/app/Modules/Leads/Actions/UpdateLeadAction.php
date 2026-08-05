@@ -117,12 +117,6 @@ final class UpdateLeadAction
                 $attributes['email'] = $this->nullableString($data['email']);
             }
 
-            if (array_key_exists('next_follow_up_at', $data)) {
-                $attributes['next_follow_up_at'] = $data['next_follow_up_at'] === null
-                    ? null
-                    : CarbonImmutable::parse((string) $data['next_follow_up_at']);
-            }
-
             $lead->forceFill($attributes)->save();
 
             return $lead->refresh();
