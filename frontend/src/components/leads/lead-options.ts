@@ -85,6 +85,10 @@ export function activityTypeKey(type: LeadActivityType): TranslationKey {
     assignment: "assignment",
     archive: "archive",
     restore: "restore",
+    follow_up_scheduled: "followUpScheduled",
+    follow_up_rescheduled: "followUpRescheduled",
+    follow_up_completed: "followUpCompleted",
+    follow_up_cancelled: "followUpCancelled",
   };
 
   return `crm.activity.${suffix[type]}` as TranslationKey;

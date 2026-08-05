@@ -1,6 +1,16 @@
 "use client";
 
-import { Archive, ArrowRightLeft, MessageSquareText, RotateCcw, Route } from "lucide-react";
+import {
+  Archive,
+  ArrowRightLeft,
+  CalendarClock,
+  CalendarPlus,
+  CalendarX,
+  CircleCheck,
+  MessageSquareText,
+  RotateCcw,
+  Route,
+} from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import {
@@ -37,6 +47,10 @@ const activityIcons: Record<LeadActivityType, typeof MessageSquareText> = {
   assignment: ArrowRightLeft,
   archive: Archive,
   restore: RotateCcw,
+  follow_up_scheduled: CalendarPlus,
+  follow_up_rescheduled: CalendarClock,
+  follow_up_completed: CircleCheck,
+  follow_up_cancelled: CalendarX,
 };
 
 export function LeadActivityTimeline({

@@ -13,15 +13,14 @@ final class LeadResponseAssembler
 {
     public function __construct(
         private readonly LeadAuthorization $authorization,
+        private readonly LeadFollowUpStateResolver $followUpStates,
     ) {
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function lead(Lead $lead, User $actor): array
     {
         $lead->loadMissing([
+            'tenant:id,timezone',
             'project:id,name,archived_at',
             'unit:id,project_id,unit_number,status,archived_at',
             'assignee:id,name,role,status',
@@ -30,8 +29,8 @@ final class LeadResponseAssembler
         ]);
 
         $assignee = $lead->assignee;
-        $assigneeMembership = $assignee?->tenantMemberships
-            ->firstWhere('tenant_id', $lead->tenant_id);
+        $assigneeMembership = $assignee?->tenantMemberships->firstWhere('tenant_id', $lead->tenant_id);
+        $timezone = (string) ($lead->tenant?->timezone ?: 'Asia/Riyadh');
 
         return [
             'id' => (string) $lead->id,
@@ -44,23 +43,24 @@ final class LeadResponseAssembler
             'project_id' => $lead->project_id,
             'unit_id' => $lead->unit_id,
             'stage' => $lead->stage->value,
-            'assigned_to' => $assignee === null
-                ? null
-                : [
-                    'id' => (int) $assignee->id,
-                    'name' => $assignee->name,
-                    'role' => $assignee->role,
-                    'account_status' => $assignee->status,
-                    'membership_status' => $assigneeMembership?->status,
-                    'is_eligible' => $assignee->status === User::STATUS_ACTIVE
-                        && $assigneeMembership?->status === TenantUser::STATUS_ACTIVE
-                        && in_array($assignee->role, [
-                            User::ROLE_ADMINISTRATOR,
-                            User::ROLE_SALES,
-                            User::ROLE_EMPLOYEE,
-                        ], true),
-                ],
+            'assigned_to' => $assignee === null ? null : [
+                'id' => (int) $assignee->id,
+                'name' => $assignee->name,
+                'role' => $assignee->role,
+                'account_status' => $assignee->status,
+                'membership_status' => $assigneeMembership?->status,
+                'is_eligible' => $assignee->status === User::STATUS_ACTIVE
+                    && $assigneeMembership?->status === TenantUser::STATUS_ACTIVE
+                    && in_array($assignee->role, [
+                        User::ROLE_ADMINISTRATOR,
+                        User::ROLE_SALES,
+                        User::ROLE_EMPLOYEE,
+                    ], true),
+            ],
             'next_follow_up_at' => $lead->next_follow_up_at?->toISOString(),
+            'next_action_type' => $lead->next_action_type?->value,
+            'next_action_note' => $lead->next_action_note,
+            'follow_up_state' => $this->followUpStates->resolve($lead, $timezone),
             'lost_reason' => $lead->lost_reason?->value,
             'lost_reason_detail' => $lead->lost_reason_detail,
             'lost_at' => $lead->lost_at?->toISOString(),
@@ -79,37 +79,28 @@ final class LeadResponseAssembler
             'updated_by' => $lead->updated_by,
             'created_at' => $lead->created_at?->toISOString(),
             'updated_at' => $lead->updated_at?->toISOString(),
-            'project' => $lead->project === null
-                ? null
-                : [
-                    'id' => (string) $lead->project->id,
-                    'name' => $lead->project->name,
-                    'archived_at' => $lead->project->archived_at?->toISOString(),
-                ],
-            'unit' => $lead->unit === null
-                ? null
-                : [
-                    'id' => (string) $lead->unit->id,
-                    'project_id' => (string) $lead->unit->project_id,
-                    'unit_number' => $lead->unit->unit_number,
-                    'status' => $lead->unit->status->value,
-                    'archived_at' => $lead->unit->archived_at?->toISOString(),
-                ],
-            'customer' => $lead->customer === null
-                ? null
-                : [
-                    'id' => (string) $lead->customer->id,
-                    'name' => $lead->customer->name,
-                    'status' => $lead->customer->status->value,
-                    'archived_at' => $lead->customer->archived_at?->toISOString(),
-                ],
+            'project' => $lead->project === null ? null : [
+                'id' => (string) $lead->project->id,
+                'name' => $lead->project->name,
+                'archived_at' => $lead->project->archived_at?->toISOString(),
+            ],
+            'unit' => $lead->unit === null ? null : [
+                'id' => (string) $lead->unit->id,
+                'project_id' => (string) $lead->unit->project_id,
+                'unit_number' => $lead->unit->unit_number,
+                'status' => $lead->unit->status->value,
+                'archived_at' => $lead->unit->archived_at?->toISOString(),
+            ],
+            'customer' => $lead->customer === null ? null : [
+                'id' => (string) $lead->customer->id,
+                'name' => $lead->customer->name,
+                'status' => $lead->customer->status->value,
+                'archived_at' => $lead->customer->archived_at?->toISOString(),
+            ],
             'allowed_actions' => $this->authorization->allowedActions($lead, $actor),
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function activity(LeadActivity $activity): array
     {
         $activity->loadMissing('creator:id,name');
@@ -121,12 +112,10 @@ final class LeadResponseAssembler
             'body' => $activity->body,
             'payload' => $activity->payload,
             'occurred_at' => $activity->occurred_at?->toISOString(),
-            'created_by' => $activity->creator === null
-                ? null
-                : [
-                    'id' => (int) $activity->creator->id,
-                    'name' => $activity->creator->name,
-                ],
+            'created_by' => $activity->creator === null ? null : [
+                'id' => (int) $activity->creator->id,
+                'name' => $activity->creator->name,
+            ],
             'created_at' => $activity->created_at?->toISOString(),
         ];
     }

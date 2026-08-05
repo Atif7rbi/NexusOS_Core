@@ -49,15 +49,31 @@ vi.mock("@/services/leads", async (importOriginal) => {
   return { ...actual, ...services };
 });
 vi.mock("@/components/leads/LeadsIndexView", () => ({
-  LeadsIndexView: ({ onOpen, onCreate, onQueryChange }: {
+  LeadsIndexView: ({
+    onOpen,
+    onCreate,
+    onQueryChange,
+    onRefresh,
+    renderedAt,
+  }: {
     onOpen: (lead: ReturnType<typeof leadFixture>) => void;
     onCreate: () => void;
     onQueryChange: (changes: Record<string, unknown>) => void;
+    onRefresh: () => void;
+    renderedAt: number;
   }) => (
     <div data-testid="list-view">
+      <span data-testid="rendered-at">{renderedAt}</span>
       <button onClick={() => onOpen(leadFixture())}>open lead</button>
       <button onClick={onCreate}>create lead</button>
-      <button onClick={() => onQueryChange({ stage: "qualified", page: 1 })}>filter</button>
+      <button
+        onClick={() =>
+          onQueryChange({ stage: "qualified", page: 1 })
+        }
+      >
+        filter
+      </button>
+      <button onClick={onRefresh}>refresh leads</button>
     </div>
   ),
 }));
@@ -197,6 +213,32 @@ describe("CrmLeadsPage routing and workflows", () => {
     fireEvent.click(screen.getByText("claim details"));
     fireEvent.click(screen.getByText("confirm claim"));
     await waitFor(() => expect(services.claimLead).toHaveBeenCalledWith("token", leadFixture().id));
+  });
+
+  it("updates renderedAt when the list is refreshed", async () => {
+    const dateSpy = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(1000);
+
+    try {
+      render(<CrmLeadsPage />);
+
+      expect(
+        (await screen.findByTestId("rendered-at")).textContent
+      ).toBe("1000");
+
+      dateSpy.mockReturnValue(2000);
+
+      fireEvent.click(screen.getByText("refresh leads"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("rendered-at").textContent
+        ).toBe("2000");
+      });
+    } finally {
+      dateSpy.mockRestore();
+    }
   });
 
   it("contains no dynamic-route or conversion UI contract", () => {

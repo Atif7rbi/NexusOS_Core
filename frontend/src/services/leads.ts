@@ -6,6 +6,7 @@ import {
 } from "@/lib/http";
 import { ApiRequestError, parseApiError } from "@/lib/api-error";
 import type {
+  CloseLeadFollowUpPayload,
   ConvertLeadPayload,
   CreateLeadPayload,
   Lead,
@@ -20,6 +21,7 @@ import type {
   LeadsIndexResponse,
   OpenLeadStage,
   UpdateLeadPayload,
+  WriteLeadFollowUpPayload,
 } from "@/types/lead";
 
 export class LeadDuplicateError extends ApiRequestError {
@@ -57,8 +59,6 @@ export async function convertLead(
   );
 
   if (!response.ok) {
-    // For the conflict case we need the full body, so we parse it ourselves
-    // before delegating to parseApiError for other errors.
     if (response.status === 409) {
       let body: Record<string, unknown>;
       try {
@@ -74,14 +74,12 @@ export async function convertLead(
           conflicting
         );
       }
-      // For other 409s, re-construct a Response to feed parseApiError
-      const err = new ApiRequestError(
+      throw new ApiRequestError(
         (errorObj?.message as string) ?? "تعذر إكمال العملية.",
         {},
         409,
         (errorObj?.code as string) ?? null
       );
-      throw err;
     }
     throw await parseApiError(response);
   }
@@ -225,6 +223,38 @@ export async function restoreLead(
   return mutateLead(token, leadId, "/restore");
 }
 
+export async function scheduleLeadFollowUp(
+  token: string,
+  leadId: string,
+  payload: WriteLeadFollowUpPayload
+): Promise<Lead> {
+  return mutateLeadFollowUp(token, leadId, "POST", "", payload);
+}
+
+export async function rescheduleLeadFollowUp(
+  token: string,
+  leadId: string,
+  payload: WriteLeadFollowUpPayload
+): Promise<Lead> {
+  return mutateLeadFollowUp(token, leadId, "PATCH", "", payload);
+}
+
+export async function completeLeadFollowUp(
+  token: string,
+  leadId: string,
+  payload: CloseLeadFollowUpPayload = {}
+): Promise<Lead> {
+  return mutateLeadFollowUp(token, leadId, "POST", "/complete", payload);
+}
+
+export async function cancelLeadFollowUp(
+  token: string,
+  leadId: string,
+  payload: CloseLeadFollowUpPayload = {}
+): Promise<Lead> {
+  return mutateLeadFollowUp(token, leadId, "POST", "/cancel", payload);
+}
+
 export async function fetchLeadActivities(
   token: string,
   leadId: string,
@@ -265,6 +295,25 @@ async function mutateLead(
       token,
       method: "PATCH",
       ...(body === undefined ? {} : { body }),
+    }
+  );
+
+  return response.data.lead;
+}
+
+async function mutateLeadFollowUp(
+  token: string,
+  leadId: string,
+  method: "POST" | "PATCH",
+  suffix: "" | "/complete" | "/cancel",
+  body: WriteLeadFollowUpPayload | CloseLeadFollowUpPayload
+): Promise<Lead> {
+  const response = await requestJson<LeadResponse>(
+    `/leads/${leadId}/follow-up${suffix}`,
+    {
+      token,
+      method,
+      body,
     }
   );
 

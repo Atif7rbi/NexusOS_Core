@@ -15,6 +15,7 @@ use App\Modules\Leads\Exceptions\LeadClaimConflictException;
 use App\Modules\Leads\Exceptions\LeadConversionCustomerArchivedException;
 use App\Modules\Leads\Exceptions\LeadConversionCustomerChangedException;
 use App\Modules\Leads\Exceptions\LeadConversionNewCustomerConflictException;
+use App\Modules\Leads\Exceptions\LeadFollowUpConflictException;
 use App\Modules\Leads\Exceptions\LeadIsArchivedException;
 use App\Modules\Leads\Exceptions\LeadNotArchivedException;
 use App\Modules\Leads\Exceptions\LeadNotFoundException;
@@ -51,6 +52,7 @@ final class LeadExceptionResponder
             $exception instanceof LeadConversionCustomerArchivedException => [409, 'lead_conversion_customer_archived'],
             $exception instanceof LeadConversionCustomerChangedException => [409, 'lead_conversion_customer_changed'],
             $exception instanceof LeadConversionNewCustomerConflictException => [409, 'lead_conversion_new_customer_conflict'],
+            $exception instanceof LeadFollowUpConflictException => [409, 'lead_follow_up_conflict'],
             $exception instanceof LeadClaimConflictException => [409, 'lead_claim_conflict'],
             $exception instanceof LeadPhoneDuplicateDetectedException => [409, 'lead_phone_duplicate_detected'],
             $exception instanceof UserHasOpenAssignedLeadsException => [409, 'user_has_open_assigned_leads'],
@@ -67,10 +69,7 @@ final class LeadExceptionResponder
             return null;
         }
 
-        $error = [
-            'code' => $code,
-            'message' => $exception->getMessage(),
-        ];
+        $error = ['code' => $code, 'message' => $exception->getMessage()];
 
         if ($exception instanceof LeadConversionNewCustomerConflictException) {
             $error['conflicting_customer'] = [
@@ -86,23 +85,16 @@ final class LeadExceptionResponder
                     'id' => (string) $lead->id,
                     'name' => $lead->name,
                     'stage' => $lead->stage->value,
-                    'assigned_to' => $lead->assignee === null
-                        ? null
-                        : [
-                            'id' => (int) $lead->assignee->id,
-                            'name' => $lead->assignee->name,
-                        ],
+                    'assigned_to' => $lead->assignee === null ? null : [
+                        'id' => (int) $lead->assignee->id,
+                        'name' => $lead->assignee->name,
+                    ],
                     'archived' => $lead->archived_at !== null,
                     'updated_at' => $lead->updated_at?->toISOString(),
-                ])
-                ->values()
-                ->all();
+                ])->values()->all();
         }
 
-        $response = [
-            'message' => $exception->getMessage(),
-            'error' => $error,
-        ];
+        $response = ['message' => $exception->getMessage(), 'error' => $error];
 
         if ($exception instanceof LeadValidationException && $exception->errors !== []) {
             $response['errors'] = $exception->errors;

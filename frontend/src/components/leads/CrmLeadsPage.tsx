@@ -18,6 +18,11 @@ import {
 import { LeadDetailsView } from "@/components/leads/LeadDetailsView";
 import { LeadDuplicateDialog } from "@/components/leads/LeadDuplicateDialog";
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
+import {
+  LeadFollowUpDialog,
+  type LeadFollowUpDialogAction,
+  type LeadFollowUpDialogPayload,
+} from "@/components/leads/LeadFollowUpDialog";
 import { LeadsIndexView } from "@/components/leads/LeadsIndexView";
 import {
   leadSources,
@@ -32,7 +37,9 @@ import {
   addLeadNote,
   archiveLead,
   assignLead,
+  cancelLeadFollowUp,
   claimLead,
+  completeLeadFollowUp,
   convertLead,
   createLead,
   fetchLead,
@@ -43,7 +50,9 @@ import {
   moveLeadStage,
   moveLeadToLost,
   reopenLead,
+  rescheduleLeadFollowUp,
   restoreLead,
+  scheduleLeadFollowUp,
   updateLead,
 } from "@/services/leads";
 import { fetchProjects } from "@/services/projects";
@@ -54,6 +63,7 @@ import type {
   LeadActivity,
   LeadConversionConflict,
   LeadDuplicateMatch,
+  FollowUpBucket,
   LeadSource,
   LeadStage,
   LeadsIndexQuery,
@@ -64,6 +74,14 @@ import type { Project } from "@/types/project";
 import type { TenantUser } from "@/types/tenant-user";
 
 const crmRoles = ["administrator", "sales", "employee"];
+
+const followUpBuckets: FollowUpBucket[] = [
+  "overdue",
+  "today",
+  "tomorrow",
+  "this_week",
+  "unscheduled",
+];
 
 function positiveInteger(value: string | null, fallback: number): number {
   const parsed = Number(value);
@@ -76,16 +94,20 @@ export function CrmLeadsPage() {
   const { t } = useTranslation();
   const isAdministrator = user?.role === "administrator";
   const selectedLeadId = searchParams.get("lead");
+  const viewMode = searchParams.get("view") === "pipeline" ? "pipeline" : "list";
   const archivedMode = isAdministrator && searchParams.get("archived") === "true";
 
   const query = useMemo<LeadsIndexQuery>(() => {
     const stage = searchParams.get("stage");
     const source = searchParams.get("source");
     const assignedTo = searchParams.get("assigned_to");
+    const followUpBucket = searchParams.get("follow_up_bucket");
+    const followUpState = searchParams.get("follow_up_state");
+    const lifecycle = searchParams.get("lifecycle");
 
     return {
       page: positiveInteger(searchParams.get("page"), 1),
-      per_page: 20,
+      per_page: viewMode === "pipeline" ? 100 : 20,
       search: searchParams.get("search") ?? "",
       stage: leadStages.includes(stage as LeadStage) ? (stage as LeadStage) : "",
       source: leadSources.includes(source as LeadSource)
@@ -93,17 +115,39 @@ export function CrmLeadsPage() {
         : "",
       assigned_to: assignedTo ? positiveInteger(assignedTo, 0) || undefined : undefined,
       project_id: searchParams.get("project_id") ?? "",
+      follow_up_bucket: followUpBuckets.includes(
+        followUpBucket as FollowUpBucket
+      )
+        ? (followUpBucket as FollowUpBucket)
+        : "",
+      follow_up_state: [
+        "overdue",
+        "today",
+        "tomorrow",
+        "this_week",
+        "scheduled_later",
+        "unscheduled",
+      ].includes(followUpState ?? "")
+        ? (followUpState as LeadsIndexQuery["follow_up_state"])
+        : "",
+      lifecycle: ["open", "won", "lost"].includes(lifecycle ?? "")
+        ? (lifecycle as LeadsIndexQuery["lifecycle"])
+        : "",
+      date_from: searchParams.get("date_from") ?? "",
+      date_to: searchParams.get("date_to") ?? "",
       overdue: searchParams.get("overdue") === "true",
       archived: archivedMode,
     };
-  }, [archivedMode, searchParams]);
+  }, [archivedMode, searchParams, viewMode]);
 
   const [searchInput, setSearchInput] = useState(query.search ?? "");
   const [index, setIndex] = useState<LeadsIndexResponse["data"] | null>(null);
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [renderedAt] = useState(() => Date.now());
+  const [renderedAt, setRenderedAt] = useState(
+    () => Date.now()
+  );
   const indexRequest = useRef(0);
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -128,6 +172,8 @@ export function CrmLeadsPage() {
   const [conversionSuccessName, setConversionSuccessName] = useState<string | null>(null);
 
   const [dialogAction, setDialogAction] = useState<LeadDialogAction | null>(null);
+  const [followUpDialogAction, setFollowUpDialogAction] =
+    useState<LeadFollowUpDialogAction | null>(null);
   const [actionProcessing, setActionProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState(false);
@@ -331,6 +377,7 @@ export function CrmLeadsPage() {
 
   const closeLead = (): void => {
     setDialogAction(null);
+    setFollowUpDialogAction(null);
     setFormOpen(false);
     setConversionConflict(null);
     setConversionSuccessName(null);
@@ -338,6 +385,7 @@ export function CrmLeadsPage() {
   };
 
   const refresh = (): void => {
+    setRenderedAt(Date.now());
     setRefreshVersion((current) => current + 1);
   };
 
@@ -490,6 +538,62 @@ export function CrmLeadsPage() {
     }
   };
 
+  const executeFollowUpAction = async (
+    payload: LeadFollowUpDialogPayload
+  ): Promise<void> => {
+    if (!token || !lead) {
+      return;
+    }
+
+    setActionProcessing(true);
+    setActionError(null);
+
+    try {
+      const updated = await (async (): Promise<Lead> => {
+        switch (payload.action) {
+          case "schedule_follow_up":
+            return scheduleLeadFollowUp(token, lead.id, {
+              next_follow_up_at: payload.nextFollowUpAt,
+              next_action_type: payload.nextActionType,
+              next_action_note: payload.nextActionNote,
+            });
+
+          case "reschedule_follow_up":
+            return rescheduleLeadFollowUp(token, lead.id, {
+              next_follow_up_at: payload.nextFollowUpAt,
+              next_action_type: payload.nextActionType,
+              next_action_note: payload.nextActionNote,
+            });
+
+          case "complete_follow_up":
+            return completeLeadFollowUp(token, lead.id, {
+              note: payload.note,
+            });
+
+          case "cancel_follow_up":
+            return cancelLeadFollowUp(token, lead.id, {
+              note: payload.note,
+            });
+        }
+      })();
+
+      setFollowUpDialogAction(null);
+      setLead(updated);
+      setSuccessMessage(t("crm.success.followUp"));
+      setConversionSuccessName(null);
+      void loadActivities(updated.id, archivedMode);
+      refresh();
+    } catch (caughtError) {
+      setActionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("crm.genericError")
+      );
+    } finally {
+      setActionProcessing(false);
+    }
+  };
+
   const submitNote = async (body: string): Promise<void> => {
     if (!token || !lead) {
       return;
@@ -515,6 +619,11 @@ export function CrmLeadsPage() {
       "source",
       "assigned_to",
       "project_id",
+      "follow_up_bucket",
+      "follow_up_state",
+      "lifecycle",
+      "date_from",
+      "date_to",
       "overdue",
       "archived",
       "page",
@@ -533,6 +642,11 @@ export function CrmLeadsPage() {
       query.source ||
       query.assigned_to ||
       query.project_id ||
+      query.follow_up_bucket ||
+      query.follow_up_state ||
+      query.lifecycle ||
+      query.date_from ||
+      query.date_to ||
       query.overdue ||
       query.archived
   );
@@ -586,11 +700,16 @@ export function CrmLeadsPage() {
               }
               setDialogAction(action);
             }}
+            onFollowUpAction={(action) => {
+              setActionError(null);
+              setFollowUpDialogAction(action);
+            }}
             onAddNote={submitNote}
           />
         ) : (
           <LeadsIndexView
             query={query}
+            viewMode={viewMode}
             index={index}
             projects={projects}
             assignees={assignees}
@@ -603,6 +722,14 @@ export function CrmLeadsPage() {
             hasFilters={hasFilters}
             onSearchInput={setSearchInput}
             onQueryChange={updateUrl}
+            onViewChange={(nextView) =>
+              updateUrl({
+                view: nextView === "pipeline" ? "pipeline" : null,
+                archived: null,
+                page: 1,
+                lead: null,
+              })
+            }
             onCreate={() => {
               setEditingLead(null);
               setFormOpen(true);
@@ -631,6 +758,23 @@ export function CrmLeadsPage() {
             }
           }}
           onSubmit={submitForm}
+        />
+      ) : null}
+
+      {lead && followUpDialogAction ? (
+        <LeadFollowUpDialog
+          key={`${lead.id}:${followUpDialogAction}`}
+          action={followUpDialogAction}
+          lead={lead}
+          isProcessing={actionProcessing}
+          error={actionError}
+          onClose={() => {
+            if (!actionProcessing) {
+              setFollowUpDialogAction(null);
+              setActionError(null);
+            }
+          }}
+          onConfirm={(payload) => void executeFollowUpAction(payload)}
         />
       ) : null}
 

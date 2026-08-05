@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarClock,
+  CircleCheckBig,
   Mail,
   MapPin,
   Pencil,
@@ -15,10 +16,12 @@ import {
   UserCheck,
   UserRoundCog,
   UserX,
+  XCircle,
 } from "lucide-react";
 
 import { LeadActivityTimeline } from "@/components/leads/LeadActivityTimeline";
 import type { LeadDialogAction } from "@/components/leads/LeadActionDialogs";
+import type { LeadFollowUpDialogAction } from "@/components/leads/LeadFollowUpDialog";
 import { LeadStageBadge } from "@/components/leads/LeadStageBadge";
 import {
   archiveReasonKey,
@@ -49,6 +52,7 @@ type LeadDetailsViewProps = {
   onRetryActivities: () => void;
   onEdit: () => void;
   onAction: (action: LeadDialogAction) => void;
+  onFollowUpAction: (action: LeadFollowUpDialogAction) => void;
   onAddNote: (body: string) => Promise<void>;
 };
 
@@ -66,6 +70,7 @@ export function LeadDetailsView({
   onRetryActivities,
   onEdit,
   onAction,
+  onFollowUpAction,
   onAddNote,
 }: LeadDetailsViewProps) {
   const { t, isArabic } = useTranslation();
@@ -125,6 +130,53 @@ export function LeadDetailsView({
               {t("crm.actions.edit")}
             </Button>
           ) : null}
+          {actions.can_schedule_follow_up ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              leadingIcon={<CalendarClock size={15} />}
+              onClick={() => onFollowUpAction("schedule_follow_up")}
+            >
+              {t("crm.followUp.schedule")}
+            </Button>
+          ) : null}
+
+          {actions.can_reschedule_follow_up ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              leadingIcon={<RotateCcw size={15} />}
+              onClick={() => onFollowUpAction("reschedule_follow_up")}
+            >
+              {t("crm.followUp.reschedule")}
+            </Button>
+          ) : null}
+
+          {actions.can_complete_follow_up ? (
+            <Button
+              type="button"
+              size="sm"
+              leadingIcon={<CircleCheckBig size={15} />}
+              onClick={() => onFollowUpAction("complete_follow_up")}
+            >
+              {t("crm.followUp.complete")}
+            </Button>
+          ) : null}
+
+          {actions.can_cancel_follow_up ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              leadingIcon={<XCircle size={15} />}
+              onClick={() => onFollowUpAction("cancel_follow_up")}
+            >
+              {t("crm.followUp.cancel")}
+            </Button>
+          ) : null}
+
           {actions.can_claim ? (
             <Button type="button" size="sm" leadingIcon={<UserCheck size={15} />} onClick={() => onAction("claim")}>
               {t("crm.actions.claim")}

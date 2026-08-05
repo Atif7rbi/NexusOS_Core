@@ -12,20 +12,13 @@ use App\Modules\Leads\Models\Lead;
 
 final class LeadAuthorization
 {
-    /**
-     * @var list<string>
-     */
     private const CRM_ROLES = [
         User::ROLE_ADMINISTRATOR,
         User::ROLE_SALES,
         User::ROLE_EMPLOYEE,
     ];
 
-    public function assertActor(
-        User $actor,
-        string $tenantId,
-        bool $lockMembership = false,
-    ): void
+    public function assertActor(User $actor, string $tenantId, bool $lockMembership = false): void
     {
         $membershipQuery = TenantUser::query()
             ->where('tenant_id', $tenantId)
@@ -85,20 +78,15 @@ final class LeadAuthorization
         return $actor->role === User::ROLE_ADMINISTRATOR;
     }
 
-    /**
-     * @return array<string, bool>
-     */
     public function allowedActions(Lead $lead, User $actor): array
     {
         $administrator = $this->isAdministrator($actor);
         $archived = $lead->isArchived();
         $open = $lead->stage instanceof LeadStage && $lead->stage->isOpen();
-        $assignedToActor = $lead->assigned_to !== null
-            && (int) $lead->assigned_to === $actor->id;
+        $assignedToActor = $lead->assigned_to !== null && (int) $lead->assigned_to === $actor->id;
         $unassigned = $lead->assigned_to === null;
-        $canOperate = ! $archived
-            && $open
-            && ($administrator || $assignedToActor);
+        $canOperate = ! $archived && $open && ($administrator || $assignedToActor);
+        $hasFollowUp = $lead->next_follow_up_at !== null;
 
         return [
             'can_edit' => $canOperate,
@@ -107,17 +95,15 @@ final class LeadAuthorization
             'can_move_stage' => $canOperate,
             'can_move_backward' => $administrator && ! $archived && $open,
             'can_move_to_lost' => $canOperate,
-            'can_reopen' => $administrator
-                && ! $archived
-                && $lead->stage === LeadStage::Lost,
+            'can_reopen' => $administrator && ! $archived && $lead->stage === LeadStage::Lost,
             'can_add_note' => $canOperate,
-            'can_archive' => $administrator
-                && ! $archived
-                && $lead->stage !== LeadStage::Won,
+            'can_archive' => $administrator && ! $archived && $lead->stage !== LeadStage::Won,
             'can_restore' => $administrator && $archived,
-            'can_convert' => ! $archived
-                && $open
-                && ($administrator || $assignedToActor),
+            'can_convert' => $canOperate,
+            'can_schedule_follow_up' => $canOperate && ! $hasFollowUp,
+            'can_reschedule_follow_up' => $canOperate && $hasFollowUp,
+            'can_complete_follow_up' => $canOperate && $hasFollowUp,
+            'can_cancel_follow_up' => $canOperate && $hasFollowUp,
         ];
     }
 }

@@ -10,6 +10,7 @@ const dateFormatter = new Intl.DateTimeFormat(
 const dateTimeFormatter = new Intl.DateTimeFormat(
   "en-GB-u-ca-gregory-nu-latn",
   {
+    timeZone: "Asia/Riyadh",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

@@ -2,7 +2,9 @@ import {
   Archive,
   CalendarClock,
   CircleCheckBig,
+  Columns3,
   Filter,
+  List,
   Plus,
   RefreshCw,
   Search,
@@ -10,6 +12,8 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { FollowUpQueueTabs } from "@/components/leads/FollowUpQueueTabs";
+import { LeadsPipelineView } from "@/components/leads/LeadsPipelineView";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 import {
   leadSources,
@@ -46,6 +50,7 @@ type QueryChange = Record<
 
 type LeadsIndexViewProps = {
   query: LeadsIndexQuery;
+  viewMode: "list" | "pipeline";
   index: LeadsIndexResponse["data"] | null;
   projects: Project[];
   assignees: TenantUser[];
@@ -58,6 +63,7 @@ type LeadsIndexViewProps = {
   hasFilters: boolean;
   onSearchInput: (value: string) => void;
   onQueryChange: (changes: QueryChange) => void;
+  onViewChange: (view: "list" | "pipeline") => void;
   onCreate: () => void;
   onRefresh: () => void;
   onReset: () => void;
@@ -66,6 +72,7 @@ type LeadsIndexViewProps = {
 
 export function LeadsIndexView({
   query,
+  viewMode,
   index,
   projects,
   assignees,
@@ -78,6 +85,7 @@ export function LeadsIndexView({
   hasFilters,
   onSearchInput,
   onQueryChange,
+  onViewChange,
   onCreate,
   onRefresh,
   onReset,
@@ -115,33 +123,88 @@ export function LeadsIndexView({
       ) : null}
 
       {summary ? (
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard
-            title={t("crm.cards.active")}
-            value={summary.active}
+            title={t("crm.cards.openLeads")}
+            value={summary.open_leads}
             icon={UsersRound}
             tone="gold"
           />
           <SummaryCard
-            title={t("crm.cards.unassigned")}
-            value={summary.unassigned}
-            icon={UserRoundCheck}
-            tone="info"
-          />
-          <SummaryCard
-            title={t("crm.cards.overdue")}
-            value={summary.overdue}
+            title={t("crm.cards.overdueFollowUps")}
+            value={summary.overdue_follow_ups}
             icon={CalendarClock}
             tone="gold"
           />
           <SummaryCard
-            title={t("crm.cards.convertedThisMonth")}
-            value={summary.converted_this_month}
+            title={t("crm.cards.todayFollowUps")}
+            value={summary.today_follow_ups}
+            icon={CalendarClock}
+            tone="info"
+          />
+          <SummaryCard
+            title={t("crm.cards.unassignedLeads")}
+            value={summary.unassigned_leads}
+            icon={UserRoundCheck}
+            tone="info"
+          />
+          <SummaryCard
+            title={t("crm.cards.monthlyConversions")}
+            value={summary.monthly_conversions}
             icon={CircleCheckBig}
             tone="success"
           />
+          <SummaryCard
+            title={t("crm.cards.lostInPeriod")}
+            value={summary.lost_leads_in_selected_period}
+            icon={UsersRound}
+            tone="gold"
+          />
         </section>
       ) : null}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={viewMode === "list" ? "primary" : "secondary"}
+          leadingIcon={<List size={16} />}
+          onClick={() => onViewChange("list")}
+        >
+          {t("crm.view.list")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={viewMode === "pipeline" ? "primary" : "secondary"}
+          leadingIcon={<Columns3 size={16} />}
+          onClick={() => onViewChange("pipeline")}
+        >
+          {t("crm.view.pipeline")}
+        </Button>
+      </div>
+
+      <FollowUpQueueTabs
+        activeBucket={query.follow_up_bucket ?? ""}
+        title={t("crm.queue.title")}
+        allLabel={t("crm.queue.all")}
+        items={[
+          { value: "overdue", label: t("crm.queue.overdue") },
+          { value: "today", label: t("crm.queue.today") },
+          { value: "tomorrow", label: t("crm.queue.tomorrow") },
+          { value: "this_week", label: t("crm.queue.thisWeek") },
+          { value: "unscheduled", label: t("crm.queue.unscheduled") },
+        ]}
+        onChange={(followUpBucket) =>
+          onQueryChange({
+            follow_up_bucket: followUpBucket,
+            follow_up_state: null,
+            overdue: null,
+            archived: null,
+            page: 1,
+          })
+        }
+      />
 
       <CrudSection>
         <FilterBar
@@ -225,16 +288,62 @@ export function LeadsIndexView({
               ]}
             />
 
-            <label className="flex h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={Boolean(query.overdue)}
-                onChange={(event) =>
-                  onQueryChange({ overdue: event.target.checked, page: 1 })
-                }
-              />
-              {t("crm.filters.overdue")}
-            </label>
+            <FilterSelect
+              label={t("crm.filters.lifecycle")}
+              value={query.lifecycle ?? ""}
+              onChange={(value) =>
+                onQueryChange({ lifecycle: value, page: 1 })
+              }
+              options={[
+                { value: "", label: t("crm.filters.allLifecycle") },
+                { value: "open", label: t("crm.lifecycle.open") },
+                { value: "won", label: t("crm.lifecycle.won") },
+                { value: "lost", label: t("crm.lifecycle.lost") },
+              ]}
+            />
+
+            <FilterSelect
+              label={t("crm.filters.followUpState")}
+              value={query.follow_up_state ?? ""}
+              onChange={(value) =>
+                onQueryChange({
+                  follow_up_state: value,
+                  follow_up_bucket: null,
+                  overdue: null,
+                  archived: null,
+                  page: 1,
+                })
+              }
+              options={[
+                { value: "", label: t("crm.filters.allFollowUpStates") },
+                { value: "overdue", label: t("crm.queue.overdue") },
+                { value: "today", label: t("crm.queue.today") },
+                { value: "tomorrow", label: t("crm.queue.tomorrow") },
+                { value: "this_week", label: t("crm.queue.thisWeek") },
+                {
+                  value: "scheduled_later",
+                  label: t("crm.filters.scheduledLater"),
+                },
+                { value: "unscheduled", label: t("crm.queue.unscheduled") },
+              ]}
+            />
+
+            <FilterDate
+              label={t("crm.filters.dateFrom")}
+              value={query.date_from ?? ""}
+              onChange={(value) =>
+                onQueryChange({ date_from: value, page: 1 })
+              }
+            />
+
+            <FilterDate
+              label={t("crm.filters.dateTo")}
+              value={query.date_to ?? ""}
+              min={query.date_from || undefined}
+              onChange={(value) =>
+                onQueryChange({ date_to: value, page: 1 })
+              }
+            />
 
             {isAdministrator ? (
               <label className="flex h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-secondary)]">
@@ -244,6 +353,9 @@ export function LeadsIndexView({
                   onChange={(event) =>
                     onQueryChange({
                       archived: event.target.checked,
+                      follow_up_bucket: null,
+                      follow_up_state: null,
+                      overdue: null,
                       page: 1,
                       lead: null,
                     })
@@ -315,6 +427,8 @@ export function LeadsIndexView({
               ) : undefined
             }
           />
+        ) : viewMode === "pipeline" ? (
+          <LeadsPipelineView leads={leads} onOpen={onOpen} />
         ) : (
           <LeadsTable leads={leads} now={renderedAt} onOpen={onOpen} />
         )}
@@ -340,6 +454,32 @@ export function LeadsIndexView({
         ) : null}
       </CrudSection>
     </>
+  );
+}
+
+function FilterDate({
+  label,
+  value,
+  min,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  min?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="sr-only">{label}</span>
+      <input
+        type="date"
+        aria-label={label}
+        value={value}
+        min={min}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-gold)]"
+      />
+    </label>
   );
 }
 

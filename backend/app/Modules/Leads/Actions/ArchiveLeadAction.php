@@ -61,6 +61,7 @@ final class ArchiveLeadAction
             }
 
             $now = CarbonImmutable::now();
+
             $lead->forceFill([
                 'archived_at' => $now,
                 'archived_by' => $actor->id,

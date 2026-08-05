@@ -12,6 +12,10 @@ export const noLeadActions: LeadAllowedActions = {
   can_archive: false,
   can_restore: false,
   can_convert: false,
+  can_schedule_follow_up: false,
+  can_reschedule_follow_up: false,
+  can_complete_follow_up: false,
+  can_cancel_follow_up: false,
 };
 
 export function leadFixture(overrides: Partial<Lead> = {}): Lead {
@@ -28,6 +32,9 @@ export function leadFixture(overrides: Partial<Lead> = {}): Lead {
     stage: "new",
     assigned_to: null,
     next_follow_up_at: null,
+    next_action_type: null,
+    next_action_note: null,
+    follow_up_state: "unscheduled",
     lost_reason: null,
     lost_reason_detail: null,
     lost_at: null,

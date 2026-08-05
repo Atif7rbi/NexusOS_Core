@@ -324,9 +324,9 @@ final class LeadsApiTest extends ApiTestCase
 
         $this->getJson('/api/leads')
             ->assertOk()
-            ->assertJsonPath('data.summary.active', 2)
-            ->assertJsonPath('data.summary.unassigned', 1)
-            ->assertJsonPath('data.summary.converted_this_month', 1);
+            ->assertJsonPath('data.summary.open_leads', 2)
+            ->assertJsonPath('data.summary.unassigned_leads', 1)
+            ->assertJsonPath('data.summary.monthly_conversions', 1);
 
         $this->getJson('/api/leads?archived=true')
             ->assertOk()
@@ -383,7 +383,10 @@ final class LeadsApiTest extends ApiTestCase
         )['user'];
         $project = $this->createLeadProject($tenant, $administrator);
 
-        $overdueAt = CarbonImmutable::now('UTC')->subMinute();
+        $overdueAt = CarbonImmutable::now('Asia/Riyadh')
+            ->startOfDay()
+            ->subMinute()
+            ->utc();
         $overdue = $this->createLead($tenant, $administrator, [
             'name' => 'Overdue Search Lead',
             'source' => LeadSource::PhoneCall,
@@ -424,10 +427,10 @@ final class LeadsApiTest extends ApiTestCase
             ->assertOk()
             ->assertJsonPath('data.pagination.total', 1)
             ->assertJsonPath('data.leads.0.id', (string) $target->id)
-            ->assertJsonPath('data.summary.active', 3)
-            ->assertJsonPath('data.summary.unassigned', 2)
-            ->assertJsonPath('data.summary.overdue', 1)
-            ->assertJsonPath('data.summary.converted_this_month', 1);
+            ->assertJsonPath('data.summary.open_leads', 3)
+            ->assertJsonPath('data.summary.unassigned_leads', 1)
+            ->assertJsonPath('data.summary.overdue_follow_ups', 1)
+            ->assertJsonPath('data.summary.monthly_conversions', 1);
 
         $this->getJson('/api/leads?overdue=true')
             ->assertOk()
@@ -439,6 +442,272 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('data.pagination.current_page', 2)
             ->assertJsonPath('data.pagination.per_page', 2)
             ->assertJsonCount(2, 'data.leads');
+    }
+
+    public function test_final_operational_filters_and_summary_use_riyadh_boundaries(): void
+    {
+        $this->freezeCrmClock(
+            CarbonImmutable::parse('2026-08-05T09:00:00Z'),
+        );
+
+        $tenant = $this->createLeadTenant([
+            'timezone' => 'Asia/Riyadh',
+        ]);
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+
+        $overdue = $this->createLead($tenant, $administrator, [
+            'name' => 'Overdue Lead',
+            'next_follow_up_at' => CarbonImmutable::parse(
+                '2026-08-04T20:59:59Z',
+            ),
+        ]);
+        $today = $this->createLead($tenant, $administrator, [
+            'name' => 'Today Lead',
+            'next_follow_up_at' => CarbonImmutable::parse(
+                '2026-08-05T08:00:00Z',
+            ),
+        ]);
+        $tomorrow = $this->createLead($tenant, $administrator, [
+            'name' => 'Tomorrow Lead',
+            'next_follow_up_at' => CarbonImmutable::parse(
+                '2026-08-06T08:00:00Z',
+            ),
+        ]);
+        $thisWeek = $this->createLead($tenant, $administrator, [
+            'name' => 'This Week Lead',
+            'next_follow_up_at' => CarbonImmutable::parse(
+                '2026-08-07T08:00:00Z',
+            ),
+        ]);
+        $scheduledLater = $this->createLead($tenant, $administrator, [
+            'name' => 'Scheduled Later Lead',
+            'next_follow_up_at' => CarbonImmutable::parse(
+                '2026-08-10T08:00:00Z',
+            ),
+        ]);
+        $unscheduled = $this->createLead($tenant, $administrator, [
+            'name' => 'Unscheduled Lead',
+            'assigned_to' => null,
+        ]);
+        $won = $this->createLead($tenant, $administrator, [
+            'name' => 'Won Lead',
+            'stage' => LeadStage::Won,
+        ]);
+        $lost = $this->createLead($tenant, $administrator, [
+            'name' => 'Lost Lead',
+            'stage' => LeadStage::Lost,
+        ]);
+
+        $won->forceFill([
+            'converted_at' => CarbonImmutable::parse(
+                '2026-08-03T08:00:00Z',
+            ),
+        ])->save();
+
+        $lost->forceFill([
+            'lost_at' => CarbonImmutable::parse(
+                '2026-08-03T08:00:00Z',
+            ),
+        ])->save();
+
+        Sanctum::actingAs($administrator);
+
+        $this->getJson('/api/leads?follow_up_state=overdue')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $overdue->id);
+
+        $this->getJson('/api/leads?follow_up_state=today')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $today->id);
+
+        $this->getJson('/api/leads?follow_up_state=tomorrow')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $tomorrow->id);
+
+        $this->getJson('/api/leads?follow_up_state=this_week')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $thisWeek->id);
+
+        $this->getJson('/api/leads?follow_up_state=scheduled_later')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $scheduledLater->id,
+            );
+
+        $this->getJson('/api/leads?follow_up_state=unscheduled')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $unscheduled->id,
+            );
+
+        $this->getJson('/api/leads?lifecycle=open')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 6);
+
+        $this->getJson('/api/leads?lifecycle=won')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $won->id);
+
+        $this->getJson('/api/leads?lifecycle=lost')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.leads.0.id', (string) $lost->id);
+
+        $this->getJson('/api/leads?'.http_build_query([
+            'date_from' => '2026-08-06',
+            'date_to' => '2026-08-07',
+            'lifecycle' => 'open',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 2)
+            ->assertJsonFragment(['id' => (string) $tomorrow->id])
+            ->assertJsonFragment(['id' => (string) $thisWeek->id]);
+
+        $this->getJson('/api/leads?'.http_build_query([
+            'date_from' => '2026-08-03',
+            'date_to' => '2026-08-03',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.summary.open_leads', 6)
+            ->assertJsonPath('data.summary.overdue_follow_ups', 1)
+            ->assertJsonPath('data.summary.today_follow_ups', 1)
+            ->assertJsonPath('data.summary.unassigned_leads', 1)
+            ->assertJsonPath('data.summary.monthly_conversions', 1)
+            ->assertJsonPath(
+                'data.summary.lost_leads_in_selected_period',
+                1,
+            );
+
+        $this->getJson('/api/leads')
+            ->assertOk()
+            ->assertJsonPath(
+                'data.summary.lost_leads_in_selected_period',
+                1,
+            );
+    }
+
+    public function test_final_operational_filter_contract_rejects_invalid_values(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        Sanctum::actingAs($administrator);
+
+        $this->getJson('/api/leads?follow_up_state=invalid')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('follow_up_state');
+
+        $this->getJson('/api/leads?lifecycle=invalid')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('lifecycle');
+
+        $this->getJson('/api/leads?date_from=05-08-2026')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('date_from');
+
+        $this->getJson(
+            '/api/leads?date_from=2026-08-06&date_to=2026-08-05',
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('date_to');
+    }
+
+    public function test_follow_up_filters_are_mutually_exclusive(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+
+        Sanctum::actingAs($administrator);
+
+        $this->getJson(
+            '/api/leads?follow_up_state=today&follow_up_bucket=overdue',
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'follow_up_state',
+                'follow_up_bucket',
+            ]);
+
+        $this->getJson(
+            '/api/leads?follow_up_state=today&overdue=true',
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'follow_up_state',
+                'overdue',
+            ]);
+
+        $this->getJson(
+            '/api/leads?follow_up_bucket=today&overdue=false',
+        )->assertOk();
+    }
+
+    public function test_follow_up_week_boundary_starts_at_monday_midnight_in_riyadh(): void
+    {
+        $this->freezeCrmClock(
+            CarbonImmutable::parse('2026-08-05T09:00:00+03:00'),
+        );
+
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+
+        $sundayLastSecond = $this->createLead(
+            $tenant,
+            $administrator,
+            [
+                'next_follow_up_at' => CarbonImmutable::parse(
+                    '2026-08-09T20:59:59.999999Z',
+                ),
+            ],
+        );
+
+        $mondayStart = $this->createLead(
+            $tenant,
+            $administrator,
+            [
+                'next_follow_up_at' => CarbonImmutable::parse(
+                    '2026-08-09T21:00:00Z',
+                ),
+            ],
+        );
+
+        Sanctum::actingAs($administrator);
+
+        $this->getJson('/api/leads?follow_up_state=this_week')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $sundayLastSecond->id,
+            );
+
+        $this->getJson('/api/leads?follow_up_state=scheduled_later')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $mondayStart->id,
+            );
     }
 
     public function test_project_and_unit_interest_validation_is_tenant_safe(): void
@@ -535,6 +804,34 @@ final class LeadsApiTest extends ApiTestCase
 
         $lead->refresh();
         $this->assertSame($updatedAt->toISOString(), $lead->updated_at?->toISOString());
+    }
+
+    public function test_generic_update_rejects_follow_up_fields(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $lead = $this->createLead($tenant, $administrator);
+
+        Sanctum::actingAs($administrator);
+
+        $this->patchJson("/api/leads/{$lead->id}", [
+            'next_follow_up_at' => '2026-08-06T09:30:00+03:00',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'validation_error')
+            ->assertJsonPath(
+                'error.message',
+                'The request contains fields that are not defined by the CRM Leads v1 API contract.',
+            );
+
+        $lead->refresh();
+
+        $this->assertNull($lead->next_follow_up_at);
+        $this->assertNull($lead->next_action_type);
+        $this->assertNull($lead->next_action_note);
     }
 
     public function test_update_is_blocked_for_unassigned_closed_and_archived_leads(): void
