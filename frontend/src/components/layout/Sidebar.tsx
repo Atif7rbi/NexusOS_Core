@@ -15,9 +15,10 @@ import {
 import { useState } from "react";
 
 import { NexusBrand } from "@/components/brand/NexusBrand";
-import { navigationGroups } from "@/config/navigation";
+import { getNavigationGroupsForRole } from "@/config/navigation";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAppShell } from "@/providers/AppShellProvider";
+import { useAuth } from "@/providers/AuthProvider";
 
 const GROUP_STORAGE_KEY = "nexusos_sidebar_groups_v1";
 
@@ -69,6 +70,9 @@ function SidebarContent({
 }: SidebarContentProps) {
   const pathname = usePathname();
   const { isArabic, t } = useTranslation();
+  const { user } = useAuth();
+  const visibleNavigationGroups =
+    getNavigationGroupsForRole(user?.role ?? null);
 
   const {
     isSidebarCollapsed,
@@ -134,7 +138,7 @@ function SidebarContent({
 
       <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-5">
         <div className="space-y-4">
-          {navigationGroups.map((group, groupIndex) => {
+          {visibleNavigationGroups.map((group, groupIndex) => {
             const groupKey = group.labelKey;
             const isHomeGroup = groupIndex === 0;
 

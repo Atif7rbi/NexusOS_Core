@@ -1,29 +1,25 @@
 import {
-  BarChart3,
-  BriefcaseBusiness,
   Building2,
   CalendarCheck2,
-  ChartNoAxesCombined,
-  ClipboardList,
   FileSignature,
   FolderKanban,
   HandCoins,
   LayoutDashboard,
-  ReceiptText,
   Settings,
   ShieldCheck,
   Users,
   UsersRound,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
 import type { TranslationKey } from "@/i18n/types";
+import type { UserRole } from "@/types/auth";
 
 export type NavigationItem = {
   labelKey: TranslationKey;
   href: string;
   icon: LucideIcon;
+  allowedRoles?: UserRole[];
 };
 
 export type NavigationGroup = {
@@ -80,16 +76,6 @@ export const navigationGroups: NavigationGroup[] = [
         href: "/units/",
         icon: Building2,
       },
-      {
-        labelKey: "navigation.contractors",
-        href: "/contractors/",
-        icon: Wrench,
-      },
-      {
-        labelKey: "navigation.contractorStatements",
-        href: "/contractor-statements/",
-        icon: ClipboardList,
-      },
     ],
   },
   {
@@ -100,35 +86,19 @@ export const navigationGroups: NavigationGroup[] = [
         href: "/collections/",
         icon: HandCoins,
       },
-      {
-        labelKey: "navigation.expenses",
-        href: "/expenses/",
-        icon: ReceiptText,
-      },
-      {
-        labelKey: "navigation.financialReports",
-        href: "/financial-reports/",
-        icon: ChartNoAxesCombined,
-      },
     ],
   },
   {
     labelKey: "navigation.administration",
     items: [
       {
-        labelKey: "navigation.employeesAndTasks",
-        href: "/employees/",
-        icon: BriefcaseBusiness,
-      },
-      {
         labelKey: "navigation.usersAndPermissions",
         href: "/users/",
         icon: ShieldCheck,
-      },
-      {
-        labelKey: "navigation.reports",
-        href: "/reports/",
-        icon: BarChart3,
+        allowedRoles: [
+          "system_owner",
+          "administrator",
+        ],
       },
       {
         labelKey: "navigation.settings",
@@ -138,3 +108,19 @@ export const navigationGroups: NavigationGroup[] = [
     ],
   },
 ];
+
+export function getNavigationGroupsForRole(
+  role: UserRole | null
+): NavigationGroup[] {
+  return navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          !item.allowedRoles ||
+          (role !== null &&
+            item.allowedRoles.includes(role))
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+}
