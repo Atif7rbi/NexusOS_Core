@@ -150,6 +150,19 @@ describe("LeadsIndexView", () => {
     fireEvent.click(screen.getAllByText("crm.resetFilters")[0]);
     expect(onReset).toHaveBeenCalled();
   });
+  it("hides the historical lifecycle selector in pipeline mode", () => {
+    render(
+      <LeadsIndexView
+        {...baseProps}
+        viewMode="pipeline"
+      />
+    );
+
+    expect(
+      screen.queryByLabelText("crm.filters.lifecycle")
+    ).toBeNull();
+  });
+
   it("emits final lifecycle follow-up and date filters", () => {
     const onQueryChange = vi.fn();
 

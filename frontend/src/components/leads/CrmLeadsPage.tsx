@@ -130,9 +130,12 @@ export function CrmLeadsPage() {
       ].includes(followUpState ?? "")
         ? (followUpState as LeadsIndexQuery["follow_up_state"])
         : "",
-      lifecycle: ["open", "won", "lost"].includes(lifecycle ?? "")
-        ? (lifecycle as LeadsIndexQuery["lifecycle"])
-        : "",
+      lifecycle:
+        viewMode === "pipeline"
+          ? ""
+          : ["open", "won", "lost"].includes(lifecycle ?? "")
+            ? (lifecycle as LeadsIndexQuery["lifecycle"])
+            : "",
       date_from: searchParams.get("date_from") ?? "",
       date_to: searchParams.get("date_to") ?? "",
       overdue: searchParams.get("overdue") === "true",
@@ -726,6 +729,7 @@ export function CrmLeadsPage() {
               updateUrl({
                 view: nextView === "pipeline" ? "pipeline" : null,
                 archived: null,
+                lifecycle: nextView === "pipeline" ? null : query.lifecycle,
                 page: 1,
                 lead: null,
               })

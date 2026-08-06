@@ -140,11 +140,11 @@ describe("CrmLeadsPage pipeline URL state", () => {
     );
   });
 
-  it("clears archived mode when switching to pipeline", () => {
+  it("clears archived and historical lifecycle modes when switching to pipeline", () => {
     window.history.replaceState(
       null,
       "",
-      "/crm/?archived=true&page=3"
+      "/crm/?archived=true&lifecycle=won&page=3"
     );
 
     const history = vi.spyOn(window.history, "pushState");
@@ -156,6 +156,25 @@ describe("CrmLeadsPage pipeline URL state", () => {
       null,
       "",
       "/crm/?page=1&view=pipeline"
+    );
+  });
+
+  it("ignores a historical lifecycle supplied directly to pipeline", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/crm/?view=pipeline&lifecycle=won"
+    );
+
+    render(<CrmLeadsPage />);
+
+    expect(screen.getByText("view:pipeline")).toBeTruthy();
+    expect(services.fetchLeads).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({
+        per_page: 100,
+        lifecycle: "",
+      })
     );
   });
 
