@@ -311,10 +311,25 @@ final class LeadsApiTest extends ApiTestCase
 
         $this->assertSame(collect([
             $ownOpen->id,
-            $ownLost->id,
-            $ownWon->id,
             $unassignedOpen->id,
         ])->sort()->values()->all(), $visibleIds);
+
+        $this->getJson('/api/leads?lifecycle=won')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $ownWon->id,
+            );
+
+        $this->getJson('/api/leads?lifecycle=lost')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $ownLost->id,
+            );
+
         $this->getJson("/api/leads/{$ownLost->id}")->assertOk();
         $this->getJson("/api/leads/{$ownWon->id}")->assertOk();
         $this->getJson("/api/leads/{$unassignedOpen->id}")
@@ -324,13 +339,14 @@ final class LeadsApiTest extends ApiTestCase
 
         $this->getJson('/api/leads')
             ->assertOk()
+            ->assertJsonPath('data.pagination.total', 2)
             ->assertJsonPath('data.summary.open_leads', 2)
             ->assertJsonPath('data.summary.unassigned_leads', 1)
             ->assertJsonPath('data.summary.monthly_conversions', 1);
 
         $this->getJson('/api/leads?archived=true')
             ->assertOk()
-            ->assertJsonPath('data.pagination.total', 4)
+            ->assertJsonPath('data.pagination.total', 2)
             ->assertJsonMissing(['id' => (string) $archivedOwn->id]);
 
         foreach ([$unassignedLost, $unassignedWon, $assignedToOther, $archivedOwn] as $hidden) {
@@ -342,7 +358,22 @@ final class LeadsApiTest extends ApiTestCase
         Sanctum::actingAs($administrator);
         $this->getJson('/api/leads')
             ->assertOk()
-            ->assertJsonPath('data.pagination.total', 7);
+            ->assertJsonPath('data.pagination.total', 3)
+            ->assertJsonMissing([
+                'id' => (string) $ownWon->id,
+            ])
+            ->assertJsonMissing([
+                'id' => (string) $ownLost->id,
+            ]);
+
+        $this->getJson('/api/leads?lifecycle=won')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 2);
+
+        $this->getJson('/api/leads?lifecycle=lost')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 2);
+
         $archived = $this->getJson('/api/leads?archived=true')
             ->assertOk()
             ->assertJsonPath('data.pagination.total', 1)
@@ -440,8 +471,10 @@ final class LeadsApiTest extends ApiTestCase
         $this->getJson('/api/leads?per_page=2&page=2')
             ->assertOk()
             ->assertJsonPath('data.pagination.current_page', 2)
+            ->assertJsonPath('data.pagination.last_page', 2)
             ->assertJsonPath('data.pagination.per_page', 2)
-            ->assertJsonCount(2, 'data.leads');
+            ->assertJsonPath('data.pagination.total', 3)
+            ->assertJsonCount(1, 'data.leads');
     }
 
     public function test_final_operational_filters_and_summary_use_riyadh_boundaries(): void
@@ -592,9 +625,32 @@ final class LeadsApiTest extends ApiTestCase
 
         $this->getJson('/api/leads')
             ->assertOk()
+            ->assertJsonPath('data.pagination.total', 6)
+            ->assertJsonMissing([
+                'id' => (string) $won->id,
+            ])
+            ->assertJsonMissing([
+                'id' => (string) $lost->id,
+            ])
             ->assertJsonPath(
                 'data.summary.lost_leads_in_selected_period',
                 1,
+            );
+
+        $this->getJson('/api/leads?stage=won')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $won->id,
+            );
+
+        $this->getJson('/api/leads?stage=lost')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath(
+                'data.leads.0.id',
+                (string) $lost->id,
             );
     }
 

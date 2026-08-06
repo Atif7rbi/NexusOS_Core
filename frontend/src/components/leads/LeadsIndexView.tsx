@@ -288,19 +288,20 @@ export function LeadsIndexView({
               ]}
             />
 
-            <FilterSelect
-              label={t("crm.filters.lifecycle")}
-              value={query.lifecycle ?? ""}
-              onChange={(value) =>
-                onQueryChange({ lifecycle: value, page: 1 })
-              }
-              options={[
-                { value: "", label: t("crm.filters.allLifecycle") },
-                { value: "open", label: t("crm.lifecycle.open") },
-                { value: "won", label: t("crm.lifecycle.won") },
-                { value: "lost", label: t("crm.lifecycle.lost") },
-              ]}
-            />
+            {viewMode === "list" ? (
+              <FilterSelect
+                label={t("crm.filters.lifecycle")}
+                value={query.lifecycle ?? ""}
+                onChange={(value) =>
+                  onQueryChange({ lifecycle: value, page: 1 })
+                }
+                options={[
+                  { value: "", label: t("crm.lifecycle.open") },
+                  { value: "won", label: t("crm.lifecycle.won") },
+                  { value: "lost", label: t("crm.lifecycle.lost") },
+                ]}
+              />
+            ) : null}
 
             <FilterSelect
               label={t("crm.filters.followUpState")}

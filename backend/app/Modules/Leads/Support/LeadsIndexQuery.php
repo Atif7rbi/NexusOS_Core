@@ -55,6 +55,17 @@ final class LeadsIndexQuery
             'customer:id,name,status,archived_at',
         ]);
 
+        if (
+            ! $archivedMode
+            && empty($filters['lifecycle'])
+            && empty($filters['stage'])
+        ) {
+            $query->whereIn(
+                'stage',
+                LeadStage::openValues(),
+            );
+        }
+
         $this->applyFilters($query, $filters, $tenantTimezone);
 
         $paginator = $query
