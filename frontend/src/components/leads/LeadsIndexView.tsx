@@ -295,8 +295,7 @@ export function LeadsIndexView({
                 onQueryChange({ lifecycle: value, page: 1 })
               }
               options={[
-                { value: "", label: t("crm.filters.allLifecycle") },
-                { value: "open", label: t("crm.lifecycle.open") },
+                { value: "", label: t("crm.lifecycle.open") },
                 { value: "won", label: t("crm.lifecycle.won") },
                 { value: "lost", label: t("crm.lifecycle.lost") },
               ]}
