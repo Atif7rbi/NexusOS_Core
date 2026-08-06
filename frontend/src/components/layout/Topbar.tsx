@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  Bell,
   ChevronDown,
   Menu,
-  Search,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -188,76 +186,7 @@ export function Topbar() {
           </div>
         </div>
 
-        <div className="hidden w-full max-w-md xl:block">
-          <div className="relative">
-            <Search
-              size={17}
-              className="pointer-events-none absolute start-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-            />
-
-            <input
-              type="search"
-              placeholder={t("common.search")}
-              className={[
-                "motion-ui h-11 w-full",
-                "rounded-[var(--radius-md)]",
-                "border border-[var(--border)]",
-                "bg-[var(--surface-soft)]",
-                "ps-11 pe-16",
-                "text-sm text-[var(--text-primary)]",
-                "outline-none",
-                "placeholder:text-[var(--text-muted)]",
-                "focus:border-[var(--brand-primary)]",
-                "focus:bg-[var(--surface)]",
-                "focus:ring-4 focus:ring-[var(--focus-ring)]",
-              ].join(" ")}
-            />
-
-            <kbd
-              className={[
-                "absolute end-3 top-1/2 -translate-y-1/2",
-                "rounded-md border border-[var(--border)]",
-                "bg-[var(--surface)] px-2 py-1",
-                "text-[10px] font-semibold text-[var(--text-muted)]",
-                "shadow-[var(--shadow-sm)]",
-              ].join(" ")}
-            >
-              ⌘ K
-            </kbd>
-          </div>
-        </div>
-
         <div className="ms-auto flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            className={[
-              "motion-ui relative inline-flex h-11 w-11 items-center justify-center",
-              "rounded-[var(--radius-md)]",
-              "border border-[var(--border)]",
-              "bg-[var(--surface)]",
-              "text-[var(--text-secondary)]",
-              "shadow-[var(--shadow-sm)]",
-              "hover:border-[var(--border-strong)]",
-              "hover:bg-[var(--surface-soft)]",
-              "hover:text-[var(--text-primary)]",
-            ].join(" ")}
-            aria-label="Notifications"
-          >
-            <Bell size={18} strokeWidth={1.8} />
-
-            <span
-              className={[
-                "absolute -end-1 -top-1",
-                "flex h-5 min-w-5 items-center justify-center",
-                "rounded-full border-2 border-[var(--surface)]",
-                "bg-[var(--brand-primary)] px-1",
-                "text-[9px] font-bold text-white",
-              ].join(" ")}
-            >
-              0
-            </span>
-          </button>
-
           <div className="hidden sm:block">
             <LanguageToggle compact />
           </div>
