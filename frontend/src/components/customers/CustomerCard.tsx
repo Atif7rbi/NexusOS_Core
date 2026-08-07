@@ -4,6 +4,7 @@ import {
   Archive,
   Building2,
   Edit3,
+  FolderOpen,
   Mail,
   MapPin,
   Phone,
@@ -21,6 +22,7 @@ import type {
 type CustomerCardProps = {
   customer: Customer;
   isArabic: boolean;
+  onOpen: () => void;
   onEdit: () => void;
   onArchive: () => void;
   onRestore: () => void;
@@ -29,6 +31,7 @@ type CustomerCardProps = {
 export function CustomerCard({
   customer,
   isArabic,
+  onOpen,
   onEdit,
   onArchive,
   onRestore,
@@ -161,7 +164,18 @@ export function CustomerCard({
         </p>
       ) : null}
 
-      <div className="mt-auto flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+      <div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-[var(--border)] pt-4">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex h-9 items-center gap-2 rounded-xl border border-[var(--brand-gold)]/30 px-3 text-xs font-bold text-[var(--brand-gold-strong)] transition hover:bg-[var(--brand-gold-soft)]"
+        >
+          <FolderOpen size={15} />
+          {isArabic
+            ? "فتح سجل العميل"
+            : "Open Customer Record"}
+        </button>
+
         {!isArchived ? (
           <>
             <button

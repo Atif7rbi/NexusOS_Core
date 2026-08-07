@@ -80,6 +80,28 @@ export async function fetchCustomers(
   };
 }
 
+export async function fetchCustomer(
+  token: string,
+  customerId: string
+): Promise<Customer> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/customers/${customerId}`,
+    {
+      headers: getHeaders(token),
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    throw await parseApiError(response);
+  }
+
+  const result =
+    (await response.json()) as CustomerResponse;
+
+  return result.data.customer;
+}
+
 export async function createCustomer(
   token: string,
   payload: CustomerFormPayload
