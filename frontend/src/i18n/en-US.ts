@@ -505,7 +505,7 @@ export const enUS: TranslationDictionary = {
   "crm.dialog.convertMatchStatus.archived": "Archived — must be restored first",
   "crm.dialog.convertLinkConfirm": "Link to this customer",
   "crm.dialog.convertArchivedBlocked": "An archived customer record exists with this phone number. An administrator must restore it before conversion can proceed.",
-  "crm.dialog.convertViewCustomers": "View Customers page",
+  "crm.dialog.convertViewCustomers": "Open Customer Record",
   "crm.form.customerType": "Customer Type",
   "crm.form.customerCategory": "Customer Category",
   "crm.customerType.individual": "Individual",

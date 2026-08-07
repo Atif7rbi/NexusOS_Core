@@ -142,7 +142,9 @@ describe("CrmLeadsPage conversion workflow", () => {
     const customersLink = screen.getByRole("link", {
       name: "crm.dialog.convertViewCustomers",
     });
-    expect(customersLink.getAttribute("href")).toBe("/customers/");
+    expect(customersLink.getAttribute("href")).toBe(
+      "/customers/?customer=01CUSTOMER00000000000000000"
+    );
   });
 
   it("clears a surfaced conflict when the dialog closes before a new attempt", async () => {
