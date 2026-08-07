@@ -498,7 +498,7 @@ export const arSA: TranslationDictionary = {
   "crm.dialog.convertMatchStatus.archived": "مؤرشف — يجب استعادته أولًا",
   "crm.dialog.convertLinkConfirm": "ربط بهذا العميل",
   "crm.dialog.convertArchivedBlocked": "يوجد سجل عميل مؤرشف بنفس الرقم. يجب على المدير استعادته أولًا قبل إتمام التحويل.",
-  "crm.dialog.convertViewCustomers": "عرض صفحة العملاء",
+  "crm.dialog.convertViewCustomers": "فتح سجل العميل",
   "crm.form.customerType": "نوع العميل",
   "crm.form.customerCategory": "تصنيف العميل",
   "crm.customerType.individual": "فرد",

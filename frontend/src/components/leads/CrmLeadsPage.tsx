@@ -172,7 +172,10 @@ export function CrmLeadsPage() {
   const [duplicatePayload, setDuplicatePayload] = useState<CreateLeadPayload | null>(null);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [conversionSuccessName, setConversionSuccessName] = useState<string | null>(null);
+  const [
+    conversionSuccessCustomerId,
+    setConversionSuccessCustomerId,
+  ] = useState<string | null>(null);
 
   const [dialogAction, setDialogAction] = useState<LeadDialogAction | null>(null);
   const [followUpDialogAction, setFollowUpDialogAction] =
@@ -367,14 +370,14 @@ export function CrmLeadsPage() {
     }
     const timeout = window.setTimeout(() => {
       setSuccessMessage(null);
-      setConversionSuccessName(null);
+      setConversionSuccessCustomerId(null);
     }, 3500);
     return () => window.clearTimeout(timeout);
   }, [successMessage]);
 
   const openLead = (record: Lead): void => {
     setConversionConflict(null);
-    setConversionSuccessName(null);
+    setConversionSuccessCustomerId(null);
     updateUrl({ lead: record.id });
   };
 
@@ -383,7 +386,7 @@ export function CrmLeadsPage() {
     setFollowUpDialogAction(null);
     setFormOpen(false);
     setConversionConflict(null);
-    setConversionSuccessName(null);
+    setConversionSuccessCustomerId(null);
     updateUrl({ lead: null });
   };
 
@@ -407,7 +410,7 @@ export function CrmLeadsPage() {
         setFormOpen(false);
         setEditingLead(null);
         setSuccessMessage(t("crm.success.updated"));
-        setConversionSuccessName(null);
+        setConversionSuccessCustomerId(null);
         refresh();
         return;
       }
@@ -416,7 +419,7 @@ export function CrmLeadsPage() {
         const created = await createLead(token, payload as CreateLeadPayload);
         setFormOpen(false);
         setSuccessMessage(t("crm.success.created"));
-        setConversionSuccessName(null);
+        setConversionSuccessCustomerId(null);
         updateUrl({ lead: created.id });
         refresh();
       } catch (caughtError) {
@@ -449,7 +452,7 @@ export function CrmLeadsPage() {
       setDuplicateMatches([]);
       setFormOpen(false);
       setSuccessMessage(t("crm.success.created"));
-      setConversionSuccessName(null);
+      setConversionSuccessCustomerId(null);
       updateUrl({ lead: created.id });
       refresh();
     } catch (caughtError) {
@@ -511,17 +514,19 @@ export function CrmLeadsPage() {
             ? `${t("crm.success.converted")} ${customerName}`
             : t("crm.success.converted")
         );
-        setConversionSuccessName(customerName || t("crm.success.converted"));
+        setConversionSuccessCustomerId(
+          updated.customer?.id ?? updated.customer_id ?? null
+        );
         setConversionConflict(null);
         setLead(updated);
         void loadActivities(updated.id, archivedMode);
       } else if (payload.action === "archive" || payload.action === "restore") {
         setSuccessMessage(t("crm.success.action"));
-        setConversionSuccessName(null);
+        setConversionSuccessCustomerId(null);
         closeLead();
       } else {
         setSuccessMessage(t("crm.success.action"));
-        setConversionSuccessName(null);
+        setConversionSuccessCustomerId(null);
         setLead(updated);
         void loadActivities(updated.id, archivedMode);
       }
@@ -583,7 +588,7 @@ export function CrmLeadsPage() {
       setFollowUpDialogAction(null);
       setLead(updated);
       setSuccessMessage(t("crm.success.followUp"));
-      setConversionSuccessName(null);
+      setConversionSuccessCustomerId(null);
       void loadActivities(updated.id, archivedMode);
       refresh();
     } catch (caughtError) {
@@ -607,7 +612,7 @@ export function CrmLeadsPage() {
       const response = await addLeadNote(token, lead.id, body);
       setActivities((current) => [response.data.activity, ...current]);
       setSuccessMessage(t("crm.success.action"));
-      setConversionSuccessName(null);
+      setConversionSuccessCustomerId(null);
     } finally {
       setAddingNote(false);
     }
@@ -663,9 +668,9 @@ export function CrmLeadsPage() {
             className="flex items-center justify-between gap-4 rounded-xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-4 py-3 text-sm font-semibold text-[var(--success)]"
           >
             <span>{successMessage}</span>
-            {conversionSuccessName ? (
+            {conversionSuccessCustomerId ? (
               <Link
-                href="/customers/"
+                href={`/customers/?customer=${conversionSuccessCustomerId}`}
                 className="shrink-0 underline underline-offset-2 hover:opacity-80"
               >
                 {t("crm.dialog.convertViewCustomers")}
