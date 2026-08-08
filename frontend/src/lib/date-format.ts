@@ -20,7 +20,19 @@ const dateTimeFormatter = new Intl.DateTimeFormat(
   }
 );
 
+const isoDateOnlyPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 export function formatDate(value: string | Date): string {
+  if (typeof value === "string") {
+    const dateOnlyParts = isoDateOnlyPattern.exec(value);
+
+    if (dateOnlyParts) {
+      const [, year, month, day] = dateOnlyParts;
+
+      return `${day}/${month}/${year}`;
+    }
+  }
+
   return dateFormatter.format(
     typeof value === "string" ? new Date(value) : value
   );
