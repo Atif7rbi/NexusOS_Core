@@ -329,7 +329,17 @@ final class CustomersApiTest extends ApiTestCase
             'national_id' => '1010000004',
         ])->assertCreated();
 
-        $this->assertDatabaseCount('customers', 2);
+        $this->assertSame(
+            2,
+            Customer::query()
+                ->whereIn('tenant_id', [
+                    $this->tenantIdFor($tenantAUser),
+                    $this->tenantIdFor($tenantBUser),
+                ])
+                ->where('phone', '0500000004')
+                ->where('national_id', '1010000004')
+                ->count(),
+        );
 
         $this->assertDatabaseHas('customers', [
             'tenant_id' => $this->tenantIdFor($tenantAUser),

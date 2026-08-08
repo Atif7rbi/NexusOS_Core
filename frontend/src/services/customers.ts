@@ -7,6 +7,10 @@ import type {
   CustomersResponse,
 } from "@/types/customer";
 import { parseApiError } from "@/lib/api-error";
+import type {
+  CustomerRecord,
+  CustomerRecordResponse,
+} from "@/types/customer-business-context";
 
 function getApiBaseUrl(): string {
   const apiBaseUrl =
@@ -83,7 +87,7 @@ export async function fetchCustomers(
 export async function fetchCustomer(
   token: string,
   customerId: string
-): Promise<Customer> {
+): Promise<CustomerRecord> {
   const response = await fetch(
     `${getApiBaseUrl()}/customers/${customerId}`,
     {
@@ -97,9 +101,9 @@ export async function fetchCustomer(
   }
 
   const result =
-    (await response.json()) as CustomerResponse;
+    (await response.json()) as CustomerRecordResponse;
 
-  return result.data.customer;
+  return result.data;
 }
 
 export async function createCustomer(

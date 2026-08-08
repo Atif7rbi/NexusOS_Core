@@ -18,6 +18,7 @@ use App\Modules\Customers\Exceptions\CustomerNotArchivedException;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Requests\StoreCustomerRequest;
 use App\Modules\Customers\Requests\UpdateCustomerRequest;
+use App\Modules\Customers\Support\CustomerBusinessContextQuery;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -193,6 +194,7 @@ final class CustomerController extends Controller
     public function show(
         Request $request,
         string $customer,
+        CustomerBusinessContextQuery $businessContextQuery,
     ): JsonResponse {
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
@@ -209,6 +211,10 @@ final class CustomerController extends Controller
         return response()->json([
             'data' => [
                 'customer' => $customerRecord,
+                'business_context' => $businessContextQuery->execute(
+                    (string) $membership->tenant_id,
+                    (string) $customerRecord->id,
+                ),
             ],
         ]);
     }

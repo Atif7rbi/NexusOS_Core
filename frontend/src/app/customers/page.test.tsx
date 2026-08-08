@@ -15,6 +15,7 @@ import {
 import CustomersPage from "@/app/customers/page";
 import { ApiRequestError } from "@/lib/api-error";
 import type { Customer } from "@/types/customer";
+import type { CustomerBusinessContext } from "@/types/customer-business-context";
 
 const services = vi.hoisted(() => ({
   fetchCustomers: vi.fn(),
@@ -89,12 +90,14 @@ vi.mock(
   () => ({
     CustomerDetailsView: ({
       customer,
+      businessContext,
       isLoading,
       isNotFound,
       error,
       onBack,
     }: {
       customer: Customer | null;
+      businessContext: CustomerBusinessContext | null;
       isLoading: boolean;
       isNotFound: boolean;
       error: string | null;
@@ -115,6 +118,10 @@ vi.mock(
 
         {customer ? (
           <span>{`record:${customer.id}`}</span>
+        ) : null}
+
+        {businessContext ? (
+          <span>{`context:${businessContext.summary.reservations_total}:${businessContext.summary.contracts_total}`}</span>
         ) : null}
 
         <button
@@ -185,7 +192,16 @@ describe("CustomersPage record query state", () => {
       indexResponse
     );
     services.fetchCustomer.mockResolvedValue(
-      customer
+      {
+        customer,
+        business_context: {
+          summary: {
+            reservations_total: 0,
+            contracts_total: 0,
+          },
+          journeys: [],
+        },
+      }
     );
   });
 
@@ -272,6 +288,9 @@ describe("CustomersPage record query state", () => {
       await screen.findByText(
         `record:${customer.id}`
       )
+    ).toBeTruthy();
+    expect(
+      screen.getByText("context:0:0")
     ).toBeTruthy();
 
     expect(
