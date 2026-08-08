@@ -71,6 +71,27 @@ const context: BusinessContext = {
 };
 
 describe("CustomerBusinessContext", () => {
+  it("links the customer journey to contextual reservation creation", () => {
+    const href =
+      "/reservations/?create=1&customer=customer-1";
+
+    render(
+      <CustomerBusinessContext
+        context={context}
+        isArabic
+        createReservationHref={href}
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("link", {
+          name: "إنشاء حجز",
+        })
+        .getAttribute("href")
+    ).toBe(href);
+  });
+
   it("renders the complete read-only business journey", () => {
     render(
       <CustomerBusinessContext
@@ -84,7 +105,23 @@ describe("CustomerBusinessContext", () => {
     expect(screen.getByText("A-101 · شقة · مباعة")).toBeTruthy();
     expect(screen.getByText("محول إلى عقد")).toBeTruthy();
     expect(screen.getAllByText("130,000 SAR")).toHaveLength(2);
-    expect(screen.getByText("الدفعة الأولى — 65,000 SAR — 01/09/2026")).toBeTruthy();
+    const nextScheduledValues = screen
+      .getAllByText("أول بند مجدول")
+      .map(
+        (label) =>
+          label.parentElement?.querySelector("dd")
+            ?.textContent
+      );
+    const nextScheduledValue =
+      nextScheduledValues.find(
+        (value) =>
+          value && value !== "لا يوجد بند مجدول"
+      );
+
+    expect(nextScheduledValues).toHaveLength(2);
+    expect(nextScheduledValue).toContain("الدفعة الأولى");
+    expect(nextScheduledValue).toContain("65,000 SAR");
+    expect(nextScheduledValue).toContain("01/09/2026");
     expect(screen.getByText("بدون جدول")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
   });

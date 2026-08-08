@@ -32,6 +32,7 @@ type CustomerDetailsViewProps = {
   onBack: () => void;
   onRetry: () => void;
   onEdit: () => void;
+  createReservationHref?: string;
 };
 
 export function CustomerDetailsView({
@@ -44,6 +45,7 @@ export function CustomerDetailsView({
   onBack,
   onRetry,
   onEdit,
+  createReservationHref,
 }: CustomerDetailsViewProps) {
   const labels = isArabic
     ? {
@@ -339,6 +341,11 @@ export function CustomerDetailsView({
         <CustomerBusinessContext
           context={businessContext}
           isArabic={isArabic}
+          createReservationHref={
+            isArchived
+              ? undefined
+              : createReservationHref
+          }
         />
       ) : null}
     </div>

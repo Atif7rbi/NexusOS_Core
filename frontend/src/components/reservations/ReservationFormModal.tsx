@@ -28,6 +28,8 @@ type ReservationFormModalProps = {
   isLoadingInitialOptions: boolean;
   isLoadingUnits: boolean;
   isSubmitting: boolean;
+  initialCustomerId?: string;
+  isCustomerLocked?: boolean;
   onClose: () => void;
   onProjectChange: (projectId: string) => Promise<void>;
   onSubmit: (payload: ReservationFormPayload) => Promise<void>;
@@ -56,12 +58,14 @@ export function ReservationFormModal({
   isLoadingInitialOptions,
   isLoadingUnits,
   isSubmitting,
+  initialCustomerId = "",
+  isCustomerLocked = false,
   onClose,
   onProjectChange,
   onSubmit,
 }: ReservationFormModalProps) {
   const [form, setForm] = useState<ReservationFormState>({
-    customer_id: "",
+    customer_id: initialCustomerId,
     project_id: "",
     unit_id: "",
     expires_at: defaultExpiry(),
@@ -75,6 +79,10 @@ export function ReservationFormModal({
     setClientFieldErrors,
     setValidationError,
   } = useFormValidation();
+  const selectedCustomer = customers.find(
+    (customer) =>
+      customer.id === form.customer_id
+  );
 
   const updateField = <Key extends keyof ReservationFormState>(
     key: Key,
@@ -179,21 +187,44 @@ export function ReservationFormModal({
           </p>
         ) : null}
 
-        <Select
-          label="العميل"
-          name="customer_id"
-          value={form.customer_id}
-          error={fieldErrors.customer_id?.[0]}
-          disabled={isLoadingInitialOptions}
-          onChange={(event) => updateField("customer_id", event.target.value)}
-          options={[
-            { value: "", label: "اختر العميل" },
-            ...customers.map((customer) => ({
-              value: customer.id,
-              label: `${customer.name} — ${customer.phone}`,
-            })),
-          ]}
-        />
+        {isCustomerLocked ? (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-secondary)]">
+              العميل
+            </p>
+            <div className="min-h-12 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+              {selectedCustomer
+                ? `${selectedCustomer.name} — ${selectedCustomer.phone}`
+                : "جارٍ تحميل العميل..."}
+            </div>
+            <input
+              type="hidden"
+              name="customer_id"
+              value={form.customer_id}
+            />
+            {fieldErrors.customer_id?.[0] ? (
+              <p className="text-xs font-semibold text-[var(--danger)]">
+                {fieldErrors.customer_id[0]}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <Select
+            label="العميل"
+            name="customer_id"
+            value={form.customer_id}
+            error={fieldErrors.customer_id?.[0]}
+            disabled={isLoadingInitialOptions}
+            onChange={(event) => updateField("customer_id", event.target.value)}
+            options={[
+              { value: "", label: "اختر العميل" },
+              ...customers.map((customer) => ({
+                value: customer.id,
+                label: `${customer.name} — ${customer.phone}`,
+              })),
+            ]}
+          />
+        )}
 
         <Select
           label="المشروع"

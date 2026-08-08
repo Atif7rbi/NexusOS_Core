@@ -43,9 +43,18 @@ import {
 } from "@/hooks/useResourceInvalidation";
 import { formatDateTime } from "@/lib/date-format";
 import { formatInteger } from "@/lib/number-format";
+import {
+  clearReservationCreateQuery,
+  parseReservationCreateQuery,
+  returnToCustomerRecord,
+  type ReservationCreateContext,
+} from "@/lib/reservation-create-context";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchProjects } from "@/services/projects";
-import { fetchCustomers } from "@/services/customers";
+import {
+  fetchCustomer,
+  fetchCustomers,
+} from "@/services/customers";
 import {
   createReservation,
   cancelReservation,
@@ -101,6 +110,8 @@ export default function ReservationsPage() {
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setFormOpen] = useState(false);
+  const [createContext, setCreateContext] =
+    useState<ReservationCreateContext | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
   const [availableUnits, setAvailableUnits] = useState<AvailableReservationUnit[]>([]);
@@ -203,38 +214,117 @@ export default function ReservationsPage() {
     setPage(1);
   };
 
-  const openCreateForm = async (): Promise<void> => {
+  const openCreateForm = useCallback(
+    async (
+      context: ReservationCreateContext | null = null
+    ): Promise<void> => {
+      if (!token) {
+        return;
+      }
+
+      setCreateContext(context);
+      setFormOpen(true);
+      setCustomers([]);
+      setAvailableUnits([]);
+      setLoadingInitialOptions(true);
+
+      try {
+        const projectRequest = fetchProjects(token, {
+          perPage: 100,
+          status: "active",
+        });
+
+        if (context) {
+          const [projectResponse, customerRecord] =
+            await Promise.all([
+              projectRequest,
+              fetchCustomer(token, context.customerId),
+            ]);
+          const contextualCustomer = customerRecord.customer;
+
+          if (
+            contextualCustomer.status === "archived" ||
+            contextualCustomer.archived_at !== null
+          ) {
+            throw new Error(
+              "لا يمكن إنشاء حجز لعميل مؤرشف."
+            );
+          }
+
+          setActiveProjects(projectResponse.data.data);
+          setCustomers([contextualCustomer]);
+        } else {
+          const [projectResponse, customerResponse] =
+            await Promise.all([
+              projectRequest,
+              fetchCustomers(token, { per_page: 100 }),
+            ]);
+
+          setActiveProjects(projectResponse.data.data);
+          setCustomers(
+            customerResponse.data.customers.data.filter(
+              (customer) =>
+                customer.status !== "archived" &&
+                customer.archived_at === null
+            )
+          );
+        }
+      } catch (caughtError) {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "تعذر تحميل خيارات الحجز."
+        );
+
+        if (context) {
+          setFormOpen(false);
+          setCreateContext(null);
+          window.history.replaceState(
+            null,
+            "",
+            clearReservationCreateQuery(
+              window.location.search
+            )
+          );
+        }
+      } finally {
+        setLoadingInitialOptions(false);
+      }
+    },
+    [token]
+  );
+
+  useEffect(() => {
     if (!token) {
       return;
     }
 
-    setFormOpen(true);
-    setAvailableUnits([]);
-    setLoadingInitialOptions(true);
+    const parsed = parseReservationCreateQuery(
+      window.location.search
+    );
 
-    try {
-      const [projectResponse, customerResponse] = await Promise.all([
-        fetchProjects(token, { perPage: 100, status: "active" }),
-        fetchCustomers(token, { per_page: 100 }),
-      ]);
-
-      setActiveProjects(projectResponse.data.data);
-      setCustomers(
-        customerResponse.data.customers.data.filter(
-          (customer) =>
-            customer.status !== "archived" && customer.archived_at === null
-        )
+    if (parsed.normalizedUrl) {
+      window.history.replaceState(
+        null,
+        "",
+        parsed.normalizedUrl
       );
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "تعذر تحميل خيارات الحجز."
-      );
-    } finally {
-      setLoadingInitialOptions(false);
     }
-  };
+
+    const context = parsed.context;
+
+    if (!context) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void openCreateForm(context);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [openCreateForm, token]);
 
   const loadAvailableUnits = async (projectId: string): Promise<void> => {
     if (!token) {
@@ -264,13 +354,21 @@ export default function ReservationsPage() {
 
     try {
       await createReservation(token, payload);
-      await loadReservations(1);
       invalidateFrontendResources([
         "projects",
         "units",
         "reservations",
         "contracts",
       ]);
+
+      if (createContext) {
+        returnToCustomerRecord(
+          createContext.returnTo
+        );
+        return;
+      }
+
+      await loadReservations(1);
       setFormOpen(false);
       setSuccessMessage("تم إنشاء الحجز بنجاح.");
     } finally {
@@ -549,6 +647,10 @@ export default function ReservationsPage() {
 
       {isFormOpen ? (
         <ReservationFormModal
+          key={
+            createContext?.customerId ??
+            "manual-reservation-create"
+          }
           isOpen
           customers={customers}
           projects={activeProjects}
@@ -556,9 +658,21 @@ export default function ReservationsPage() {
           isLoadingInitialOptions={isLoadingInitialOptions}
           isLoadingUnits={isLoadingAvailableUnits}
           isSubmitting={isSubmitting}
+          initialCustomerId={
+            createContext?.customerId
+          }
+          isCustomerLocked={createContext !== null}
           onClose={() => {
             if (!isSubmitting) {
+              if (createContext) {
+                returnToCustomerRecord(
+                  createContext.returnTo
+                );
+                return;
+              }
+
               setFormOpen(false);
+              setCreateContext(null);
             }
           }}
           onProjectChange={loadAvailableUnits}

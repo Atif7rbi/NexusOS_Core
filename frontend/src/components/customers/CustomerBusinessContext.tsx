@@ -5,6 +5,7 @@ import {
   CalendarCheck2,
   FileSignature,
   Home,
+  Plus,
   Route,
 } from "lucide-react";
 
@@ -20,11 +21,13 @@ import type { CustomerBusinessContext as BusinessContext } from "@/types/custome
 type CustomerBusinessContextProps = {
   context: BusinessContext;
   isArabic: boolean;
+  createReservationHref?: string;
 };
 
 export function CustomerBusinessContext({
   context,
   isArabic,
+  createReservationHref,
 }: CustomerBusinessContextProps) {
   const copy = getCustomerBusinessContextCopy(isArabic);
 
@@ -45,15 +48,27 @@ export function CustomerBusinessContext({
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <SummaryValue
-            label={copy.reservations}
-            value={context.summary.reservations_total}
-          />
-          <SummaryValue
-            label={copy.contracts}
-            value={context.summary.contracts_total}
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          {createReservationHref ? (
+            <a
+              href={createReservationHref}
+              className="motion-ui inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] border border-transparent bg-[var(--brand-primary)] px-4 text-sm font-bold text-[var(--text-inverse)] shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:bg-[var(--brand-primary-hover)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
+            >
+              <Plus size={17} aria-hidden="true" />
+              {copy.createReservation}
+            </a>
+          ) : null}
+
+          <div className="flex gap-2">
+            <SummaryValue
+              label={copy.reservations}
+              value={context.summary.reservations_total}
+            />
+            <SummaryValue
+              label={copy.contracts}
+              value={context.summary.contracts_total}
+            />
+          </div>
         </div>
       </div>
 

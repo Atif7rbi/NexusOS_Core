@@ -42,6 +42,34 @@ const businessContext: CustomerBusinessContext = {
 };
 
 describe("CustomerDetailsView", () => {
+  it("exposes contextual reservation creation for an active record", () => {
+    const href =
+      "/reservations/?create=1&customer=customer-1";
+
+    render(
+      <CustomerDetailsView
+        customer={customer}
+        businessContext={businessContext}
+        isArabic
+        isLoading={false}
+        error={null}
+        isNotFound={false}
+        onBack={vi.fn()}
+        onRetry={vi.fn()}
+        onEdit={vi.fn()}
+        createReservationHref={href}
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("link", {
+          name: "إنشاء حجز",
+        })
+        .getAttribute("href")
+    ).toBe(href);
+  });
+
   it("renders the full customer record", () => {
     render(
       <CustomerDetailsView
@@ -54,6 +82,7 @@ describe("CustomerDetailsView", () => {
         onBack={vi.fn()}
         onRetry={vi.fn()}
         onEdit={vi.fn()}
+        createReservationHref="/reservations/?create=1&customer=customer-1"
       />
     );
 
@@ -128,6 +157,11 @@ describe("CustomerDetailsView", () => {
 
     expect(
       screen.queryByText("تعديل")
+    ).toBeNull();
+    expect(
+      screen.queryByRole("link", {
+        name: "إنشاء حجز",
+      })
     ).toBeNull();
   });
 
