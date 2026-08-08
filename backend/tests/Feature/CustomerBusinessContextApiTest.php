@@ -109,9 +109,14 @@ final class CustomerBusinessContextApiTest extends ApiTestCase
             );
 
         $journey = $response->json('data.business_context.journeys.0');
+        $expectedProjectNumber = (string) DB::table('projects')
+            ->join('units', 'units.project_id', '=', 'projects.id')
+            ->join('reservations', 'reservations.unit_id', '=', 'units.id')
+            ->where('reservations.id', $newerReservation)
+            ->value('projects.project_number');
 
         $this->assertSame('2026-08-02T09:00:00.000000Z', $journey['reservation']['reserved_at']);
-        $this->assertSame('PILOT-3', $journey['project']['project_number']);
+        $this->assertSame($expectedProjectNumber, $journey['project']['project_number']);
         $this->assertSame('مشروع 3', $journey['project']['name']);
         $this->assertSame('UNIT-3', $journey['unit']['unit_number']);
         $this->assertSame('apartment', $journey['unit']['unit_type']);

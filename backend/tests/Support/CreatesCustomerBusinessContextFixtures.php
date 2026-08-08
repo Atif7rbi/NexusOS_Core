@@ -104,13 +104,20 @@ trait CreatesCustomerBusinessContextFixtures
         $projectId = (string) Str::ulid();
         $unitId = (string) Str::ulid();
         $reservationId = (string) Str::ulid();
+        $projectYear = $createdAt->year;
+        $projectSequence = $this->nextContextProjectSequence($projectYear);
+        $projectNumber = sprintf(
+            'CTX-%d-%d',
+            $projectYear,
+            $projectSequence,
+        );
 
         DB::table('projects')->insert([
             'id' => $projectId,
             'tenant_id' => $tenantId,
-            'project_number' => "PILOT-{$this->customerContextFixtureSequence}",
-            'project_number_year' => 2026,
-            'project_sequence_number' => $this->customerContextFixtureSequence,
+            'project_number' => $projectNumber,
+            'project_number_year' => $projectYear,
+            'project_sequence_number' => $projectSequence,
             'name' => "مشروع {$this->customerContextFixtureSequence}",
             'project_type' => 'residential',
             'status' => 'active',
@@ -148,6 +155,15 @@ trait CreatesCustomerBusinessContextFixtures
         ]);
 
         return $reservationId;
+    }
+
+    private function nextContextProjectSequence(int $year): int
+    {
+        $currentMaximum = DB::table('projects')
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number');
+
+        return ((int) $currentMaximum) + 1;
     }
 
     private function createContextContract(
