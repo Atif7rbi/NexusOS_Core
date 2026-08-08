@@ -28,6 +28,11 @@ final class IndexCollectionsRequest extends FormRequest
                 'nullable',
                 Rule::in(['absent', 'draft', 'scheduled', 'cancelled']),
             ],
+            'sort' => [
+                'sometimes',
+                'nullable',
+                Rule::in(['next_scheduled_collection']),
+            ],
         ];
     }
 }

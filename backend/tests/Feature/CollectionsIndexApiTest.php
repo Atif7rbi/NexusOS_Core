@@ -27,7 +27,14 @@ final class CollectionsIndexApiTest extends ApiTestCase
         $invalid = $this->createContract($tenantId, $userId, 'عميل غير صالح', 'A-105');
 
         $this->createCollection($tenantId, $draft, $userId, CollectionStatus::Draft, 1, '300.25');
-        $this->createCollection($tenantId, $scheduled, $userId, CollectionStatus::Scheduled, 1, '700.50');
+        $scheduledCollection = $this->createCollection(
+            $tenantId,
+            $scheduled,
+            $userId,
+            CollectionStatus::Scheduled,
+            1,
+            '700.50',
+        );
         $this->createCollection($tenantId, $scheduled, $userId, CollectionStatus::Cancelled, 2, '99.99');
         $this->createCollection($tenantId, $cancelled, $userId, CollectionStatus::Cancelled, 1, '400.00');
         $this->createCollection($tenantId, $invalid, $userId, CollectionStatus::Draft, 1, '100.00');
@@ -46,12 +53,19 @@ final class CollectionsIndexApiTest extends ApiTestCase
 
         $this->assertSame('absent', $items[$absent]['schedule_state']);
         $this->assertSame('0.00', $items[$absent]['schedule_active_total']);
+        $this->assertNull($items[$absent]['next_scheduled_collection']);
         $this->assertSame('draft', $items[$draft]['schedule_state']);
         $this->assertSame('300.25', $items[$draft]['schedule_active_total']);
+        $this->assertNull($items[$draft]['next_scheduled_collection']);
         $this->assertSame('scheduled', $items[$scheduled]['schedule_state']);
         $this->assertSame('700.50', $items[$scheduled]['schedule_active_total']);
+        $this->assertSame(
+            $scheduledCollection,
+            $items[$scheduled]['next_scheduled_collection']['id'],
+        );
         $this->assertSame('cancelled', $items[$cancelled]['schedule_state']);
         $this->assertSame('0.00', $items[$cancelled]['schedule_active_total']);
+        $this->assertNull($items[$cancelled]['next_scheduled_collection']);
         $this->assertFalse($items->has($invalid));
     }
 
@@ -206,6 +220,85 @@ final class CollectionsIndexApiTest extends ApiTestCase
             ->assertJsonPath('data.items.0.contract_total_amount', '12.30');
     }
 
+    public function test_next_scheduled_collection_is_selected_and_sorted_deterministically(): void
+    {
+        [$tenantId, $userId] = $this->authenticate();
+        $firstContract = $this->createContract(
+            $tenantId,
+            $userId,
+            'عميل التحصيل الأول',
+            'NEXT-101',
+        );
+        $secondContract = $this->createContract(
+            $tenantId,
+            $userId,
+            'عميل التحصيل الثاني',
+            'NEXT-102',
+        );
+
+        $this->createCollection(
+            $tenantId,
+            $firstContract,
+            $userId,
+            CollectionStatus::Cancelled,
+            1,
+            '10.00',
+            '2026-08-09',
+            'بند ملغى',
+        );
+        $expectedId = $this->createCollection(
+            $tenantId,
+            $firstContract,
+            $userId,
+            CollectionStatus::Scheduled,
+            2,
+            '65.50',
+            '2026-09-01',
+            'الدفعة الأولى',
+        );
+        $this->createCollection(
+            $tenantId,
+            $firstContract,
+            $userId,
+            CollectionStatus::Scheduled,
+            3,
+            '70.00',
+            '2026-09-01',
+            'الدفعة الثانية',
+        );
+        $this->createCollection(
+            $tenantId,
+            $secondContract,
+            $userId,
+            CollectionStatus::Scheduled,
+            1,
+            '80.00',
+            '2026-08-20',
+            'دفعة أقرب',
+        );
+
+        $baselineSummary = $this->getJson('/api/collections')
+            ->assertOk()
+            ->json('data.summary');
+
+        $response = $this->getJson(
+            '/api/collections?schedule_state=scheduled'
+            .'&sort=next_scheduled_collection&per_page=5',
+        )->assertOk()
+            ->assertJsonPath('data.pagination.total', 2)
+            ->assertJsonPath('data.items.0.contract_id', $secondContract)
+            ->assertJsonPath('data.items.1.contract_id', $firstContract)
+            ->assertJsonPath('data.items.1.next_scheduled_collection.id', $expectedId)
+            ->assertJsonPath('data.items.1.next_scheduled_collection.title', 'الدفعة الأولى')
+            ->assertJsonPath('data.items.1.next_scheduled_collection.amount', '65.50')
+            ->assertJsonPath('data.items.1.next_scheduled_collection.due_date', '2026-09-01');
+
+        $this->assertSame(
+            $baselineSummary,
+            $response->json('data.summary'),
+        );
+    }
+
     public function test_invalid_parameters_return_validation_errors_and_unknown_parameters_are_ignored(): void
     {
         $this->authenticate();
@@ -217,6 +310,7 @@ final class CollectionsIndexApiTest extends ApiTestCase
             '/api/collections?per_page=not-an-integer',
             '/api/collections?status=unknown',
             '/api/collections?schedule_state=invalid',
+            '/api/collections?sort=invalid',
         ] as $url) {
             $this->getJson($url)->assertUnprocessable();
         }
@@ -243,21 +337,44 @@ final class CollectionsIndexApiTest extends ApiTestCase
     {
         [$tenantId, $userId] = $this->authenticate();
         $visible = $this->createContract($tenantId, $userId, 'عميل المستأجر', 'E-101');
+        $visibleCollection = $this->createCollection(
+            $tenantId,
+            $visible,
+            $userId,
+            CollectionStatus::Scheduled,
+            1,
+            '100.00',
+        );
 
         $otherUser = $this->createActiveUser();
         $otherTenantId = (string) TenantUser::query()
             ->where('user_id', $otherUser->id)
             ->value('tenant_id');
         $hidden = $this->createContract($otherTenantId, $otherUser->id, 'عميل آخر', 'E-102');
+        $hiddenCollection = $this->createCollection(
+            $otherTenantId,
+            $hidden,
+            $otherUser->id,
+            CollectionStatus::Scheduled,
+            1,
+            '200.00',
+        );
 
-        $response = $this->getJson('/api/collections')
+        $response = $this->getJson(
+            '/api/collections?schedule_state=scheduled&sort=next_scheduled_collection',
+        )
             ->assertOk()
-            ->assertJsonPath('data.pagination.total', 1);
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.items.0.contract_id', $visible)
+            ->assertJsonPath('data.items.0.next_scheduled_collection.id', $visibleCollection);
 
         $ids = collect($response->json('data.items'))->pluck('contract_id');
+        $collectionIds = collect($response->json('data.items'))
+            ->pluck('next_scheduled_collection.id');
 
         $this->assertTrue($ids->contains($visible));
         $this->assertFalse($ids->contains($hidden));
+        $this->assertFalse($collectionIds->contains($hiddenCollection));
     }
 
     public function test_query_count_is_bounded_when_page_size_grows(): void
@@ -326,13 +443,22 @@ final class CollectionsIndexApiTest extends ApiTestCase
         $unitId = (string) Str::ulid();
         $reservationId = (string) Str::ulid();
         $contractId = (string) Str::ulid();
+        $projectYear = 2026;
+        $projectSequence = $this->nextCollectionsIndexProjectSequence(
+            $projectYear,
+        );
+        $projectNumber = sprintf(
+            'IDX-%d-%03d',
+            $projectYear,
+            $projectSequence,
+        );
 
         DB::table('projects')->insert([
             'id' => $projectId,
             'tenant_id' => $tenantId,
-            'project_number' => "IDX-{$this->fixtureSequence}",
-            'project_number_year' => 2026,
-            'project_sequence_number' => $this->fixtureSequence,
+            'project_number' => $projectNumber,
+            'project_number_year' => $projectYear,
+            'project_sequence_number' => $projectSequence,
             'name' => $projectName ?? "مشروع {$this->fixtureSequence}",
             'project_type' => 'residential',
             'status' => 'active',
@@ -401,6 +527,15 @@ final class CollectionsIndexApiTest extends ApiTestCase
         return $contractId;
     }
 
+    private function nextCollectionsIndexProjectSequence(int $year): int
+    {
+        $currentMaximum = DB::table('projects')
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number');
+
+        return ((int) $currentMaximum) + 1;
+    }
+
     private function createCollection(
         string $tenantId,
         string $contractId,
@@ -408,19 +543,22 @@ final class CollectionsIndexApiTest extends ApiTestCase
         CollectionStatus $status,
         int $sequence,
         string $amount,
-    ): void {
+        ?string $dueDate = null,
+        ?string $title = null,
+    ): string {
         $timestamp = CarbonImmutable::now();
         $scheduled = $status === CollectionStatus::Scheduled;
         $cancelled = $status === CollectionStatus::Cancelled;
+        $collectionId = (string) Str::ulid();
 
         DB::table('collections')->insert([
-            'id' => (string) Str::ulid(),
+            'id' => $collectionId,
             'tenant_id' => $tenantId,
             'contract_id' => $contractId,
             'sequence' => $sequence,
-            'title' => "بند التحصيل {$sequence}",
+            'title' => $title ?? "بند التحصيل {$sequence}",
             'amount' => $amount,
-            'due_date' => $timestamp->addMonths($sequence)->toDateString(),
+            'due_date' => $dueDate ?? $timestamp->addMonths($sequence)->toDateString(),
             'notes' => null,
             'status' => $status->value,
             'scheduled_at' => $scheduled ? $timestamp : null,
@@ -433,5 +571,7 @@ final class CollectionsIndexApiTest extends ApiTestCase
             'created_at' => $timestamp,
             'updated_at' => $timestamp,
         ]);
+
+        return $collectionId;
     }
 }

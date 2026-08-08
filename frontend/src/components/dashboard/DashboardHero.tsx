@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   CalendarPlus,
-  CircleDollarSign,
   FilePlus2,
   FolderPlus,
   UserPlus,
@@ -77,13 +76,7 @@ export function DashboardHero() {
       label: t("dashboard.quickActions.newContract"),
       icon: FilePlus2,
       href: "/contracts/",
-      enabled: false,
-    },
-    {
-      label: t("dashboard.quickActions.newPayment"),
-      icon: CircleDollarSign,
-      href: "/collections/",
-      enabled: false,
+      enabled: true,
     },
   ];
 
@@ -129,7 +122,7 @@ export function DashboardHero() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-3">
             {actions.map((action) => {
               const Icon = action.icon;
 

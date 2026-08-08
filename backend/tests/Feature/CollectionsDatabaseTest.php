@@ -201,32 +201,101 @@ final class CollectionsDatabaseTest extends ApiTestCase
         $currencyMigration = require database_path(
             'migrations/2026_07_28_080000_prepare_contract_currency_for_collections.php'
         );
+        $baselineContractCount = DB::table('contracts')->count();
+        $originalSchema = (string) DB::selectOne(
+            'SELECT current_schema() AS name'
+        )->name;
+        $isolatedSchema = 'collections_migration_'.strtolower((string) Str::ulid());
 
-        $this->assertSame(0, DB::table('contracts')->count());
+        DB::statement("CREATE SCHEMA {$isolatedSchema}");
+        DB::selectOne(
+            "SELECT set_config('search_path', ?, false)",
+            [$isolatedSchema],
+        );
 
-        $collectionsMigration->down();
-        $currencyMigration->down();
+        try {
+            DB::statement(<<<'SQL'
+                CREATE TABLE tenants (
+                    id CHAR(26) PRIMARY KEY,
+                    currency VARCHAR(3) NOT NULL
+                )
+            SQL);
+            DB::statement(<<<'SQL'
+                CREATE TABLE users (
+                    id BIGINT PRIMARY KEY
+                )
+            SQL);
+            DB::statement(<<<'SQL'
+                CREATE TABLE contracts (
+                    id CHAR(26) PRIMARY KEY,
+                    tenant_id CHAR(26) NOT NULL
+                )
+            SQL);
 
-        $this->assertFalse(
-            collect(DB::select(<<<'SQL'
-                SELECT column_name
+            $currencyMigration->up();
+            $collectionsMigration->up();
+
+            $tenantId = (string) Str::ulid();
+            DB::table('tenants')->insert([
+                'id' => $tenantId,
+                'currency' => 'SAR',
+            ]);
+            DB::table('contracts')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $tenantId,
+                'currency' => 'SAR',
+            ]);
+
+            $collectionsMigration->down();
+
+            try {
+                $currencyMigration->down();
+                $this->fail(
+                    'Expected contract records to block the currency migration rollback.'
+                );
+            } catch (\RuntimeException $exception) {
+                $this->assertSame(
+                    'Cannot safely roll back contract currency preparation while '
+                    .'contracts exist. Use a forward-fix migration instead.',
+                    $exception->getMessage(),
+                );
+            }
+
+            DB::table('contracts')->delete();
+            $currencyMigration->down();
+
+            $this->assertFalse(
+                collect(DB::select(<<<'SQL'
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'contracts'
+                      AND column_name = 'currency'
+                SQL))->isNotEmpty()
+            );
+
+            $currencyMigration->up();
+            $collectionsMigration->up();
+
+            $this->assertSame('NO', DB::selectOne(<<<'SQL'
+                SELECT is_nullable
                 FROM information_schema.columns
                 WHERE table_schema = current_schema()
                   AND table_name = 'contracts'
                   AND column_name = 'currency'
-            SQL))->isNotEmpty()
+            SQL)->is_nullable);
+        } finally {
+            DB::selectOne(
+                "SELECT set_config('search_path', ?, false)",
+                [$originalSchema],
+            );
+            DB::statement("DROP SCHEMA IF EXISTS {$isolatedSchema} CASCADE");
+        }
+
+        $this->assertSame(
+            $baselineContractCount,
+            DB::table('contracts')->count(),
         );
-
-        $currencyMigration->up();
-        $collectionsMigration->up();
-
-        $this->assertSame('NO', DB::selectOne(<<<'SQL'
-            SELECT is_nullable
-            FROM information_schema.columns
-            WHERE table_schema = current_schema()
-              AND table_name = 'contracts'
-              AND column_name = 'currency'
-        SQL)->is_nullable);
     }
 
     /**

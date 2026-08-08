@@ -3,127 +3,193 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
+import {
+  initialDashboardResource,
+  loadDashboardResource,
+} from "@/hooks/dashboard-resource";
 import { useAuth } from "@/providers/AuthProvider";
+import { fetchCollectionsIndex } from "@/services/collections";
+import { fetchContracts } from "@/services/contracts";
 import { fetchCustomers } from "@/services/customers";
+import { fetchLeads } from "@/services/leads";
 import { fetchProjects } from "@/services/projects";
+import { fetchReservations } from "@/services/reservations";
 import { fetchUnits } from "@/services/units";
-import type { Project } from "@/types/project";
+import type {
+  DashboardCollections,
+  DashboardData,
+  DashboardFollowUps,
+  DashboardProjects,
+  DashboardResource,
+} from "@/types/dashboard";
 
-type DashboardData = {
-  projects: Project[];
-  recentProjects: Project[];
-  totalProjects: number;
-  totalCustomers: number | null;
-  totalUnits: number | null;
-  isLoading: boolean;
-  error: string | null;
-  refresh: () => Promise<void>;
-};
+const CRM_ROLES = new Set([
+  "administrator",
+  "sales",
+  "employee",
+]);
 
 export function useDashboard(): DashboardData {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const requestSequence = useRef(0);
+  const hasCrmAccess = CRM_ROLES.has(user?.role ?? "");
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [totalProjects, setTotalProjects] = useState(0);
-  const [totalCustomers, setTotalCustomers] =
-    useState<number | null>(null);
-  const [totalUnits, setTotalUnits] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [projects, setProjects] =
+    useState<DashboardResource<DashboardProjects>>(
+      initialDashboardResource
+    );
+  const [customers, setCustomers] =
+    useState<DashboardResource<number>>(initialDashboardResource);
+  const [units, setUnits] =
+    useState<DashboardResource<number>>(initialDashboardResource);
+  const [reservations, setReservations] =
+    useState<DashboardResource<number>>(initialDashboardResource);
+  const [contracts, setContracts] =
+    useState<DashboardResource<number>>(initialDashboardResource);
+  const [followUps, setFollowUps] =
+    useState<DashboardResource<DashboardFollowUps>>(
+      initialDashboardResource
+    );
+  const [collections, setCollections] =
+    useState<DashboardResource<DashboardCollections>>(
+      initialDashboardResource
+    );
 
   const loadDashboard = useCallback(async (): Promise<void> => {
     if (!token) {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    setTotalCustomers(null);
-    setTotalUnits(null);
+    const requestId = ++requestSequence.current;
+    const isCurrent = (): boolean =>
+      requestSequence.current === requestId;
+    const tasks: Promise<void>[] = [
+      loadDashboardResource(
+        async () => {
+          const response = await fetchProjects(token, {
+            perPage: 5,
+            status: "active",
+          });
 
-    try {
-      const [projectsResponse, customersResponse, unitsResponse] =
-        await Promise.all([
-          fetchProjects(token, { perPage: 5 }),
-          fetchCustomers(token, { per_page: 1 }),
-          fetchUnits(token, { per_page: 1 }),
-        ]);
+          return {
+            items: response.data.data,
+            activeTotal: response.data.total,
+          };
+        },
+        setProjects,
+        isCurrent
+      ),
+      loadDashboardResource(
+        async () =>
+          (await fetchCustomers(token, { per_page: 1 }))
+            .data.summary.total,
+        setCustomers,
+        isCurrent
+      ),
+      loadDashboardResource(
+        async () =>
+          (
+            await fetchUnits(token, {
+              per_page: 1,
+              status: "available",
+              archived: false,
+            })
+          ).data.units.total,
+        setUnits,
+        isCurrent
+      ),
+      loadDashboardResource(
+        async () =>
+          (await fetchReservations(token, { per_page: 1 }))
+            .data.summary.active,
+        setReservations,
+        isCurrent
+      ),
+      loadDashboardResource(
+        async () =>
+          (await fetchContracts(token, { per_page: 1 }))
+            .data.summary.total,
+        setContracts,
+        isCurrent
+      ),
+      loadDashboardResource(
+        async () => {
+          const response = await fetchCollectionsIndex(token, {
+            per_page: 5,
+            schedule_state: "scheduled",
+            sort: "next_scheduled_collection",
+          });
 
-      setProjects(projectsResponse.data.data);
-      setTotalProjects(projectsResponse.data.total);
-      setTotalCustomers(
-        customersResponse.data.summary.total
+          return {
+            items: response.data.items,
+            summary: response.data.summary,
+          };
+        },
+        setCollections,
+        isCurrent
+      ),
+    ];
+
+    if (hasCrmAccess) {
+      tasks.push(
+        loadDashboardResource(
+          async () => {
+            const [overdue, today] = await Promise.all([
+              fetchLeads(token, {
+                follow_up_state: "overdue",
+                per_page: 5,
+              }),
+              fetchLeads(token, {
+                follow_up_state: "today",
+                per_page: 5,
+              }),
+            ]);
+
+            return {
+              summary: overdue.data.summary,
+              overdue: overdue.data.leads,
+              today: today.data.leads,
+            };
+          },
+          setFollowUps,
+          isCurrent
+        )
       );
-      setTotalUnits(unitsResponse.data.summary.total);
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to load dashboard data."
-      );
-    } finally {
-      setIsLoading(false);
+    } else {
+      setFollowUps({
+        data: null,
+        isLoading: false,
+        error: null,
+      });
     }
-  }, [token]);
+
+    await Promise.all(tasks);
+  }, [hasCrmAccess, token]);
 
   useEffect(() => {
-    if (!token) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    Promise.all([
-      fetchProjects(token, { perPage: 5 }),
-      fetchCustomers(token, { per_page: 1 }),
-      fetchUnits(token, { per_page: 1 }),
-    ])
-      .then(([projectsResponse, customersResponse, unitsResponse]) => {
-        if (isCancelled) {
-          return;
-        }
-
-        setProjects(projectsResponse.data.data);
-        setTotalProjects(projectsResponse.data.total);
-        setTotalCustomers(
-          customersResponse.data.summary.total
-        );
-        setTotalUnits(unitsResponse.data.summary.total);
-        setError(null);
-      })
-      .catch((caughtError: unknown) => {
-        if (isCancelled) {
-          return;
-        }
-
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Unable to load dashboard data."
-        );
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      });
+    const timeoutId = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
 
     return () => {
-      isCancelled = true;
+      window.clearTimeout(timeoutId);
+      requestSequence.current += 1;
     };
-  }, [token]);
+  }, [loadDashboard]);
 
   return {
     projects,
-    recentProjects: projects,
-    totalProjects,
-    totalCustomers,
-    totalUnits,
-    isLoading,
-    error,
+    customers,
+    units,
+    reservations,
+    contracts,
+    followUps,
+    collections,
+    hasCrmAccess,
     refresh: loadDashboard,
   };
 }
