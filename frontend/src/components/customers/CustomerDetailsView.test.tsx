@@ -12,6 +12,7 @@ import {
 
 import { CustomerDetailsView } from "@/components/customers/CustomerDetailsView";
 import type { Customer } from "@/types/customer";
+import type { CustomerBusinessContext } from "@/types/customer-business-context";
 
 const customer: Customer = {
   id: "01K00000000000000000000001",
@@ -32,11 +33,20 @@ const customer: Customer = {
   updated_at: "2026-08-05T07:30:00.000Z",
 };
 
+const businessContext: CustomerBusinessContext = {
+  summary: {
+    reservations_total: 0,
+    contracts_total: 0,
+  },
+  journeys: [],
+};
+
 describe("CustomerDetailsView", () => {
   it("renders the full customer record", () => {
     render(
       <CustomerDetailsView
         customer={customer}
+        businessContext={businessContext}
         isArabic
         isLoading={false}
         error={null}
@@ -74,6 +84,7 @@ describe("CustomerDetailsView", () => {
     render(
       <CustomerDetailsView
         customer={customer}
+        businessContext={businessContext}
         isArabic
         isLoading={false}
         error={null}
@@ -104,6 +115,7 @@ describe("CustomerDetailsView", () => {
           archived_at:
             "2026-08-05T08:00:00.000Z",
         }}
+        businessContext={businessContext}
         isArabic
         isLoading={false}
         error={null}
@@ -123,6 +135,7 @@ describe("CustomerDetailsView", () => {
     const { rerender } = render(
       <CustomerDetailsView
         customer={null}
+        businessContext={null}
         isArabic
         isLoading
         error={null}
@@ -142,6 +155,7 @@ describe("CustomerDetailsView", () => {
     rerender(
       <CustomerDetailsView
         customer={null}
+        businessContext={null}
         isArabic
         isLoading={false}
         error={null}
@@ -163,6 +177,7 @@ describe("CustomerDetailsView", () => {
     rerender(
       <CustomerDetailsView
         customer={null}
+        businessContext={null}
         isArabic
         isLoading={false}
         error="تعذر الاتصال"

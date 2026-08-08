@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { CustomerBusinessContext } from "@/components/customers/CustomerBusinessContext";
 import { formatDateTime } from "@/lib/date-format";
+import type { CustomerBusinessContext as BusinessContext } from "@/types/customer-business-context";
 import type {
   Customer,
   CustomerCategory,
@@ -22,6 +24,7 @@ import type {
 
 type CustomerDetailsViewProps = {
   customer: Customer | null;
+  businessContext: BusinessContext | null;
   isArabic: boolean;
   isLoading: boolean;
   error: string | null;
@@ -33,6 +36,7 @@ type CustomerDetailsViewProps = {
 
 export function CustomerDetailsView({
   customer,
+  businessContext,
   isArabic,
   isLoading,
   error,
@@ -330,6 +334,13 @@ export function CustomerDetailsView({
           </p>
         </RecordSection>
       </div>
+
+      {businessContext ? (
+        <CustomerBusinessContext
+          context={businessContext}
+          isArabic={isArabic}
+        />
+      ) : null}
     </div>
   );
 }

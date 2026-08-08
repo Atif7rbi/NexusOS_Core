@@ -43,6 +43,7 @@ import type {
   CustomerStatus,
   CustomerType,
 } from "@/types/customer";
+import type { CustomerBusinessContext } from "@/types/customer-business-context";
 
 type CustomerAction = "archive" | "restore";
 
@@ -108,6 +109,11 @@ function CustomersPageContent() {
 
   const [customerRecord, setCustomerRecord] =
     useState<Customer | null>(null);
+
+  const [
+    customerBusinessContext,
+    setCustomerBusinessContext,
+  ] = useState<CustomerBusinessContext | null>(null);
 
   const [
     isCustomerRecordLoading,
@@ -360,6 +366,7 @@ function CustomersPageContent() {
     useCallback(async (): Promise<void> => {
       if (!token || !query.customerId) {
         setCustomerRecord(null);
+        setCustomerBusinessContext(null);
         setCustomerRecordError(null);
         setCustomerRecordNotFound(false);
         setCustomerRecordLoading(false);
@@ -376,9 +383,13 @@ function CustomersPageContent() {
           query.customerId
         );
 
-        setCustomerRecord(record);
+        setCustomerRecord(record.customer);
+        setCustomerBusinessContext(
+          record.business_context
+        );
       } catch (caughtError) {
         setCustomerRecord(null);
+        setCustomerBusinessContext(null);
 
         if (
           caughtError instanceof ApiRequestError &&
@@ -512,6 +523,7 @@ function CustomersPageContent() {
       <AppShell>
         <CustomerDetailsView
           customer={customerRecord}
+          businessContext={customerBusinessContext}
           isArabic={isArabic}
           isLoading={isCustomerRecordLoading}
           error={customerRecordError}

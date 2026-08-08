@@ -52,6 +52,13 @@ describe("customers service", () => {
           JSON.stringify({
             data: {
               customer: responseCustomer,
+              business_context: {
+                summary: {
+                  reservations_total: 0,
+                  contracts_total: 0,
+                },
+                journeys: [],
+              },
             },
           }),
           {
@@ -68,7 +75,16 @@ describe("customers service", () => {
         "token",
         responseCustomer.id
       )
-    ).resolves.toEqual(responseCustomer);
+    ).resolves.toEqual({
+      customer: responseCustomer,
+      business_context: {
+        summary: {
+          reservations_total: 0,
+          contracts_total: 0,
+        },
+        journeys: [],
+      },
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       `https://api.example.test/customers/${responseCustomer.id}`,
