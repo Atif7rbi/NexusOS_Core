@@ -24,6 +24,7 @@ import { CustomerDetailsView } from "@/components/customers/CustomerDetailsView"
 import { CustomerFormModal } from "@/components/customers/CustomerFormModal";
 import { Button } from "@/components/ui/Button";
 import { ApiRequestError } from "@/lib/api-error";
+import { buildContextualReservationUrl } from "@/lib/reservation-create-context";
 import { useCustomersQueryState } from "@/hooks/useCustomersQueryState";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/providers/AuthProvider";
@@ -519,6 +520,15 @@ function CustomersPageContent() {
     query.category !== "all";
 
   if (query.customerId) {
+    const createReservationHref =
+      customerRecord &&
+      typeof window !== "undefined"
+        ? buildContextualReservationUrl(
+            customerRecord.id,
+            `${window.location.pathname}${window.location.search}`
+          )
+        : undefined;
+
     return (
       <AppShell>
         <CustomerDetailsView
@@ -537,6 +547,7 @@ function CustomersPageContent() {
               openEditModal(customerRecord);
             }
           }}
+          createReservationHref={createReservationHref}
         />
 
         {isFormOpen ? (

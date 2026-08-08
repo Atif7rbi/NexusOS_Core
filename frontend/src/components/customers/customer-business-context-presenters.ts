@@ -22,6 +22,7 @@ export function getCustomerBusinessContextCopy(isArabic: boolean) {
         description:
           "الحجوزات والمشاريع والوحدات والعقود وجداول التحصيل المرتبطة بالعميل.",
         reservations: "الحجوزات",
+        createReservation: "إنشاء حجز",
         reservation: "الحجز",
         contracts: "العقود",
         contract: "العقد",
@@ -65,6 +66,7 @@ export function getCustomerBusinessContextCopy(isArabic: boolean) {
         description:
           "Reservations, projects, units, contracts and collection schedules linked to this customer.",
         reservations: "Reservations",
+        createReservation: "Create reservation",
         reservation: "Reservation",
         contracts: "Contracts",
         contract: "Contract",

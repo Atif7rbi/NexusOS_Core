@@ -71,6 +71,27 @@ const context: BusinessContext = {
 };
 
 describe("CustomerBusinessContext", () => {
+  it("links the customer journey to contextual reservation creation", () => {
+    const href =
+      "/reservations/?create=1&customer=customer-1";
+
+    render(
+      <CustomerBusinessContext
+        context={context}
+        isArabic
+        createReservationHref={href}
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("link", {
+          name: "إنشاء حجز",
+        })
+        .getAttribute("href")
+    ).toBe(href);
+  });
+
   it("renders the complete read-only business journey", () => {
     render(
       <CustomerBusinessContext

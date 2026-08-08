@@ -95,6 +95,7 @@ vi.mock(
       isNotFound,
       error,
       onBack,
+      createReservationHref,
     }: {
       customer: Customer | null;
       businessContext: CustomerBusinessContext | null;
@@ -102,6 +103,7 @@ vi.mock(
       isNotFound: boolean;
       error: string | null;
       onBack: () => void;
+      createReservationHref?: string;
     }) => (
       <div>
         {isLoading ? (
@@ -130,6 +132,12 @@ vi.mock(
         >
           close-record
         </button>
+
+        {createReservationHref ? (
+          <a href={createReservationHref}>
+            create-reservation
+          </a>
+        ) : null}
       </div>
     ),
   })
@@ -308,6 +316,36 @@ describe("CustomersPage record query state", () => {
       null,
       "",
       "/customers/?page=3&status=customer"
+    );
+  });
+
+  it("builds contextual reservation navigation with the complete record state", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      `/customers/?page=3&status=customer&search=محمد&customer=${customer.id}`
+    );
+
+    render(<CustomersPage />);
+
+    const link = await screen.findByRole(
+      "link",
+      {
+        name: "create-reservation",
+      }
+    );
+    const target = new URL(
+      link.getAttribute("href") ?? "",
+      "https://nexusos.test"
+    );
+
+    expect(target.pathname).toBe(
+      "/reservations/"
+    );
+    expect(target.searchParams.get("create")).toBe("1");
+    expect(target.searchParams.get("customer")).toBe(customer.id);
+    expect(target.searchParams.get("returnTo")).toBe(
+      `/customers/?page=3&status=customer&search=%D9%85%D8%AD%D9%85%D8%AF&customer=${customer.id}`
     );
   });
 
