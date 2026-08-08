@@ -124,6 +124,12 @@ export type CollectionsIndexItem = {
   project_name: string | null;
   schedule_state: DerivedScheduleState;
   schedule_active_total: string;
+  next_scheduled_collection: {
+    id: string;
+    title: string;
+    amount: string;
+    due_date: string;
+  } | null;
 };
 
 export type CollectionsIndexPagination = {
@@ -155,4 +161,5 @@ export type CollectionsIndexQuery = {
   search?: string;
   status?: ContractStatus | "";
   schedule_state?: DerivedScheduleState | "";
+  sort?: "next_scheduled_collection" | "";
 };

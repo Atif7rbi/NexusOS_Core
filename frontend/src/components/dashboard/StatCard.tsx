@@ -10,7 +10,7 @@ type StatCardProps = {
   value: string;
   description: string;
   icon: LucideIcon;
-  tone: "gold" | "blue" | "green" | "violet";
+  tone: "gold" | "blue" | "green" | "violet" | "red";
   href?: string;
 };
 
@@ -31,6 +31,10 @@ const toneClasses = {
     icon:
       "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
     accent: "bg-[var(--brand-primary)]",
+  },
+  red: {
+    icon: "bg-[var(--danger-soft)] text-[var(--danger)]",
+    accent: "bg-[var(--danger)]",
   },
 };
 

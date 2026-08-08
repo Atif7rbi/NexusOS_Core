@@ -64,9 +64,21 @@ final class CollectionsIndexQuery
             );
         }
 
-        $paginator = $itemsQuery
-            ->orderByDesc('contracts.created_at')
-            ->paginate($perPage, ['*'], 'page', $page);
+        if (($filters['sort'] ?? null) === 'next_scheduled_collection') {
+            $itemsQuery
+                ->orderByRaw('next_scheduled_collections.due_date ASC NULLS LAST')
+                ->orderBy('next_scheduled_collections.sequence')
+                ->orderBy('next_scheduled_collections.id');
+        } else {
+            $itemsQuery->orderByDesc('contracts.created_at');
+        }
+
+        $paginator = $itemsQuery->paginate(
+            $perPage,
+            ['*'],
+            'page',
+            $page,
+        );
 
         $summary = DB::query()
             ->fromSub(
@@ -139,6 +151,15 @@ final class CollectionsIndexQuery
                         ->on('collection_totals.contract_id', '=', 'contracts.id');
                 },
             )
+            ->leftJoinSub(
+                $this->nextScheduledCollections(),
+                'next_scheduled_collections',
+                function ($join): void {
+                    $join
+                        ->on('next_scheduled_collections.tenant_id', '=', 'contracts.tenant_id')
+                        ->on('next_scheduled_collections.contract_id', '=', 'contracts.id');
+                },
+            )
             ->where('contracts.tenant_id', $tenantId)
             ->select([
                 'contracts.id AS contract_id',
@@ -148,6 +169,10 @@ final class CollectionsIndexQuery
                 'customers.name AS customer_name',
                 'units.unit_number',
                 'projects.name AS project_name',
+                'next_scheduled_collections.id AS next_scheduled_collection_id',
+                'next_scheduled_collections.title AS next_scheduled_collection_title',
+                'next_scheduled_collections.amount AS next_scheduled_collection_amount',
+                'next_scheduled_collections.due_date AS next_scheduled_collection_due_date',
             ])
             ->selectRaw(self::SCHEDULE_STATE_SQL.' AS schedule_state')
             ->selectRaw('COALESCE(collection_totals.active_total, 0) AS schedule_active_total');
@@ -163,6 +188,33 @@ final class CollectionsIndexQuery
             ->selectRaw("COUNT(*) FILTER (WHERE status = 'scheduled') AS scheduled_count")
             ->selectRaw("COALESCE(SUM(amount) FILTER (WHERE status <> 'cancelled'), 0) AS active_total")
             ->groupBy(['tenant_id', 'contract_id']);
+    }
+
+    private function nextScheduledCollections(): Builder
+    {
+        $ranked = DB::table('collections')
+            ->where('status', 'scheduled')
+            ->select([
+                'id',
+                'tenant_id',
+                'contract_id',
+                'sequence',
+                'title',
+                'amount',
+                'due_date',
+            ])
+            ->selectRaw(
+                <<<'SQL'
+                    ROW_NUMBER() OVER (
+                        PARTITION BY tenant_id, contract_id
+                        ORDER BY due_date ASC, sequence ASC, id ASC
+                    ) AS schedule_position
+                SQL,
+            );
+
+        return DB::query()
+            ->fromSub($ranked, 'ranked_scheduled_collections')
+            ->where('schedule_position', 1);
     }
 
     /** @return array<string, mixed> */
@@ -184,6 +236,14 @@ final class CollectionsIndexQuery
                 : (string) $item->project_name,
             'schedule_state' => (string) $item->schedule_state,
             'schedule_active_total' => $this->decimal($item->schedule_active_total),
+            'next_scheduled_collection' => $item->next_scheduled_collection_id === null
+                ? null
+                : [
+                    'id' => (string) $item->next_scheduled_collection_id,
+                    'title' => (string) $item->next_scheduled_collection_title,
+                    'amount' => $this->decimal($item->next_scheduled_collection_amount),
+                    'due_date' => (string) $item->next_scheduled_collection_due_date,
+                ],
         ];
     }
 
