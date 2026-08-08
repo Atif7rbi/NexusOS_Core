@@ -443,13 +443,22 @@ final class CollectionsIndexApiTest extends ApiTestCase
         $unitId = (string) Str::ulid();
         $reservationId = (string) Str::ulid();
         $contractId = (string) Str::ulid();
+        $projectYear = 2026;
+        $projectSequence = $this->nextCollectionsIndexProjectSequence(
+            $projectYear,
+        );
+        $projectNumber = sprintf(
+            'IDX-%d-%03d',
+            $projectYear,
+            $projectSequence,
+        );
 
         DB::table('projects')->insert([
             'id' => $projectId,
             'tenant_id' => $tenantId,
-            'project_number' => "IDX-{$this->fixtureSequence}",
-            'project_number_year' => 2026,
-            'project_sequence_number' => $this->fixtureSequence,
+            'project_number' => $projectNumber,
+            'project_number_year' => $projectYear,
+            'project_sequence_number' => $projectSequence,
             'name' => $projectName ?? "مشروع {$this->fixtureSequence}",
             'project_type' => 'residential',
             'status' => 'active',
@@ -516,6 +525,15 @@ final class CollectionsIndexApiTest extends ApiTestCase
         ]);
 
         return $contractId;
+    }
+
+    private function nextCollectionsIndexProjectSequence(int $year): int
+    {
+        $currentMaximum = DB::table('projects')
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number');
+
+        return ((int) $currentMaximum) + 1;
     }
 
     private function createCollection(
