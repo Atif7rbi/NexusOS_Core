@@ -28,13 +28,13 @@ export default function RootLayout({
       <body>
         <SystemSettingsProvider>
           <LanguageProvider>
-            <ThemeProvider>
-              <AuthProvider>
+            <AuthProvider>
+              <ThemeProvider>
                 <AppShellProvider>
                   {children}
                 </AppShellProvider>
-              </AuthProvider>
-            </ThemeProvider>
+              </ThemeProvider>
+            </AuthProvider>
           </LanguageProvider>
         </SystemSettingsProvider>
       </body>

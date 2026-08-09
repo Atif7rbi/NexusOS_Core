@@ -6,6 +6,7 @@ import {
 } from "@testing-library/react";
 import {
   afterEach,
+  beforeEach,
   describe,
   expect,
   it,
@@ -18,6 +19,15 @@ import {
   useTheme,
   type ThemeProfile,
 } from "@/providers/ThemeProvider";
+
+const authState = vi.hoisted(() => ({
+  user: null as { id: number } | null,
+  isLoading: false,
+}));
+
+vi.mock("@/providers/AuthProvider", () => ({
+  useAuth: () => authState,
+}));
 
 function ThemeProbe() {
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
@@ -41,16 +51,22 @@ function ThemeProbe() {
   );
 }
 
-function renderProvider(storedTheme?: string) {
-  if (storedTheme) {
-    window.localStorage.setItem("ufq_theme", storedTheme);
-  }
+function renderProvider(userId: number | null = 1) {
+  authState.user = userId === null ? null : { id: userId };
 
   return render(
     <ThemeProvider>
       <ThemeProbe />
     </ThemeProvider>
   );
+}
+
+function setCurrentUser(userId: number | null): void {
+  authState.user = userId === null ? null : { id: userId };
+}
+
+function userThemeKey(userId: number): string {
+  return `ufq_theme:user:${userId}`;
 }
 
 async function expectRootTheme(
@@ -61,10 +77,18 @@ async function expectRootTheme(
     expect(document.documentElement.dataset.theme).toBe(profile);
   });
   expect(document.documentElement.classList.contains("dark")).toBe(isDark);
-  expect(window.localStorage.getItem("ufq_theme")).toBe(profile);
 }
 
 describe("ThemeProvider", () => {
+  beforeEach(() => {
+    authState.user = null;
+    authState.isLoading = false;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockReturnValue({ matches: false })
+    );
+  });
+
   afterEach(() => {
     window.localStorage.clear();
     document.documentElement.classList.remove("dark");
@@ -78,7 +102,7 @@ describe("ThemeProvider", () => {
       vi.fn().mockReturnValue({ matches: true })
     );
 
-    renderProvider();
+    renderProvider(1);
 
     await expectRootTheme("dark-1", true);
     expect(screen.getByText("dark-1:dark")).toBeTruthy();
@@ -90,45 +114,120 @@ describe("ThemeProvider", () => {
     ["dark-1", true],
     ["dark-2", true],
   ] as const)(
-    "restores and synchronizes the %s profile",
+    "restores and synchronizes the %s profile for the current user",
     async (profile, isDark) => {
-      renderProvider(profile);
+      window.localStorage.setItem(userThemeKey(1), profile);
+      renderProvider(1);
       await expectRootTheme(profile, isDark);
-      expect(
-        screen.getByText(`${profile}:${isDark ? "dark" : "light"}`)
-      ).toBeTruthy();
     }
   );
+
+  it("removes malformed scoped and legacy values before using the safe default", async () => {
+    window.localStorage.setItem(userThemeKey(7), "unknown-profile");
+    window.localStorage.setItem("ufq_theme", "malformed-theme");
+
+    renderProvider(7);
+
+    await expectRootTheme("light-1", false);
+    expect(window.localStorage.getItem(userThemeKey(7))).toBeNull();
+    expect(window.localStorage.getItem("ufq_theme")).toBeNull();
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+  });
 
   it.each([
     ["light", "light-1", false],
     ["dark", "dark-1", true],
   ] as const)(
-    "migrates legacy %s storage to %s",
+    "migrates legacy %s storage once to the authenticated user",
     async (legacy, profile, isDark) => {
-      renderProvider(legacy);
+      window.localStorage.setItem("ufq_theme", legacy);
+      renderProvider(7);
+
       await expectRootTheme(profile, isDark);
+      expect(window.localStorage.getItem(userThemeKey(7))).toBe(profile);
+      expect(window.localStorage.getItem("ufq_theme")).toBeNull();
     }
   );
 
-  it("keeps the profile family when toggling light and dark", async () => {
-    renderProvider("light-2");
+  it.each([
+    ["light-1", "dark-1"],
+    ["light-2", "dark-2"],
+  ] as const)(
+    "keeps the %s and %s profile family when toggling",
+    async (lightProfile, darkProfile) => {
+      window.localStorage.setItem(userThemeKey(1), lightProfile);
+      renderProvider(1);
+      await expectRootTheme(lightProfile, false);
+
+      fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+      await expectRootTheme(darkProfile, true);
+      expect(window.localStorage.getItem(userThemeKey(1))).toBe(darkProfile);
+
+      fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+      await expectRootTheme(lightProfile, false);
+      expect(window.localStorage.getItem(userThemeKey(1))).toBe(lightProfile);
+    }
+  );
+
+  it("restores independent preferences across logout and login without leakage", async () => {
+    const view = renderProvider(101);
+
+    fireEvent.click(screen.getByRole("button", { name: "dark-1" }));
+    await expectRootTheme("dark-1", true);
+    expect(window.localStorage.getItem(userThemeKey(101))).toBe("dark-1");
+
+    setCurrentUser(null);
+    view.rerender(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>
+    );
+    await expectRootTheme("light-1", false);
+
+    setCurrentUser(202);
+    view.rerender(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>
+    );
+    await expectRootTheme("light-1", false);
+    expect(window.localStorage.getItem(userThemeKey(202))).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "light-2" }));
     await expectRootTheme("light-2", false);
+    expect(window.localStorage.getItem(userThemeKey(202))).toBe("light-2");
 
-    fireEvent.click(screen.getByRole("button", { name: "toggle" }));
-    await expectRootTheme("dark-2", true);
+    setCurrentUser(null);
+    view.rerender(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>
+    );
+    await expectRootTheme("light-1", false);
 
-    fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+    setCurrentUser(101);
+    view.rerender(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>
+    );
+    await expectRootTheme("dark-1", true);
+
+    setCurrentUser(202);
+    view.rerender(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>
+    );
     await expectRootTheme("light-2", false);
   });
 
-  it("updates storage, data-theme, and class through setTheme", async () => {
-    renderProvider("light-1");
-
+  it("keeps unauthenticated changes ephemeral", async () => {
+    renderProvider(null);
     fireEvent.click(screen.getByRole("button", { name: "dark-2" }));
-    await expectRootTheme("dark-2", true);
 
-    fireEvent.click(screen.getByRole("button", { name: "light-1" }));
-    await expectRootTheme("light-1", false);
+    await expectRootTheme("dark-2", true);
+    expect(window.localStorage.getItem("ufq_theme")).toBeNull();
+    expect(window.localStorage.length).toBe(0);
   });
 });

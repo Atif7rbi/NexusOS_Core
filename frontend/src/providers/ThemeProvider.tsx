@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { useAuth } from "@/providers/AuthProvider";
+
 export const THEME_PROFILES = [
   "light-1",
   "light-2",
@@ -27,6 +29,10 @@ type ThemeContextValue = {
 };
 
 const STORAGE_KEY = "ufq_theme";
+
+function getUserStorageKey(userId: number): string {
+  return `${STORAGE_KEY}:user:${userId}`;
+}
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
@@ -50,17 +56,13 @@ function normalizeStoredTheme(
   ) ?? null;
 }
 
-function getInitialTheme(): ThemeProfile {
+function getDefaultTheme(): ThemeProfile {
   if (typeof window === "undefined") {
     return "light-1";
   }
 
-  const storedTheme = normalizeStoredTheme(
-    window.localStorage.getItem(STORAGE_KEY)
-  );
-
-  if (storedTheme) {
-    return storedTheme;
+  if (typeof window.matchMedia !== "function") {
+    return "light-1";
   }
 
   return window.matchMedia(
@@ -68,6 +70,36 @@ function getInitialTheme(): ThemeProfile {
   ).matches
     ? "dark-1"
     : "light-1";
+}
+
+function getUserTheme(userId: number): ThemeProfile {
+  const userStorageKey = getUserStorageKey(userId);
+  const storedValue = window.localStorage.getItem(userStorageKey);
+  const storedTheme = normalizeStoredTheme(storedValue);
+
+  if (storedTheme) {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return storedTheme;
+  }
+
+  if (storedValue !== null) {
+    window.localStorage.removeItem(userStorageKey);
+  }
+
+  const legacyValue = window.localStorage.getItem(STORAGE_KEY);
+  const legacyTheme = normalizeStoredTheme(legacyValue);
+
+  if (legacyTheme) {
+    window.localStorage.setItem(userStorageKey, legacyTheme);
+    window.localStorage.removeItem(STORAGE_KEY);
+    return legacyTheme;
+  }
+
+  if (legacyValue !== null) {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+
+  return getDefaultTheme();
 }
 
 function isDarkProfile(theme: ThemeProfile): boolean {
@@ -85,19 +117,46 @@ function applyTheme(theme: ThemeProfile): void {
 export function ThemeProvider({
   children,
 }: ThemeProviderProps) {
+  const { user, isLoading } = useAuth();
+  const userId = isLoading ? null : (user?.id ?? null);
+  const identityKey = isLoading
+    ? "auth-loading"
+    : userId === null
+      ? "anonymous"
+      : `user-${userId}`;
+
+  return (
+    <ThemeStateProvider key={identityKey} userId={userId}>
+      {children}
+    </ThemeStateProvider>
+  );
+}
+
+function ThemeStateProvider({
+  children,
+  userId,
+}: ThemeProviderProps & { userId: number | null }) {
   const [theme, setThemeState] =
-    useState<ThemeProfile>(getInitialTheme);
+    useState<ThemeProfile>(() =>
+      userId === null ? getDefaultTheme() : getUserTheme(userId)
+    );
 
   useEffect(() => {
     applyTheme(theme);
-    window.localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   const setTheme = useCallback(
     (nextTheme: ThemeProfile): void => {
       setThemeState(nextTheme);
+
+      if (userId !== null) {
+        window.localStorage.setItem(
+          getUserStorageKey(userId),
+          nextTheme
+        );
+      }
     },
-    []
+    [userId]
   );
 
   const toggleTheme = useCallback((): void => {
