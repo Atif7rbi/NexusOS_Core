@@ -1,6 +1,9 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -18,6 +21,7 @@ type QuickCreateQuery = {
 };
 
 export function useQuickCreateQuery(): QuickCreateQuery {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [isRequested, setRequested] = useState(false);
   const queryString = searchParams.toString();
@@ -40,9 +44,9 @@ export function useQuickCreateQuery(): QuickCreateQuery {
       window.location.search
     );
 
-    window.history.replaceState(null, "", nextUrl);
+    router.replace(nextUrl, { scroll: false });
     setRequested(false);
-  }, []);
+  }, [router]);
 
   return {
     isRequested,

@@ -13,9 +13,13 @@ const services = vi.hoisted(() => ({
   fetchProjects: vi.fn(),
   createProject: vi.fn(),
   fetchTenantUsers: vi.fn(),
+  routerReplace: vi.fn((url: string) => {
+    window.history.replaceState(null, "", url);
+  }),
 }));
 
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: services.routerReplace }),
   useSearchParams: () =>
     new URLSearchParams(window.location.search),
 }));
@@ -100,6 +104,16 @@ describe("ProjectsPage quick create", () => {
       data: { users: { data: [] } },
     });
     services.createProject.mockResolvedValue({});
+  });
+
+  it("keeps the regular projects route out of create mode", async () => {
+    render(<ProjectsPage />);
+
+    await waitFor(() => {
+      expect(services.fetchProjects).toHaveBeenCalled();
+    });
+
+    expect(screen.queryByText("project-create-modal")).toBeNull();
   });
 
   it("opens from create=1 and clears only create after success", async () => {

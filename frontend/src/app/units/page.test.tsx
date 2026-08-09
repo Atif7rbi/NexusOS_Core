@@ -6,9 +6,13 @@ import UnitsPage from "@/app/units/page";
 const services = vi.hoisted(() => ({
   fetchUnits: vi.fn(),
   fetchProjects: vi.fn(),
+  routerReplace: vi.fn((url: string) => {
+    window.history.replaceState(null, "", url);
+  }),
 }));
 
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: services.routerReplace }),
   useSearchParams: () =>
     new URLSearchParams(window.location.search),
 }));

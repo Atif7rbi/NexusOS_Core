@@ -7,13 +7,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 
+const navigation = vi.hoisted(() => ({
+  replace: vi.fn((url: string) => {
+    window.history.replaceState(null, "", url);
+  }),
+}));
+
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: navigation.replace }),
   useSearchParams: () =>
     new URLSearchParams(window.location.search),
 }));
 
 describe("useQuickCreateQuery", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     window.history.replaceState(null, "", "/projects/");
   });
 
@@ -35,6 +43,10 @@ describe("useQuickCreateQuery", () => {
     expect(result.current.isRequested).toBe(false);
     expect(window.location.pathname).toBe("/projects/");
     expect(window.location.search).toBe("?status=active&page=2");
+    expect(navigation.replace).toHaveBeenCalledWith(
+      "/projects/?status=active&page=2",
+      { scroll: false }
+    );
   });
 
   it("tracks query navigation in both directions without stale state", async () => {

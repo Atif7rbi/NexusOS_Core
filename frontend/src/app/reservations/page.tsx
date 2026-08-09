@@ -470,7 +470,7 @@ export default function ReservationsPage() {
               type="button"
               onClick={() => void openCreateForm()}
               variant="accent"
-              className="gap-2"
+              className="min-w-44 gap-2"
             >
               <Plus size={18} />
               إضافة حجز

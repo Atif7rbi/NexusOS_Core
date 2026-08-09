@@ -24,9 +24,13 @@ const services = vi.hoisted(() => ({
   updateCustomer: vi.fn(),
   archiveCustomer: vi.fn(),
   restoreCustomer: vi.fn(),
+  routerReplace: vi.fn((url: string) => {
+    window.history.replaceState(null, "", url);
+  }),
 }));
 
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: services.routerReplace }),
   useSearchParams: () =>
     new URLSearchParams(window.location.search),
 }));
