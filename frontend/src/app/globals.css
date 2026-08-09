@@ -12,6 +12,26 @@
   --brand-gold-strong: #a96f0e;
   --brand-gold-soft: #fff4d9;
 
+  --company-primary: #0f172a;
+  --company-secondary: #475569;
+
+  --action-primary: #6847d9;
+  --action-primary-hover: #5638c4;
+  --action-primary-soft: #eee9ff;
+  --action-primary-foreground: #ffffff;
+
+  --action-accent: #c99428;
+  --action-accent-hover: #a96f0e;
+  --action-accent-soft: #fff4d9;
+  --action-accent-foreground: #241704;
+
+  --action-danger: #d9465f;
+  --action-danger-hover: #c5324c;
+  --action-danger-soft: #fff0f3;
+  --action-danger-foreground: #ffffff;
+
+  --backdrop: rgba(15, 8, 31, 0.55);
+
   --app-bg: #f6f4fb;
   --surface: #ffffff;
   --surface-soft: #fbfaff;
@@ -36,7 +56,10 @@
   --sidebar-active-text: #96620a;
 
   --success: #169663;
+  --success-hover: #117d52;
+  --success-foreground: #071f15;
   --success-soft: #e7f8f0;
+  --focus-ring-success: rgba(22, 150, 99, 0.24);
 
   --danger: #d9465f;
   --danger-soft: #fff0f3;
@@ -67,6 +90,8 @@
     0 28px 80px rgba(30, 20, 55, 0.13);
 
   --focus-ring: rgba(104, 71, 217, 0.22);
+  --focus-ring-accent: rgba(169, 111, 14, 0.28);
+  --focus-ring-danger: rgba(217, 70, 95, 0.24);
 
   --transition-fast: 140ms ease;
   --transition-base: 180ms ease;
@@ -84,6 +109,23 @@ html[data-theme="dark"] {
   --brand-gold: #e0b04c;
   --brand-gold-strong: #f0c66b;
   --brand-gold-soft: rgba(224, 176, 76, 0.13);
+
+  --action-primary: #9f82ff;
+  --action-primary-hover: #b49cff;
+  --action-primary-soft: rgba(159, 130, 255, 0.14);
+  --action-primary-foreground: #181322;
+
+  --action-accent: #e0b04c;
+  --action-accent-hover: #f0c66b;
+  --action-accent-soft: rgba(224, 176, 76, 0.13);
+  --action-accent-foreground: #181322;
+
+  --action-danger: #ff6b7d;
+  --action-danger-hover: #ff8997;
+  --action-danger-soft: rgba(255, 107, 125, 0.11);
+  --action-danger-foreground: #181322;
+
+  --backdrop: rgba(3, 2, 8, 0.68);
 
   --app-bg: #120f1d;
   --surface: #1d1830;
@@ -109,7 +151,10 @@ html[data-theme="dark"] {
   --sidebar-active-text: #e3ba5c;
 
   --success: #4bd394;
+  --success-hover: #6ee0aa;
+  --success-foreground: #181322;
   --success-soft: rgba(75, 211, 148, 0.12);
+  --focus-ring-success: rgba(75, 211, 148, 0.24);
 
   --danger: #ff6b7d;
   --danger-soft: rgba(255, 107, 125, 0.11);
@@ -134,6 +179,8 @@ html[data-theme="dark"] {
     0 32px 90px rgba(0, 0, 0, 0.34);
 
   --focus-ring: rgba(159, 130, 255, 0.24);
+  --focus-ring-accent: rgba(224, 176, 76, 0.25);
+  --focus-ring-danger: rgba(255, 107, 125, 0.24);
 }
 
 * {

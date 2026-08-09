@@ -54,7 +54,18 @@ vi.mock("@/components/layout/AppShell", () => ({
 vi.mock(
   "@/components/customers/CustomerFormModal",
   () => ({
-    CustomerFormModal: () => null,
+    CustomerFormModal: ({
+      onClose,
+    }: {
+      onClose: () => void;
+    }) => (
+      <div>
+        <span>customer-create-modal</span>
+        <button type="button" onClick={onClose}>
+          close-customer-create
+        </button>
+      </div>
+    ),
   })
 );
 
@@ -210,6 +221,26 @@ describe("CustomersPage record query state", () => {
           journeys: [],
         },
       }
+    );
+  });
+
+  it("opens create from the query and removes only create on close", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/customers/?page=3&create=1&status=customer"
+    );
+
+    render(<CustomersPage />);
+
+    expect(
+      await screen.findByText("customer-create-modal")
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByText("close-customer-create"));
+
+    expect(window.location.search).toBe(
+      "?page=3&status=customer"
     );
   });
 

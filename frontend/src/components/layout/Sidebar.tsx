@@ -340,7 +340,7 @@ export function Sidebar() {
             type="button"
             aria-label="Close sidebar"
             onClick={closeMobileSidebar}
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-[var(--backdrop)] backdrop-blur-[2px]"
           />
 
           <aside

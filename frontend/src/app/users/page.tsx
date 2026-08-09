@@ -444,7 +444,7 @@ export default function UsersPage() {
               !canManageUsers ||
               summary.total >= summary.limit
             }
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--brand-gold)] px-5 text-sm font-bold text-white transition-all hover:bg-[var(--brand-gold-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--action-accent)] px-5 text-sm font-bold text-[var(--action-accent-foreground)] transition-all hover:bg-[var(--action-accent-hover)] focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-accent)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-muted)] disabled:opacity-60"
           >
             <Plus size={18} />
             {labels.add}

@@ -352,7 +352,7 @@ export function ProjectFormModal({
         type="button"
         onClick={onClose}
         aria-label={labels.close}
-        className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[var(--backdrop)] backdrop-blur-[2px]"
       />
 
       <div className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[26px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)]">
@@ -754,7 +754,7 @@ export function ProjectFormModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="!bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="accent"
             >
               {isSubmitting
                 ? labels.submitting

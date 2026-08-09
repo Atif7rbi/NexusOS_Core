@@ -8,6 +8,7 @@ import {
   ListChecks,
 } from "lucide-react";
 
+import { DashboardCollapsibleSection } from "@/components/dashboard/DashboardCollapsibleSection";
 import { formatDate } from "@/lib/date-format";
 import { formatMoney } from "@/lib/number-format";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -26,7 +27,7 @@ export function CollectionSummary({
   const { isArabic } = useTranslation();
   const copy = isArabic
     ? {
-        title: "نظرة على جداول التحصيل",
+        title: "نظرة عامة على التحصيل",
         description: "حالة الجداول المعتمدة والمسودات والعقود التي لم يُنشأ لها جدول.",
         open: "فتح جداول التحصيل",
         scheduled: "جداول معتمدة",
@@ -55,36 +56,46 @@ export function CollectionSummary({
       };
 
   return (
-    <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">
-            {copy.title}
-          </h3>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            {copy.description}
-          </p>
-        </div>
-
+    <DashboardCollapsibleSection
+      title={copy.title}
+      description={copy.description}
+      action={
         <Link
           href="/collections/"
           className="rounded-full bg-[var(--brand-primary-soft)] px-4 py-2 text-xs font-bold text-[var(--brand-primary)]"
         >
           {copy.open}
         </Link>
-      </div>
+      }
+      summary={
+        resource.data ? (
+          <>
+            <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-xs font-bold text-[var(--success)]">
+              {copy.scheduled}: {resource.data.summary.scheduled_count}
+            </span>
+            <span className="rounded-full bg-[var(--warning-soft)] px-3 py-1 text-xs font-bold text-[var(--warning)]">
+              {copy.draft}: {resource.data.summary.draft_count}
+            </span>
+            <span className="rounded-full bg-[var(--danger-soft)] px-3 py-1 text-xs font-bold text-[var(--danger)]">
+              {copy.absent}: {resource.data.summary.absent_count}
+            </span>
+          </>
+        ) : null
+      }
+      contentClassName="mt-6"
+    >
 
       {resource.isLoading ? (
-        <div className="mt-6 flex min-h-64 items-center justify-center text-sm text-[var(--text-secondary)]">
+        <div className="flex min-h-64 items-center justify-center text-sm text-[var(--text-secondary)]">
           {copy.loading}
         </div>
       ) : resource.error || !resource.data ? (
-        <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger-soft)] p-8 text-center text-sm font-semibold text-[var(--danger)]">
+        <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger-soft)] p-8 text-center text-sm font-semibold text-[var(--danger)]">
           {copy.error}
         </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {[
               {
                 label: copy.scheduled,
@@ -178,6 +189,6 @@ export function CollectionSummary({
           </div>
         </>
       )}
-    </section>
+    </DashboardCollapsibleSection>
   );
 }

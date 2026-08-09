@@ -247,7 +247,7 @@ export function ContractFormModal({
               type="submit"
               isLoading={isSubmitting}
               disabled={isLoadingReservations || Boolean(reservationLoadError)}
-              className="!bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="accent"
             >
               {isEditing ? "حفظ التعديلات" : "إنشاء العقد"}
             </Button>

@@ -271,7 +271,7 @@ export function UserFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--backdrop)] p-4 backdrop-blur-sm">
       <div
         className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)]"
         role="dialog"
@@ -553,7 +553,7 @@ export function UserFormModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="h-11 rounded-xl bg-[var(--brand-gold)] px-6 text-sm font-bold text-white transition-all hover:bg-[var(--brand-gold-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 rounded-xl bg-[var(--action-accent)] px-6 text-sm font-bold text-[var(--action-accent-foreground)] transition-all hover:bg-[var(--action-accent-hover)] focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-accent)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-muted)] disabled:opacity-60"
             >
               {isSubmitting
                 ? labels.submitting

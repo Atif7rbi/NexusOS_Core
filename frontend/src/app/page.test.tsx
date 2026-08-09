@@ -1,6 +1,8 @@
 import {
+  fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import {
   beforeEach,
@@ -29,10 +31,6 @@ vi.mock("@/components/layout/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
-}));
-
-vi.mock("@/components/dashboard/DashboardHero", () => ({
-  DashboardHero: () => <div>dashboard-hero</div>,
 }));
 
 vi.mock("@/components/dashboard/FollowUpsPanel", () => ({
@@ -103,12 +101,20 @@ describe("Operational dashboard", () => {
   it("renders the approved hierarchy with real operational metrics", () => {
     render(<HomePage />);
 
-    expect(screen.getByText("dashboard-hero")).toBeTruthy();
-    expect(screen.getByText("ما يحتاج انتباهك اليوم")).toBeTruthy();
-    expect(screen.getByText("متابعات متأخرة")).toBeTruthy();
-    expect(screen.getByText("متابعات اليوم")).toBeTruthy();
-    expect(screen.getByText("حجوزات نشطة")).toBeTruthy();
-    expect(screen.getByText("إجمالي العقود")).toBeTruthy();
+    const attention = screen.getByRole("region", {
+      name: "ما يحتاج انتباهك اليوم",
+    });
+    const business = screen
+      .getByText("الحالة التشغيلية الحالية")
+      .closest("section");
+
+    expect(attention).toBeTruthy();
+    expect(business).toBeTruthy();
+    expect(within(attention).getAllByText(/متابعات متأخرة/)).toHaveLength(2);
+    expect(within(attention).getAllByText(/متابعات اليوم/)).toHaveLength(2);
+    expect(within(attention).getAllByText(/حجوزات نشطة/)).toHaveLength(2);
+    expect(within(attention).queryByText("إجمالي العقود")).toBeNull();
+    expect(within(business as HTMLElement).getByText("إجمالي العقود")).toBeTruthy();
     expect(screen.getByText("follow-ups-panel")).toBeTruthy();
     expect(screen.getByText("collections-panel")).toBeTruthy();
     expect(screen.getByText("الحالة التشغيلية الحالية")).toBeTruthy();
@@ -116,6 +122,23 @@ describe("Operational dashboard", () => {
     expect(screen.getByText("إجمالي العملاء")).toBeTruthy();
     expect(screen.getByText("وحدات متاحة")).toBeTruthy();
     expect(screen.getByText("active-projects-panel")).toBeTruthy();
+  });
+
+  it("expands attention by default and collapses without hiding its summary", () => {
+    render(<HomePage />);
+
+    const toggle = screen.getByRole("button", {
+      name: /ما يحتاج انتباهك اليوم/,
+    });
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("الحجوزات الفعالة حاليًا")).toBeTruthy();
+
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("الحجوزات الفعالة حاليًا")).toBeNull();
+    expect(screen.getByText("حجوزات نشطة: 5")).toBeTruthy();
   });
 
   it("omits CRM attention without treating missing access as failure", () => {

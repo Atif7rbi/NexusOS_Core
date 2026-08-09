@@ -5,6 +5,7 @@ import type {
 
 type ButtonVariant =
   | "primary"
+  | "accent"
   | "secondary"
   | "ghost"
   | "danger";
@@ -27,11 +28,23 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: [
     "border border-transparent",
-    "bg-[var(--brand-primary)] text-[var(--text-inverse)]",
+    "bg-[var(--action-primary)] text-[var(--action-primary-foreground)]",
     "shadow-[var(--shadow-sm)]",
-    "hover:-translate-y-0.5 hover:bg-[var(--brand-primary-hover)]",
+    "hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)]",
     "hover:shadow-[var(--shadow-md)]",
     "focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]",
+    "disabled:bg-[var(--surface-muted)]",
+    "disabled:text-[var(--text-muted)]",
+    "disabled:shadow-none",
+  ].join(" "),
+
+  accent: [
+    "border border-transparent",
+    "bg-[var(--action-accent)] text-[var(--action-accent-foreground)]",
+    "shadow-[var(--shadow-sm)]",
+    "hover:-translate-y-0.5 hover:bg-[var(--action-accent-hover)]",
+    "hover:shadow-[var(--shadow-md)]",
+    "focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-accent)]",
     "disabled:bg-[var(--surface-muted)]",
     "disabled:text-[var(--text-muted)]",
     "disabled:shadow-none",
@@ -41,8 +54,8 @@ const variantClasses: Record<ButtonVariant, string> = {
     "border border-[var(--border-strong)]",
     "bg-[var(--surface)] text-[var(--text-primary)]",
     "shadow-[var(--shadow-sm)]",
-    "hover:-translate-y-0.5 hover:border-[var(--brand-primary)]",
-    "hover:bg-[var(--brand-primary-soft)]",
+    "hover:-translate-y-0.5 hover:border-[var(--action-primary)]",
+    "hover:bg-[var(--action-primary-soft)]",
     "focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]",
   ].join(" "),
 
@@ -56,11 +69,11 @@ const variantClasses: Record<ButtonVariant, string> = {
 
   danger: [
     "border border-transparent",
-    "bg-[var(--danger)] text-white",
+    "bg-[var(--action-danger)] text-[var(--action-danger-foreground)]",
     "shadow-[var(--shadow-sm)]",
-    "hover:-translate-y-0.5 hover:brightness-95",
+    "hover:-translate-y-0.5 hover:bg-[var(--action-danger-hover)]",
     "hover:shadow-[var(--shadow-md)]",
-    "focus-visible:ring-4 focus-visible:ring-[var(--danger-soft)]",
+    "focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-danger)]",
     "disabled:bg-[var(--surface-muted)]",
     "disabled:text-[var(--text-muted)]",
     "disabled:shadow-none",
@@ -93,7 +106,7 @@ export function Button({
         "motion-ui inline-flex items-center justify-center gap-2",
         "whitespace-nowrap font-bold",
         "focus-visible:outline-none",
-        "disabled:pointer-events-none disabled:translate-y-0",
+        "disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-60",
         sizeClasses[size],
         variantClasses[variant],
         fullWidth ? "w-full" : "",

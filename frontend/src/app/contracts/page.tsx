@@ -335,7 +335,8 @@ export default function ContractsPage() {
             <Button
               type="button"
               onClick={() => void openCreateForm()}
-              className="gap-2 !bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="accent"
+              className="gap-2"
             >
               <Plus size={18} />
               إنشاء عقد

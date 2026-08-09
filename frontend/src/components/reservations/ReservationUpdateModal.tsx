@@ -114,7 +114,7 @@ export function ReservationUpdateModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="!bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="accent"
             >
               {isSubmitting ? "جارٍ الحفظ..." : "حفظ التعديلات"}
             </Button>

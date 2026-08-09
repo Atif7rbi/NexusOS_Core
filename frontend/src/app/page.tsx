@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { CollectionSummary } from "@/components/dashboard/CollectionSummary";
-import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardCollapsibleSection } from "@/components/dashboard/DashboardCollapsibleSection";
 import { FollowUpsPanel } from "@/components/dashboard/FollowUpsPanel";
 import { ProjectsOverview } from "@/components/dashboard/ProjectsOverview";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -145,6 +145,9 @@ export default function HomePage() {
       tone: "green" as const,
       href: "/reservations/",
     },
+  ];
+
+  const businessStats = [
     {
       label: copy.totalContracts,
       value: metricValue(
@@ -160,9 +163,6 @@ export default function HomePage() {
       tone: "violet" as const,
       href: "/contracts/",
     },
-  ];
-
-  const businessStats = [
     {
       label: copy.activeProjects,
       value: metricValue(
@@ -213,21 +213,25 @@ export default function HomePage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-[1600px] space-y-6">
-        <DashboardHero />
-
-        <section>
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">
-            {copy.attention}
-          </h2>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            {copy.attentionDescription}
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DashboardCollapsibleSection
+          title={copy.attention}
+          description={copy.attentionDescription}
+          contentClassName="mt-4"
+          summary={attentionStats.map((stat) => (
+            <span
+              key={stat.label}
+              className="rounded-full bg-[var(--surface-soft)] px-3 py-1 text-xs font-bold text-[var(--text-secondary)]"
+            >
+              {stat.label}: {stat.value}
+            </span>
+          ))}
+        >
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {attentionStats.map((stat) => (
               <StatCard key={stat.label} {...stat} />
             ))}
           </div>
-        </section>
+        </DashboardCollapsibleSection>
 
         {dashboard.hasCrmAccess ? (
           <FollowUpsPanel resource={dashboard.followUps} />
@@ -242,7 +246,7 @@ export default function HomePage() {
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
             {copy.businessDescription}
           </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {businessStats.map((stat) => (
               <StatCard key={stat.label} {...stat} />
             ))}

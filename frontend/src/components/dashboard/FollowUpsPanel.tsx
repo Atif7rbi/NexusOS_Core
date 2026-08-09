@@ -8,6 +8,7 @@ import {
   ClockAlert,
 } from "lucide-react";
 
+import { DashboardCollapsibleSection } from "@/components/dashboard/DashboardCollapsibleSection";
 import { formatDateTime } from "@/lib/date-format";
 import { useTranslation } from "@/hooks/useTranslation";
 import type {
@@ -129,35 +130,42 @@ export function FollowUpsPanel({
       };
 
   return (
-    <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">
-            {copy.title}
-          </h3>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            {copy.description}
-          </p>
-        </div>
-
+    <DashboardCollapsibleSection
+      title={copy.title}
+      description={copy.description}
+      action={
         <Link
           href="/crm/"
           className="rounded-full bg-[var(--brand-primary-soft)] px-4 py-2 text-xs font-bold text-[var(--brand-primary)]"
         >
           {copy.showAll}
         </Link>
-      </div>
+      }
+      summary={
+        resource.data ? (
+          <>
+            <span className="rounded-full bg-[var(--danger-soft)] px-3 py-1 text-xs font-bold text-[var(--danger)]">
+              {copy.overdue}: {resource.data.summary.overdue_follow_ups}
+            </span>
+            <span className="rounded-full bg-[var(--warning-soft)] px-3 py-1 text-xs font-bold text-[var(--warning)]">
+              {copy.today}: {resource.data.summary.today_follow_ups}
+            </span>
+          </>
+        ) : null
+      }
+      contentClassName="mt-6"
+    >
 
       {resource.isLoading ? (
-        <div className="mt-6 flex min-h-52 items-center justify-center text-sm text-[var(--text-secondary)]">
+        <div className="flex min-h-52 items-center justify-center text-sm text-[var(--text-secondary)]">
           {copy.loading}
         </div>
       ) : resource.error || !resource.data ? (
-        <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger-soft)] p-8 text-center text-sm font-semibold text-[var(--danger)]">
+        <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger-soft)] p-8 text-center text-sm font-semibold text-[var(--danger)]">
           {copy.error}
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <FollowUpGroup
             title={copy.overdue}
             count={resource.data.summary.overdue_follow_ups}
@@ -176,6 +184,6 @@ export function FollowUpsPanel({
           />
         </div>
       )}
-    </section>
+    </DashboardCollapsibleSection>
   );
 }

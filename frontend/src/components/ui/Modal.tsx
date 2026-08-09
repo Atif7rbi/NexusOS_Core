@@ -49,7 +49,7 @@ export function Modal({
         type="button"
         onClick={onClose}
         aria-label={closeLabel}
-        className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[var(--backdrop)] backdrop-blur-[2px]"
       />
 
       <div

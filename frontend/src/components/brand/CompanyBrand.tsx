@@ -6,12 +6,16 @@ import { useSystemSettings } from "@/providers/SystemSettingsProvider";
 type CompanyBrandProps = {
   compact?: boolean;
   hideText?: boolean;
+  inlineText?: boolean;
+  responsiveShortName?: boolean;
   variant?: "default" | "inverse";
 };
 
 export function CompanyBrand({
   compact = false,
   hideText = false,
+  inlineText = false,
+  responsiveShortName = false,
   variant = "default",
 }: CompanyBrandProps) {
   const settings = useSystemSettings();
@@ -30,6 +34,11 @@ export function CompanyBrand({
     : settings.company_tagline_en ??
       settings.company_tagline_ar;
 
+  const shortName = isArabic
+    ? settings.short_name_ar
+    : settings.short_name_en ??
+      settings.short_name_ar;
+
   const isInverse = variant === "inverse";
 
   return (
@@ -47,7 +56,14 @@ export function CompanyBrand({
       />
 
       {!hideText ? (
-        <div className="min-w-0">
+        <div
+          className={[
+            "min-w-0",
+            inlineText
+              ? "flex items-baseline gap-2"
+              : "",
+          ].join(" ")}
+        >
           <p
             className={[
               "truncate text-[15px] font-bold",
@@ -56,18 +72,33 @@ export function CompanyBrand({
                 : "text-[var(--text-primary)]",
             ].join(" ")}
           >
-            {companyName}
+            {responsiveShortName ? (
+              <>
+                <span className="sm:hidden">
+                  {shortName}
+                </span>
+                <span className="hidden sm:inline">
+                  {companyName}
+                </span>
+              </>
+            ) : (
+              companyName
+            )}
           </p>
 
           {companyTagline ? (
             <p
               className={[
-                "mt-1 truncate text-[11px] font-medium",
+                "truncate text-[11px] font-medium",
+                inlineText
+                  ? "hidden lg:block"
+                  : "mt-1",
                 isInverse
                   ? "text-white/65"
                   : "text-[var(--text-secondary)]",
               ].join(" ")}
             >
+              {inlineText ? "— " : ""}
               {companyTagline}
             </p>
           ) : null}

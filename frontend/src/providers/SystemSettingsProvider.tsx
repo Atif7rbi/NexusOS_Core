@@ -84,12 +84,12 @@ export function SystemSettingsProvider({
         document.documentElement.dir = "rtl";
 
         document.documentElement.style.setProperty(
-          "--brand-primary",
+          "--company-primary",
           payload.data.primary_color
         );
 
         document.documentElement.style.setProperty(
-          "--brand-secondary",
+          "--company-secondary",
           payload.data.secondary_color
         );
       } catch {

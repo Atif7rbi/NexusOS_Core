@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/Button";
 import { ApiRequestError } from "@/lib/api-error";
 import { buildContextualReservationUrl } from "@/lib/reservation-create-context";
 import { useCustomersQueryState } from "@/hooks/useCustomersQueryState";
+import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -60,6 +61,7 @@ function CustomersPageContent() {
   const { isArabic } = useTranslation();
   const { token } = useAuth();
   const query = useCustomersQueryState();
+  const quickCreate = useQuickCreateQuery();
 
   const [customers, setCustomers] = useState<
     Customer[]
@@ -423,6 +425,17 @@ function CustomersPageContent() {
     };
   }, [loadCustomerRecord]);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (quickCreate.isRequested) {
+        setFormCustomer(null);
+        setFormOpen(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [quickCreate.isRequested]);
+
   const openCreateModal = (): void => {
     setFormCustomer(null);
     setFormOpen(true);
@@ -479,6 +492,7 @@ function CustomersPageContent() {
 
       setFormOpen(false);
       setFormCustomer(null);
+      quickCreate.clear();
     } finally {
       setSubmitting(false);
     }
@@ -596,7 +610,8 @@ function CustomersPageContent() {
             <Button
               type="button"
               onClick={openCreateModal}
-              className="gap-2 !bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="accent"
+              className="gap-2"
             >
               <Plus size={18} />
               {labels.newCustomer}
@@ -818,7 +833,8 @@ function CustomersPageContent() {
                   <Button
                     type="button"
                     onClick={openCreateModal}
-                    className="mt-5 gap-2 !bg-[var(--brand-gold)] !text-white"
+                    variant="accent"
+                    className="mt-5 gap-2"
                   >
                     <Plus size={17} />
                     {labels.newCustomer}
@@ -909,6 +925,7 @@ function CustomersPageContent() {
             if (!isSubmitting) {
               setFormOpen(false);
               setFormCustomer(null);
+              quickCreate.clear();
             }
           }}
           onSubmit={handleFormSubmit}

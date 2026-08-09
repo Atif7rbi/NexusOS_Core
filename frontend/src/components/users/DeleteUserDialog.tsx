@@ -50,7 +50,7 @@ export function DeleteUserDialog({
       };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--backdrop)] p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)]">
         <div className="flex items-start justify-between gap-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--danger-soft)] text-[var(--danger)]">
@@ -94,7 +94,7 @@ export function DeleteUserDialog({
             type="button"
             onClick={() => void onConfirm()}
             disabled={isDeleting}
-            className="h-11 rounded-xl bg-[var(--danger)] px-5 text-sm font-bold text-white disabled:opacity-60"
+            className="h-11 rounded-xl bg-[var(--action-danger)] px-5 text-sm font-bold text-[var(--action-danger-foreground)] hover:bg-[var(--action-danger-hover)] focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-danger)] disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-muted)] disabled:opacity-60"
           >
             {isDeleting
               ? labels.deleting
