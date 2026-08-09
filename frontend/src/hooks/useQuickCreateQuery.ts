@@ -34,6 +34,11 @@ export function useQuickCreateQuery(): QuickCreateQuery {
       window.location.search
     );
 
+    window.history.replaceState(
+      window.history.state,
+      "",
+      nextUrl
+    );
     router.replace(nextUrl, { scroll: false });
   }, [router]);
 

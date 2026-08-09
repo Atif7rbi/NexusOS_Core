@@ -8,9 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 
 const navigation = vi.hoisted(() => ({
-  replace: vi.fn((url: string) => {
-    window.history.replaceState(null, "", url);
-  }),
+  replace: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
