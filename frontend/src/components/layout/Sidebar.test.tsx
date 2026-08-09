@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 
 const shellState = vi.hoisted(() => ({
   collapsed: false,
+  isDark: false,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -51,9 +52,14 @@ vi.mock("@/providers/AppShellProvider", () => ({
   }),
 }));
 
+vi.mock("@/providers/ThemeProvider", () => ({
+  useTheme: () => ({ isDark: shellState.isDark }),
+}));
+
 describe("Sidebar brand identity", () => {
   beforeEach(() => {
     shellState.collapsed = false;
+    shellState.isDark = false;
   });
 
   it("uses the sidebar semantic surface and inverse NexusOS identity", () => {
@@ -64,7 +70,7 @@ describe("Sidebar brand identity", () => {
     expect(sidebar?.className).toContain("border-[var(--sidebar-border)]");
     expect(
       screen.getByTestId("nexus-brand").getAttribute("data-inverse")
-    ).toBe("true");
+    ).toBe("false");
     expect(
       screen.getByTestId("nexus-brand").getAttribute("data-compact")
     ).toBe("false");
@@ -80,6 +86,15 @@ describe("Sidebar brand identity", () => {
     expect(
       screen.getByTestId("nexus-brand").getAttribute("data-compact")
     ).toBe("true");
+    expect(
+      screen.getByTestId("nexus-brand").getAttribute("data-inverse")
+    ).toBe("false");
+  });
+
+  it("keeps the inverse NexusOS identity for dark profiles", () => {
+    shellState.isDark = true;
+    render(<Sidebar />);
+
     expect(
       screen.getByTestId("nexus-brand").getAttribute("data-inverse")
     ).toBe("true");

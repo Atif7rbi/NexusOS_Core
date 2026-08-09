@@ -21,6 +21,50 @@ function profileTokens(profile: string): string {
   return match[1];
 }
 
+function tokenValue(tokens: string, token: string): string {
+  const value = tokens.match(
+    new RegExp(`--${token}:\\s*(#[0-9a-f]{6});`, "i")
+  )?.[1];
+
+  if (!value) {
+    throw new Error(`Missing color token: ${token}`);
+  }
+
+  return value;
+}
+
+function relativeLuminance(hex: string): number {
+  const channels = hex
+    .slice(1)
+    .match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16) / 255);
+
+  if (!channels) {
+    throw new Error(`Invalid color: ${hex}`);
+  }
+
+  const [red, green, blue] = channels.map((channel) =>
+    channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4
+  );
+
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const lighter = Math.max(
+    relativeLuminance(foreground),
+    relativeLuminance(background)
+  );
+  const darker = Math.min(
+    relativeLuminance(foreground),
+    relativeLuminance(background)
+  );
+
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 describe("appearance profile token contract", () => {
   it.each(["light-1", "light-2"])(
     "%s uses a blue primary action with white foreground",
@@ -51,6 +95,38 @@ describe("appearance profile token contract", () => {
       expect(tokens).toContain("--sidebar-active-bg:");
       expect(tokens).toContain("--sidebar-active-indicator:");
       expect(tokens).toContain("--sidebar-icon:");
+    }
+  );
+
+  it.each(["light-1", "light-2"])(
+    "%s keeps light sidebar navigation, headings, hover, and active text readable",
+    (profile) => {
+      const tokens = profileTokens(profile);
+
+      expect(
+        contrastRatio(
+          tokenValue(tokens, "sidebar-text"),
+          tokenValue(tokens, "sidebar-bg")
+        )
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(
+          tokenValue(tokens, "sidebar-heading"),
+          tokenValue(tokens, "sidebar-bg")
+        )
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(
+          tokenValue(tokens, "sidebar-hover-text"),
+          tokenValue(tokens, "sidebar-hover-bg")
+        )
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(
+          tokenValue(tokens, "sidebar-active-text"),
+          tokenValue(tokens, "sidebar-active-bg")
+        )
+      ).toBeGreaterThanOrEqual(4.5);
     }
   );
 });

@@ -19,6 +19,7 @@ import { getNavigationGroupsForRole } from "@/config/navigation";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAppShell } from "@/providers/AppShellProvider";
 import { useAuth } from "@/providers/AuthProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 
 const GROUP_STORAGE_KEY = "nexusos_sidebar_groups_v1";
 
@@ -70,6 +71,7 @@ function SidebarContent({
 }: SidebarContentProps) {
   const pathname = usePathname();
   const { isArabic, t } = useTranslation();
+  const { isDark } = useTheme();
   const { user } = useAuth();
   const visibleNavigationGroups =
     getNavigationGroupsForRole(user?.role ?? null);
@@ -122,7 +124,7 @@ function SidebarContent({
   return (
     <>
       <div className="flex h-[82px] shrink-0 items-center justify-between border-b border-[var(--sidebar-border)] px-4">
-        <NexusBrand compact={collapsed} inverse />
+        <NexusBrand compact={collapsed} inverse={isDark} />
 
         {mobile ? (
           <button

@@ -48,16 +48,16 @@ html[data-theme="light-1"] {
   --border: #e7e1f0;
   --border-strong: #d8cfe7;
 
-  --sidebar-bg: #171126;
-  --sidebar-border: #2d2342;
-  --sidebar-text: #d9d0e8;
-  --sidebar-heading: #968aa9;
-  --sidebar-hover-bg: #261c39;
-  --sidebar-hover-text: #ffffff;
-  --sidebar-active-bg: #35234f;
-  --sidebar-active-text: #f6efff;
-  --sidebar-active-indicator: #a78bfa;
-  --sidebar-icon: #a99fbb;
+  --sidebar-bg: #f0edff;
+  --sidebar-border: #d9d2f5;
+  --sidebar-text: #312e5b;
+  --sidebar-heading: #625d84;
+  --sidebar-hover-bg: #e2ddfa;
+  --sidebar-hover-text: #1e1b4b;
+  --sidebar-active-bg: #4f46e5;
+  --sidebar-active-text: #ffffff;
+  --sidebar-active-indicator: #ffffff;
+  --sidebar-icon: #5b5680;
 
   --success: #169663;
   --success-hover: #117d52;
@@ -146,16 +146,16 @@ html[data-theme="light-2"] {
   --border: #dce8f3;
   --border-strong: #c7d8e8;
 
-  --sidebar-bg: #09213a;
-  --sidebar-border: #173a5d;
-  --sidebar-text: #d6e7f8;
-  --sidebar-heading: #83a0bd;
-  --sidebar-hover-bg: #123453;
-  --sidebar-hover-text: #ffffff;
-  --sidebar-active-bg: #1b466d;
-  --sidebar-active-text: #f3f8ff;
-  --sidebar-active-indicator: #a78bfa;
-  --sidebar-icon: #96b3cf;
+  --sidebar-bg: #eaf4ff;
+  --sidebar-border: #c9def4;
+  --sidebar-text: #19324f;
+  --sidebar-heading: #526f8f;
+  --sidebar-hover-bg: #d8eafd;
+  --sidebar-hover-text: #0f2742;
+  --sidebar-active-bg: #1671d9;
+  --sidebar-active-text: #ffffff;
+  --sidebar-active-indicator: #ffffff;
+  --sidebar-icon: #607f9f;
 
   --focus-ring: rgba(22, 113, 217, 0.25);
   --focus-ring-accent: rgba(201, 135, 26, 0.27);
