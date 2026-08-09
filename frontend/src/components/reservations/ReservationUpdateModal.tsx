@@ -114,7 +114,7 @@ export function ReservationUpdateModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              variant="accent"
+              variant="primary"
             >
               {isSubmitting ? "جارٍ الحفظ..." : "حفظ التعديلات"}
             </Button>

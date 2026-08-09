@@ -625,7 +625,7 @@ export function CustomerFormModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              variant="accent"
+              variant="primary"
             >
               {isSubmitting
                 ? labels.submitting

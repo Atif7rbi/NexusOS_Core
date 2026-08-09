@@ -247,7 +247,7 @@ export function ContractFormModal({
               type="submit"
               isLoading={isSubmitting}
               disabled={isLoadingReservations || Boolean(reservationLoadError)}
-              variant="accent"
+              variant="primary"
             >
               {isEditing ? "حفظ التعديلات" : "إنشاء العقد"}
             </Button>

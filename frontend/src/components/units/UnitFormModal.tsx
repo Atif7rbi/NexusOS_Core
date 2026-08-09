@@ -264,7 +264,7 @@ export function UnitFormModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              variant="accent"
+              variant="primary"
             >
               {isSubmitting ? labels.saving : labels.save}
             </Button>

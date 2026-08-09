@@ -754,7 +754,7 @@ export function ProjectFormModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              variant="accent"
+              variant="primary"
             >
               {isSubmitting
                 ? labels.submitting

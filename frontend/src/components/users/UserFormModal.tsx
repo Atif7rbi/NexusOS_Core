@@ -553,7 +553,7 @@ export function UserFormModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="h-11 rounded-xl bg-[var(--action-accent)] px-6 text-sm font-bold text-[var(--action-accent-foreground)] transition-all hover:bg-[var(--action-accent-hover)] focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-accent)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-muted)] disabled:opacity-60"
+              className="h-11 rounded-xl bg-[var(--action-primary)] px-6 text-sm font-bold text-[var(--action-primary-foreground)] transition-all hover:bg-[var(--action-primary-hover)] focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-muted)] disabled:opacity-60"
             >
               {isSubmitting
                 ? labels.submitting

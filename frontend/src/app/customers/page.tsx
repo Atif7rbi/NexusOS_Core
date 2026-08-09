@@ -610,7 +610,7 @@ function CustomersPageContent() {
             <Button
               type="button"
               onClick={openCreateModal}
-              variant="accent"
+              variant="primary"
               leadingIcon={<Plus size={18} />}
               className="min-w-44"
             >
@@ -833,7 +833,7 @@ function CustomersPageContent() {
                   <Button
                     type="button"
                     onClick={openCreateModal}
-                    variant="accent"
+                    variant="primary"
                     leadingIcon={<Plus size={17} />}
                     className="mt-5"
                   >

@@ -10,13 +10,20 @@ import {
   type ReactNode,
 } from "react";
 
-export type ThemeMode = "light" | "dark";
+export const THEME_PROFILES = [
+  "light-1",
+  "light-2",
+  "dark-1",
+  "dark-2",
+] as const;
+
+export type ThemeProfile = (typeof THEME_PROFILES)[number];
 
 type ThemeContextValue = {
-  theme: ThemeMode;
+  theme: ThemeProfile;
   isDark: boolean;
   toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
+  setTheme: (theme: ThemeProfile) => void;
 };
 
 const STORAGE_KEY = "ufq_theme";
@@ -27,30 +34,51 @@ type ThemeProviderProps = {
   children: ReactNode;
 };
 
-function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "light";
+function normalizeStoredTheme(
+  storedTheme: string | null
+): ThemeProfile | null {
+  if (storedTheme === "light") {
+    return "light-1";
   }
 
-  const storedTheme =
-    window.localStorage.getItem(STORAGE_KEY);
+  if (storedTheme === "dark") {
+    return "dark-1";
+  }
 
-  if (storedTheme === "light" || storedTheme === "dark") {
+  return THEME_PROFILES.find(
+    (profile) => profile === storedTheme
+  ) ?? null;
+}
+
+function getInitialTheme(): ThemeProfile {
+  if (typeof window === "undefined") {
+    return "light-1";
+  }
+
+  const storedTheme = normalizeStoredTheme(
+    window.localStorage.getItem(STORAGE_KEY)
+  );
+
+  if (storedTheme) {
     return storedTheme;
   }
 
   return window.matchMedia(
     "(prefers-color-scheme: dark)"
   ).matches
-    ? "dark"
-    : "light";
+    ? "dark-1"
+    : "light-1";
 }
 
-function applyTheme(theme: ThemeMode): void {
+function isDarkProfile(theme: ThemeProfile): boolean {
+  return theme.startsWith("dark-");
+}
+
+function applyTheme(theme: ThemeProfile): void {
   document.documentElement.dataset.theme = theme;
   document.documentElement.classList.toggle(
     "dark",
-    theme === "dark"
+    isDarkProfile(theme)
   );
 }
 
@@ -58,32 +86,35 @@ export function ThemeProvider({
   children,
 }: ThemeProviderProps) {
   const [theme, setThemeState] =
-    useState<ThemeMode>(getInitialTheme);
+    useState<ThemeProfile>(getInitialTheme);
 
   useEffect(() => {
     applyTheme(theme);
+    window.localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   const setTheme = useCallback(
-    (nextTheme: ThemeMode): void => {
+    (nextTheme: ThemeProfile): void => {
       setThemeState(nextTheme);
-
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        nextTheme
-      );
     },
     []
   );
 
   const toggleTheme = useCallback((): void => {
-    setTheme(theme === "light" ? "dark" : "light");
+    const matchingProfile: Record<ThemeProfile, ThemeProfile> = {
+      "light-1": "dark-1",
+      "light-2": "dark-2",
+      "dark-1": "light-1",
+      "dark-2": "light-2",
+    };
+
+    setTheme(matchingProfile[theme]);
   }, [setTheme, theme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
-      isDark: theme === "dark",
+      isDark: isDarkProfile(theme),
       toggleTheme,
       setTheme,
     }),

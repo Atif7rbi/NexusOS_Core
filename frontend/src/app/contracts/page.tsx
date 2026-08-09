@@ -335,7 +335,7 @@ export default function ContractsPage() {
             <Button
               type="button"
               onClick={() => void openCreateForm()}
-              variant="accent"
+              variant="primary"
               leadingIcon={<Plus size={18} />}
               className="min-w-44"
             >

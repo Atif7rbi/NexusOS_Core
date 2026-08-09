@@ -370,7 +370,7 @@ function UnitsPageContent() {
                 setFormUnit(null);
                 setFormOpen(true);
               }}
-              variant="accent"
+              variant="primary"
               leadingIcon={<Plus size={18} />}
               className="min-w-44"
             >

@@ -129,7 +129,7 @@ export function QuickCreateMenu() {
           }
         }}
         onKeyDown={handleTriggerKeyDown}
-        className="motion-ui inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-transparent bg-[var(--action-accent)] text-[var(--action-accent-foreground)] shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:bg-[var(--action-accent-hover)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-accent)]"
+        className="motion-ui inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-transparent bg-[var(--action-primary)] text-[var(--action-primary-foreground)] shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
       >
         <Plus size={20} aria-hidden="true" />
       </button>

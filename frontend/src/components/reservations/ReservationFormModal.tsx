@@ -204,7 +204,7 @@ export function ReservationFormModal({
                 hasNoAvailableUnits ||
                 unitLoadError
               }
-              variant="accent"
+              variant="primary"
             >
               {isSubmitting ? "جارٍ الحفظ..." : "حفظ الحجز"}
             </Button>
