@@ -371,9 +371,9 @@ function UnitsPageContent() {
                 setFormOpen(true);
               }}
               variant="accent"
-              className="gap-2"
+              leadingIcon={<Plus size={18} />}
+              className="min-w-44"
             >
-              <Plus size={18} />
               إضافة وحدة
             </Button>
           }

@@ -336,9 +336,9 @@ export default function ContractsPage() {
               type="button"
               onClick={() => void openCreateForm()}
               variant="accent"
-              className="min-w-44 gap-2"
+              leadingIcon={<Plus size={18} />}
+              className="min-w-44"
             >
-              <Plus size={18} />
               إنشاء عقد
             </Button>
           }

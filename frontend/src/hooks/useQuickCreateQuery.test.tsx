@@ -32,13 +32,14 @@ describe("useQuickCreateQuery", () => {
       "/projects/?status=active&create=1&page=2"
     );
 
-    const { result } = renderHook(() => useQuickCreateQuery());
+    const { result, rerender } = renderHook(() => useQuickCreateQuery());
 
     await waitFor(() => {
       expect(result.current.isRequested).toBe(true);
     });
 
     act(() => result.current.clear());
+    rerender();
 
     expect(result.current.isRequested).toBe(false);
     expect(window.location.pathname).toBe("/projects/");

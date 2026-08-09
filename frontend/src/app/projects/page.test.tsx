@@ -116,6 +116,33 @@ describe("ProjectsPage quick create", () => {
     expect(screen.queryByText("project-create-modal")).toBeNull();
   });
 
+  it("does not reopen create after cancel and returning to projects", async () => {
+    window.history.replaceState(null, "", "/projects/?create=1");
+
+    const firstVisit = render(<ProjectsPage />);
+
+    fireEvent.click(
+      await screen.findByText("close-project-create")
+    );
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/projects/");
+      expect(window.location.search).toBe("");
+      expect(screen.queryByText("project-create-modal")).toBeNull();
+    });
+
+    firstVisit.unmount();
+    window.history.replaceState(null, "", "/");
+    window.history.replaceState(null, "", "/projects/");
+
+    render(<ProjectsPage />);
+
+    await waitFor(() => {
+      expect(services.fetchProjects).toHaveBeenCalled();
+    });
+    expect(screen.queryByText("project-create-modal")).toBeNull();
+  });
+
   it("opens from create=1 and clears only create after success", async () => {
     window.history.replaceState(
       null,

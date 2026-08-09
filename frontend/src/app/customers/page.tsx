@@ -611,9 +611,9 @@ function CustomersPageContent() {
               type="button"
               onClick={openCreateModal}
               variant="accent"
-              className="min-w-44 gap-2"
+              leadingIcon={<Plus size={18} />}
+              className="min-w-44"
             >
-              <Plus size={18} />
               {labels.newCustomer}
             </Button>
           </div>
@@ -834,9 +834,9 @@ function CustomersPageContent() {
                     type="button"
                     onClick={openCreateModal}
                     variant="accent"
-                    className="mt-5 gap-2"
+                    leadingIcon={<Plus size={17} />}
+                    className="mt-5"
                   >
-                    <Plus size={17} />
                     {labels.newCustomer}
                   </Button>
                 ) : null}

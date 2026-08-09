@@ -6,8 +6,6 @@ import {
 } from "next/navigation";
 import {
   useCallback,
-  useEffect,
-  useState,
 } from "react";
 
 import {
@@ -23,16 +21,8 @@ type QuickCreateQuery = {
 export function useQuickCreateQuery(): QuickCreateQuery {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isRequested, setRequested] = useState(false);
   const queryString = searchParams.toString();
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setRequested(isQuickCreateRequested(queryString));
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [queryString]);
+  const isRequested = isQuickCreateRequested(queryString);
 
   const clear = useCallback((): void => {
     if (!isQuickCreateRequested(window.location.search)) {
@@ -45,7 +35,6 @@ export function useQuickCreateQuery(): QuickCreateQuery {
     );
 
     router.replace(nextUrl, { scroll: false });
-    setRequested(false);
   }, [router]);
 
   return {

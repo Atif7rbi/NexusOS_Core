@@ -456,9 +456,9 @@ function ProjectsPageContent() {
               type="button"
               onClick={openCreateModal}
               variant="accent"
-              className="gap-2"
+              leadingIcon={<Plus size={18} />}
+              className="min-w-44"
             >
-              <Plus size={18} />
               {labels.newProject}
             </Button>
           </div>
@@ -579,9 +579,9 @@ function ProjectsPageContent() {
                   type="button"
                   onClick={openCreateModal}
                   variant="accent"
-                  className="mt-5 gap-2"
+                  leadingIcon={<Plus size={17} />}
+                  className="mt-5"
                 >
-                  <Plus size={17} />
                   {labels.newProject}
                 </Button>
               </div>
