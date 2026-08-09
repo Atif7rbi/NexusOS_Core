@@ -19,7 +19,7 @@ type ProfilePreview = {
   actionText: string;
 };
 
-const profiles: ProfilePreview[] = [
+export const APPEARANCE_PROFILE_PREVIEWS: ProfilePreview[] = [
   {
     id: "light-1",
     label: "Light 1",
@@ -29,7 +29,7 @@ const profiles: ProfilePreview[] = [
     },
     canvas: "#f6f4fb",
     surface: "#ffffff",
-    sidebar: "#171126",
+    sidebar: "#f0edff",
     action: "#2563eb",
     actionText: "#ffffff",
   },
@@ -42,7 +42,7 @@ const profiles: ProfilePreview[] = [
     },
     canvas: "#f2f7fc",
     surface: "#ffffff",
-    sidebar: "#09213a",
+    sidebar: "#eaf4ff",
     action: "#1671d9",
     actionText: "#ffffff",
   },
@@ -82,13 +82,13 @@ export function AppearanceProfileSelector() {
     ? {
         title: "المظهر",
         description:
-          "اختر ملف الألوان الأنسب لك. يُحفظ الاختيار على هذا الجهاز.",
+          "اختر ملف الألوان الأنسب لك. يُحفظ الاختيار لهذا الحساب على هذا الجهاز.",
         selected: "محدد",
       }
     : {
         title: "Appearance",
         description:
-          "Choose your preferred color profile. The selection is saved on this device.",
+          "Choose your preferred color profile. The selection is saved for this account on this device.",
         selected: "Selected",
       };
 
@@ -107,7 +107,7 @@ export function AppearanceProfileSelector() {
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {profiles.map((profile) => {
+        {APPEARANCE_PROFILE_PREVIEWS.map((profile) => {
           const selected = theme === profile.id;
 
           return (

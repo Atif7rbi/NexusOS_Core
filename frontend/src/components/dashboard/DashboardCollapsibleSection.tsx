@@ -54,6 +54,8 @@ export function DashboardCollapsibleSection({
           <span className="min-w-0">
             <span
               id={headingId}
+              role="heading"
+              aria-level={2}
               className="block text-lg font-bold text-[var(--text-primary)] group-hover:text-[var(--action-primary)]"
             >
               {title}

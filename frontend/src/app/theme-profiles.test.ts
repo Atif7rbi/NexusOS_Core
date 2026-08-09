@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { APPEARANCE_PROFILE_PREVIEWS } from "@/components/theme/AppearanceProfileSelector";
+
 const css = readFileSync(
   resolve(process.cwd(), "src/app/globals.css"),
   "utf8"
@@ -72,6 +74,19 @@ describe("appearance profile token contract", () => {
       const tokens = profileTokens(profile);
       expect(tokens).toMatch(/--action-primary:\s*#[12][0-9a-f]{5};/i);
       expect(tokens).toContain("--action-primary-foreground: #ffffff;");
+    }
+  );
+
+  it.each(["light-1", "light-2"] as const)(
+    "%s preview sidebar matches its semantic sidebar token",
+    (profile) => {
+      const preview = APPEARANCE_PROFILE_PREVIEWS.find(
+        (candidate) => candidate.id === profile
+      );
+
+      expect(preview?.sidebar).toBe(
+        tokenValue(profileTokens(profile), "sidebar-bg")
+      );
     }
   );
 

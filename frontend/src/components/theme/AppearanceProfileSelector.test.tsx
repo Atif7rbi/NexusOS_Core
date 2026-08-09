@@ -39,6 +39,11 @@ describe("AppearanceProfileSelector", () => {
     renderSelector();
 
     expect(screen.getByText("المظهر")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "اختر ملف الألوان الأنسب لك. يُحفظ الاختيار لهذا الحساب على هذا الجهاز."
+      )
+    ).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(4);
     expect(
       screen

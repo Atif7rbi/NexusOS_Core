@@ -5,7 +5,7 @@ import { DashboardCollapsibleSection } from "@/components/dashboard/DashboardCol
 
 describe("DashboardCollapsibleSection", () => {
   it("is expanded by default and exposes an accessible toggle", () => {
-    render(
+    const { container } = render(
       <DashboardCollapsibleSection
         title="قسم تشغيلي"
         summary={<span>المؤشر: 3</span>}
@@ -19,7 +19,16 @@ describe("DashboardCollapsibleSection", () => {
     });
 
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(toggle.getAttribute("aria-controls")).toBeTruthy();
+    const contentId = toggle.getAttribute("aria-controls");
+    const heading = screen.getByRole("heading", {
+      level: 2,
+      name: "قسم تشغيلي",
+    });
+    const section = container.querySelector("section");
+
+    expect(contentId).toBeTruthy();
+    expect(document.getElementById(contentId ?? "")).toBeTruthy();
+    expect(section?.getAttribute("aria-labelledby")).toBe(heading.id);
     expect(screen.getByText("تفاصيل القسم")).toBeTruthy();
   });
 
