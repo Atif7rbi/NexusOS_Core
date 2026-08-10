@@ -386,7 +386,7 @@ function UnitsPageContent() {
           />
         ) : null}
 
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             title="إجمالي الوحدات"
             value={summary.total}

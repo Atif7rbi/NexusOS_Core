@@ -10,6 +10,7 @@ import {
 
 import { AppShell } from "@/components/layout/AppShell";
 import { AppearanceProfileSelector } from "@/components/theme/AppearanceProfileSelector";
+import { TypographyPreferencesSelector } from "@/components/theme/TypographyPreferencesSelector";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -37,7 +38,7 @@ export default function SettingsPage() {
       isArabic
         ? {
             title: "الإعدادات",
-            description: "إدارة مظهر النظام ورقم التواصل العام.",
+            description: "إدارة المظهر والخط وحجم النص ورقم التواصل العام.",
             card: "رقم التواصل",
             phone: "رقم الجوال",
             save: "حفظ رقم التواصل",
@@ -50,7 +51,7 @@ export default function SettingsPage() {
           }
         : {
             title: "Settings",
-            description: "Manage appearance and the system contact phone.",
+            description: "Manage appearance, text preferences, and the system contact phone.",
             card: "Contact phone",
             phone: "Mobile number",
             save: "Save contact phone",
@@ -136,6 +137,7 @@ export default function SettingsPage() {
         </header>
 
         <AppearanceProfileSelector />
+        <TypographyPreferencesSelector />
 
         <section className="max-w-2xl rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6">
           <h2 className="text-lg font-bold">{labels.card}</h2>

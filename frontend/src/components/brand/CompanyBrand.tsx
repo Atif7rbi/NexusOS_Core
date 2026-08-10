@@ -11,6 +11,17 @@ type CompanyBrandProps = {
   variant?: "default" | "inverse";
 };
 
+export function shouldDisplayCompanyTagline(
+  companyName: string,
+  tagline: string | null
+): boolean {
+  const normalizedCompanyName = companyName.trim().toLocaleLowerCase();
+  const normalizedTagline = tagline?.trim().toLocaleLowerCase() ?? "";
+
+  return Boolean(normalizedTagline) &&
+    !normalizedCompanyName.includes(normalizedTagline);
+}
+
 export function CompanyBrand({
   compact = false,
   hideText = false,
@@ -40,6 +51,10 @@ export function CompanyBrand({
       settings.short_name_ar;
 
   const isInverse = variant === "inverse";
+  const shouldShowTagline = shouldDisplayCompanyTagline(
+    companyName,
+    companyTagline
+  );
 
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -86,7 +101,7 @@ export function CompanyBrand({
             )}
           </p>
 
-          {companyTagline ? (
+          {shouldShowTagline ? (
             <p
               className={[
                 "truncate text-[11px] font-medium",

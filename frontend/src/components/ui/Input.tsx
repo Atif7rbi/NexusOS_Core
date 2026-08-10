@@ -39,7 +39,7 @@ export function Input({
     <div className="space-y-2">
       <label
         htmlFor={inputId}
-        className="block text-sm font-semibold text-[var(--text-secondary)]"
+        className="type-form-label block"
       >
         {label}
       </label>
@@ -61,7 +61,7 @@ export function Input({
             "rounded-[var(--radius-md)]",
             "border border-[var(--border)]",
             "bg-[var(--surface)]",
-            "px-4 text-sm",
+            "type-input px-4",
             "text-[var(--text-primary)]",
             "placeholder:text-[var(--text-muted)]",
             "shadow-[var(--shadow-sm)]",
@@ -89,7 +89,7 @@ export function Input({
       {hint && !error && (
         <p
           id={hintId}
-          className="text-xs text-[var(--text-secondary)]"
+          className="type-helper text-[var(--text-secondary)]"
         >
           {hint}
         </p>
@@ -98,7 +98,7 @@ export function Input({
       {error && (
         <p
           id={errorId}
-          className="text-xs font-semibold text-[var(--danger)]"
+          className="type-helper font-semibold text-[var(--danger)]"
         >
           {error}
         </p>

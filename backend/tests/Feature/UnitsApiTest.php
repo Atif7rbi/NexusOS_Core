@@ -351,6 +351,50 @@ final class UnitsApiTest extends ApiTestCase
             ->assertJsonValidationErrors(['unit']);
     }
 
+    public function test_unit_summary_respects_the_active_archive_scope(): void
+    {
+        $user = $this->createActiveUser();
+
+        Sanctum::actingAs($user);
+
+        $projectId = $this->createProject();
+
+        $activeUnitId = $this->postJson('/api/units', [
+            'project_id' => $projectId,
+            'unit_number' => 'A-501',
+            'unit_type' => 'apartment',
+            'status' => 'available',
+            'selling_price' => 500000,
+        ])->assertCreated()->json('data.unit.id');
+
+        $archivedUnitId = $this->postJson('/api/units', [
+            'project_id' => $projectId,
+            'unit_number' => 'A-502',
+            'unit_type' => 'apartment',
+            'status' => 'available',
+            'selling_price' => 500000,
+        ])->assertCreated()->json('data.unit.id');
+
+        $this->patchJson("/api/units/{$archivedUnitId}/archive")
+            ->assertOk();
+
+        $this->getJson('/api/units?archived=false')
+            ->assertOk()
+            ->assertJsonPath('data.units.total', 1)
+            ->assertJsonPath('data.units.data.0.id', $activeUnitId)
+            ->assertJsonPath('data.summary.total', 1)
+            ->assertJsonPath('data.summary.available', 1)
+            ->assertJsonPath('data.summary.reserved', 0)
+            ->assertJsonPath('data.summary.sold', 0);
+
+        $this->getJson('/api/units?archived=true')
+            ->assertOk()
+            ->assertJsonPath('data.units.total', 1)
+            ->assertJsonPath('data.units.data.0.id', $archivedUnitId)
+            ->assertJsonPath('data.summary.total', 1)
+            ->assertJsonPath('data.summary.available', 1);
+    }
+
     public function test_units_are_scoped_to_the_active_tenant(): void
     {
         $tenantAUser = $this->createActiveUser();

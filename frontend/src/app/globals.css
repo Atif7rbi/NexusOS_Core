@@ -100,6 +100,13 @@ html[data-theme="light-1"] {
   --transition-fast: 140ms ease;
   --transition-base: 180ms ease;
   --transition-slow: 260ms ease;
+
+  --type-body: 15px;
+  --type-table: 14px;
+  --type-secondary: 13px;
+  --type-helper: 12px;
+  --type-label: 15px;
+  --form-label: var(--text-primary);
 }
 
 html[data-theme="light-2"] {
@@ -337,6 +344,62 @@ html[data-theme="dark-2"] {
   --focus-ring-danger: rgba(251, 113, 133, 0.25);
 }
 
+html[data-text-size="normal"] {
+  --type-body: 15px;
+  --type-table: 14px;
+  --type-secondary: 13px;
+  --type-helper: 12px;
+  --type-label: 15px;
+}
+
+html[data-text-size="large"] {
+  --type-body: 17px;
+  --type-table: 16px;
+  --type-secondary: 15px;
+  --type-helper: 14px;
+  --type-label: 17px;
+}
+
+html[data-text-size="extra-large"] {
+  --type-body: 19px;
+  --type-table: 18px;
+  --type-secondary: 17px;
+  --type-helper: 16px;
+  --type-label: 19px;
+}
+
+html[data-font="ibm-plex-sans-arabic"] {
+  --app-font: "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+html[data-font="noto-sans-arabic"] {
+  --app-font: "Noto Sans Arabic", "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+html[data-font="tajawal"] {
+  --app-font: Tajawal, "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+html[data-font="tahoma"] {
+  --app-font: Tahoma, "IBM Plex Sans Arabic", "Noto Sans Arabic", Arial, sans-serif;
+}
+
+.font-preview-ibm-plex-sans-arabic {
+  font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+.font-preview-noto-sans-arabic {
+  font-family: "Noto Sans Arabic", "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+.font-preview-tajawal {
+  font-family: Tajawal, "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+.font-preview-tahoma {
+  font-family: Tahoma, "IBM Plex Sans Arabic", "Noto Sans Arabic", Arial, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -351,12 +414,68 @@ body {
   margin: 0;
   background: var(--app-bg);
   color: var(--text-primary);
-  font-family:
-    "Tahoma",
-    "Arial",
-    sans-serif;
+  font-family: var(--app-font, "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+.type-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.type-modal-title,
+.type-section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.type-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.type-display-number {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.type-body,
+.type-button,
+.type-input {
+  font-size: var(--type-body);
+  line-height: 1.5;
+}
+
+.type-table {
+  font-size: var(--type-table);
+  line-height: 1.5;
+}
+
+.type-secondary {
+  font-size: var(--type-secondary);
+  line-height: 1.5;
+}
+
+.type-helper {
+  font-size: var(--type-helper);
+  line-height: 1.5;
+}
+
+.type-form-label {
+  color: var(--form-label);
+  font-size: var(--type-label);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+form label:not(.sr-only) {
+  color: var(--form-label);
+  font-size: var(--type-label);
 }
 
 button,
@@ -377,6 +496,16 @@ button {
 
 button:disabled {
   cursor: not-allowed;
+}
+
+input:not([type="checkbox"]):not([type="radio"])[class],
+textarea[class],
+select[class] {
+  font-size: var(--type-body);
+}
+
+table[class] {
+  font-size: var(--type-table);
 }
 
 a {

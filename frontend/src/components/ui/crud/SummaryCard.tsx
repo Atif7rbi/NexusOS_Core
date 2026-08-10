@@ -27,10 +27,10 @@ export function SummaryCard({
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold text-[var(--text-secondary)]">
+          <p className="type-secondary font-semibold text-[var(--text-secondary)]">
             {title}
           </p>
-          <p className="mt-3 text-3xl font-bold text-[var(--text-primary)]">
+          <p className="type-display-number mt-3 text-[var(--text-primary)]">
             {typeof value === "number" ? formatInteger(value) : value}
           </p>
         </div>
