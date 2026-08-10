@@ -66,7 +66,8 @@ export default function HomePage() {
         availableUnits: "وحدات متاحة",
         loading: "جارٍ التحميل",
         error: "تعذر تحميل هذا المؤشر",
-        visibleFollowUps: "ضمن نطاق CRM المصرح لك",
+        overdueFollowUps: "متابعات تجاوزت موعدها",
+        todayFollowUps: "المتابعات المطلوب تنفيذها اليوم",
         currentReservations: "الحجوزات الفعالة حاليًا",
         registeredContracts: "كل العقود المسجلة",
         currentProjects: "المشاريع النشطة حاليًا",
@@ -87,7 +88,8 @@ export default function HomePage() {
         availableUnits: "Available units",
         loading: "Loading",
         error: "Unable to load this metric",
-        visibleFollowUps: "Within your authorized CRM scope",
+        overdueFollowUps: "Follow-ups past their scheduled time",
+        todayFollowUps: "Follow-ups to complete today",
         currentReservations: "Currently active reservations",
         registeredContracts: "All registered contracts",
         currentProjects: "Currently active projects",
@@ -105,7 +107,7 @@ export default function HomePage() {
               dashboard.followUps.data?.summary.overdue_follow_ups
             ),
             description: metricDescription(dashboard.followUps, {
-              ready: copy.visibleFollowUps,
+              ready: copy.overdueFollowUps,
               loading: copy.loading,
               error: copy.error,
             }),
@@ -120,7 +122,7 @@ export default function HomePage() {
               dashboard.followUps.data?.summary.today_follow_ups
             ),
             description: metricDescription(dashboard.followUps, {
-              ready: copy.visibleFollowUps,
+              ready: copy.todayFollowUps,
               loading: copy.loading,
               error: copy.error,
             }),

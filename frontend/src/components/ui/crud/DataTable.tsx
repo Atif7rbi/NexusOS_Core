@@ -15,7 +15,7 @@ export function DataTable({
     <div className="overflow-x-auto">
       <table
         className={[
-          "w-full text-right",
+          "type-table w-full text-right",
           className,
         ].join(" ")}
         style={{ minWidth }}

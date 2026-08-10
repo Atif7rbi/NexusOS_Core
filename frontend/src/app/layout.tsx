@@ -8,6 +8,7 @@ import { AuthProvider } from "@/providers/AuthProvider";
 import { LanguageProvider } from "@/providers/LanguageProvider";
 import { SystemSettingsProvider } from "@/providers/SystemSettingsProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { TypographyProvider } from "@/providers/TypographyProvider";
 
 export const metadata: Metadata = {
   title: "شركة أفق السكنية",
@@ -30,9 +31,11 @@ export default function RootLayout({
           <LanguageProvider>
             <AuthProvider>
               <ThemeProvider>
-                <AppShellProvider>
-                  {children}
-                </AppShellProvider>
+                <TypographyProvider>
+                  <AppShellProvider>
+                    {children}
+                  </AppShellProvider>
+                </TypographyProvider>
               </ThemeProvider>
             </AuthProvider>
           </LanguageProvider>

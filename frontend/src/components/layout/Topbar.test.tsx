@@ -5,6 +5,7 @@ import {
   getGreetingForTimeZone,
   Topbar,
 } from "@/components/layout/Topbar";
+import { shouldDisplayCompanyTagline } from "@/components/brand/CompanyBrand";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
@@ -98,5 +99,17 @@ describe("Topbar", () => {
     expect(
       getGreetingForTimeZone(date, "America/New_York", true)
     ).toBe("مساء الخير");
+  });
+
+  it("does not duplicate a tagline already contained in the full company name", () => {
+    expect(
+      shouldDisplayCompanyTagline(
+        "شركة أسوار للتطوير العقاري",
+        "للتطوير العقاري"
+      )
+    ).toBe(false);
+    expect(
+      shouldDisplayCompanyTagline("أسوار", "للتطوير العقاري")
+    ).toBe(true);
   });
 });
