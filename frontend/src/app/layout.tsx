@@ -1,4 +1,9 @@
 import type { Metadata } from "next";
+import {
+  IBM_Plex_Sans_Arabic,
+  Noto_Sans_Arabic,
+  Tajawal,
+} from "next/font/google";
 import type { ReactNode } from "react";
 
 import "./globals.css";
@@ -15,6 +20,27 @@ export const metadata: Metadata = {
   description: "نظام تشغيل وإدارة الأعمال",
 };
 
+const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ibm-plex-sans-arabic",
+  display: "swap",
+});
+
+const notoSansArabic = Noto_Sans_Arabic({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-noto-sans-arabic",
+  display: "swap",
+});
+
+const tajawal = Tajawal({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-tajawal",
+  display: "swap",
+});
+
 export default function RootLayout({
   children,
 }: {
@@ -25,6 +51,7 @@ export default function RootLayout({
       lang="ar-SA"
       dir="rtl"
       suppressHydrationWarning
+      className={`${ibmPlexSansArabic.variable} ${notoSansArabic.variable} ${tajawal.variable}`}
     >
       <body>
         <SystemSettingsProvider>
