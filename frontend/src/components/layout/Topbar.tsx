@@ -13,12 +13,15 @@ import {
   type KeyboardEvent,
 } from "react";
 
+import { CompanyBrand } from "@/components/brand/CompanyBrand";
 import { LanguageToggle } from "@/components/language/LanguageToggle";
+import { QuickCreateMenu } from "@/components/layout/QuickCreateMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { getPageTitle } from "@/config/page-titles";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAppShell } from "@/providers/AppShellProvider";
 import { useAuth } from "@/providers/AuthProvider";
+import { useSystemSettings } from "@/providers/SystemSettingsProvider";
 
 const roleTranslationKeys = {
   system_owner: "roles.systemOwner",
@@ -29,13 +32,37 @@ const roleTranslationKeys = {
   employee: "roles.employee",
 } as const;
 
+export function getGreetingForTimeZone(
+  date: Date,
+  timeZone: string,
+  isArabic: boolean
+): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      hourCycle: "h23",
+      timeZone,
+    }).format(date)
+  );
+
+  const isMorning = hour >= 5 && hour < 12;
+
+  if (isArabic) {
+    return isMorning ? "صباح الخير" : "مساء الخير";
+  }
+
+  return isMorning ? "Good morning" : "Good evening";
+}
+
 export function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const { t } = useTranslation();
+  const { t, isArabic } = useTranslation();
   const { user, logout } = useAuth();
+  const settings = useSystemSettings();
   const { openMobileSidebar } = useAppShell();
+  const [greeting, setGreeting] = useState("");
   const [isUserMenuOpen, setIsUserMenuOpen] =
     useState(false);
   const userMenuContainerRef =
@@ -57,6 +84,20 @@ export function Topbar() {
         ] ?? "roles.employee"
       )
     : "";
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setGreeting(
+        getGreetingForTimeZone(
+          new Date(),
+          settings.timezone,
+          isArabic
+        )
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isArabic, settings.timezone]);
 
   useEffect(() => {
     if (!isUserMenuOpen) {
@@ -161,37 +202,32 @@ export function Topbar() {
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="hidden md:block">
-            <p className="text-[11px] font-bold tracking-[0.12em] text-[var(--brand-primary)]">
-              NEXUSOS
-            </p>
+          <h1 className="sr-only">
+            {t(page.titleKey)}
+          </h1>
 
-            <div className="mt-1 flex min-w-0 items-center gap-3">
-              <h1 className="truncate text-lg font-bold text-[var(--text-primary)] lg:text-xl">
-                {t(page.titleKey)}
-              </h1>
-
-              <span className="hidden h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--border-strong)] lg:block" />
-
-              <p className="hidden truncate text-xs text-[var(--text-secondary)] lg:block">
-                {t(page.descriptionKey)}
-              </p>
-            </div>
-          </div>
-
-          <div className="md:hidden">
-            <h1 className="truncate text-base font-bold text-[var(--text-primary)]">
-              {t(page.titleKey)}
-            </h1>
-          </div>
+          <CompanyBrand
+            compact
+            inlineText
+            responsiveShortName
+          />
         </div>
 
         <div className="ms-auto flex shrink-0 items-center gap-2">
+          <QuickCreateMenu />
+
           <div className="hidden sm:block">
             <LanguageToggle compact />
           </div>
 
           <ThemeToggle />
+
+          <p
+            className="hidden min-w-24 text-center text-xs font-bold text-[var(--text-secondary)] md:block"
+            aria-live="polite"
+          >
+            {greeting}
+          </p>
 
           <div className="mx-1 hidden h-8 w-px bg-[var(--border)] sm:block" />
 
@@ -234,8 +270,8 @@ export function Topbar() {
                 className={[
                   "flex h-10 w-10 shrink-0 items-center justify-center",
                   "rounded-[var(--radius-md)]",
-                  "bg-[var(--brand-primary)]",
-                  "text-sm font-bold text-white",
+                  "bg-[var(--action-primary)]",
+                  "text-sm font-bold text-[var(--action-primary-foreground)]",
                   "shadow-[var(--shadow-sm)]",
                 ].join(" ")}
               >

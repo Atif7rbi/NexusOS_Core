@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useState,
@@ -22,6 +23,7 @@ import { ProjectFormModal } from "@/components/projects/ProjectFormModal";
 import { Button } from "@/components/ui/Button";
 import { AppShell } from "@/components/layout/AppShell";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -44,8 +46,17 @@ import type {
 } from "@/types/project";
 
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProjectsPageContent />
+    </Suspense>
+  );
+}
+
+function ProjectsPageContent() {
   const { isArabic } = useTranslation();
   const { token } = useAuth();
+  const quickCreate = useQuickCreateQuery();
 
   const [projects, setProjects] = useState<Project[]>(
     []
@@ -332,6 +343,17 @@ export default function ProjectsPage() {
 
   useResourceInvalidation("projects", () => loadProjects());
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (quickCreate.isRequested) {
+        setFormProject(null);
+        setFormOpen(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [quickCreate.isRequested]);
+
   const openCreateModal = (): void => {
     setFormProject(null);
     setFormOpen(true);
@@ -373,6 +395,7 @@ export default function ProjectsPage() {
 
       setFormOpen(false);
       setFormProject(null);
+      quickCreate.clear();
     } finally {
       setSubmitting(false);
     }
@@ -432,9 +455,10 @@ export default function ProjectsPage() {
             <Button
               type="button"
               onClick={openCreateModal}
-              className="gap-2 !bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="primary"
+              leadingIcon={<Plus size={18} />}
+              className="min-w-44"
             >
-              <Plus size={18} />
               {labels.newProject}
             </Button>
           </div>
@@ -554,9 +578,10 @@ export default function ProjectsPage() {
                 <Button
                   type="button"
                   onClick={openCreateModal}
-                  className="mt-5 gap-2 !bg-[var(--brand-gold)] !text-white"
+                  variant="primary"
+                  leadingIcon={<Plus size={17} />}
+                  className="mt-5"
                 >
-                  <Plus size={17} />
                   {labels.newProject}
                 </Button>
               </div>
@@ -725,6 +750,7 @@ export default function ProjectsPage() {
             if (!isSubmitting) {
               setFormOpen(false);
               setFormProject(null);
+              quickCreate.clear();
             }
           }}
           onSubmit={handleFormSubmit}

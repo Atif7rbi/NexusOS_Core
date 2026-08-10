@@ -83,7 +83,7 @@ export function CustomerArchiveDialog({
         type="button"
         onClick={onCancel}
         aria-label={labels.close}
-        className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[var(--backdrop)] backdrop-blur-[2px]"
       />
 
       <div className="relative w-full max-w-md rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)]">
@@ -147,7 +147,7 @@ export function CustomerArchiveDialog({
             className={
               isArchive
                 ? ""
-                : "!bg-[var(--success)] !text-white hover:opacity-90"
+                : "!bg-[var(--success)] !text-[var(--success-foreground)] hover:!bg-[var(--success-hover)] focus-visible:!ring-[var(--focus-ring-success)]"
             }
           >
             {isProcessing

@@ -1,4 +1,5 @@
 import {
+  fireEvent,
   render,
   screen,
 } from "@testing-library/react";
@@ -102,5 +103,29 @@ describe("FollowUpsPanel", () => {
       screen.getByText("تعذر تحميل قائمة المتابعة.")
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "فتح CRM" })).toBeTruthy();
+  });
+
+  it("collapses the queue while keeping follow-up counts visible", () => {
+    render(
+      <FollowUpsPanel
+        resource={{
+          data,
+          isLoading: false,
+          error: null,
+        }}
+      />
+    );
+
+    const toggle = screen.getByRole("button", {
+      name: /قائمة المتابعة/,
+    });
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("عميل متأخر")).toBeNull();
+    expect(screen.getByText("متأخرة: 2")).toBeTruthy();
+    expect(screen.getByText("اليوم: 1")).toBeTruthy();
   });
 });

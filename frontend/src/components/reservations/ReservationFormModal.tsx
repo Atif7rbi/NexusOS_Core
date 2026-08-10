@@ -71,6 +71,7 @@ export function ReservationFormModal({
     expires_at: defaultExpiry(),
     notes: "",
   });
+  const [unitLoadError, setUnitLoadError] = useState(false);
   const {
     formRef,
     fieldErrors,
@@ -83,6 +84,26 @@ export function ReservationFormModal({
     (customer) =>
       customer.id === form.customer_id
   );
+  const hasSelectedProject = form.project_id !== "";
+  const hasNoAvailableUnits =
+    hasSelectedProject &&
+    !isLoadingUnits &&
+    !isLoadingInitialOptions &&
+    !unitLoadError &&
+    units.length === 0;
+  const unitSelectionDisabled =
+    !hasSelectedProject ||
+    isLoadingUnits ||
+    isLoadingInitialOptions ||
+    unitLoadError ||
+    hasNoAvailableUnits;
+  const unitPlaceholder = isLoadingUnits && hasSelectedProject
+    ? "جارٍ تحميل الوحدات المتاحة..."
+    : unitLoadError
+      ? "تعذر تحميل الوحدات المتاحة."
+      : hasNoAvailableUnits
+        ? "لا توجد وحدات متاحة لهذا المشروع."
+        : "اختر الوحدة";
 
   const updateField = <Key extends keyof ReservationFormState>(
     key: Key,
@@ -93,6 +114,7 @@ export function ReservationFormModal({
   };
 
   const selectProject = async (projectId: string): Promise<void> => {
+    setUnitLoadError(false);
     updateField("project_id", projectId);
     setForm((current) => ({ ...current, unit_id: "" }));
 
@@ -102,8 +124,8 @@ export function ReservationFormModal({
 
     try {
       await onProjectChange(projectId);
-    } catch (error) {
-      setValidationError(error, "تعذر تحميل الوحدات المتاحة.");
+    } catch {
+      setUnitLoadError(true);
     }
   };
 
@@ -116,7 +138,9 @@ export function ReservationFormModal({
     const errors = {
       ...(!form.customer_id ? { customer_id: ["اختر العميل."] } : {}),
       ...(!form.project_id ? { project_id: ["اختر المشروع."] } : {}),
-      ...(!form.unit_id ? { unit_id: ["اختر الوحدة."] } : {}),
+      ...(!form.unit_id && !hasNoAvailableUnits && !unitLoadError
+        ? { unit_id: ["اختر الوحدة."] }
+        : {}),
       ...(!form.expires_at ? { expires_at: ["حدد تاريخ انتهاء الحجز."] } : {}),
     };
 
@@ -173,8 +197,14 @@ export function ReservationFormModal({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingInitialOptions || isLoadingUnits}
-              className="!bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              disabled={
+                isSubmitting ||
+                isLoadingInitialOptions ||
+                isLoadingUnits ||
+                hasNoAvailableUnits ||
+                unitLoadError
+              }
+              variant="primary"
             >
               {isSubmitting ? "جارٍ الحفظ..." : "حفظ الحجز"}
             </Button>
@@ -246,21 +276,50 @@ export function ReservationFormModal({
           label="الوحدة المتاحة"
           name="unit_id"
           value={form.unit_id}
-          error={fieldErrors.unit_id?.[0]}
-          disabled={!form.project_id || isLoadingUnits || isLoadingInitialOptions}
+          error={
+            hasNoAvailableUnits || unitLoadError
+              ? undefined
+              : fieldErrors.unit_id?.[0]
+          }
+          disabled={unitSelectionDisabled}
           onChange={(event) => updateField("unit_id", event.target.value)}
           options={[
-            { value: "", label: "اختر الوحدة" },
+            { value: "", label: unitPlaceholder },
             ...units.map((unit) => ({
               value: unit.id,
               label: `${unit.unit_number} — ${unit.project_name}`,
             })),
           ]}
         />
-        {isLoadingUnits ? (
-          <p className="-mt-3 text-xs text-[var(--text-secondary)]">
+        {isLoadingUnits && hasSelectedProject ? (
+          <p
+            role="status"
+            className="-mt-3 text-xs text-[var(--text-secondary)]"
+          >
             جارٍ تحميل الوحدات المتاحة للمشروع...
           </p>
+        ) : null}
+        {unitLoadError ? (
+          <p
+            role="alert"
+            className="-mt-3 text-xs font-semibold text-[var(--danger)]"
+          >
+            تعذر تحميل الوحدات المتاحة.
+          </p>
+        ) : null}
+        {hasNoAvailableUnits ? (
+          <div
+            role="status"
+            className="-mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--warning)]/25 bg-[var(--warning-soft)] px-3 py-2 text-xs font-semibold text-[var(--warning)]"
+          >
+            <span>لا توجد وحدات متاحة لهذا المشروع.</span>
+            <a
+              href="/units/?create=1"
+              className="underline underline-offset-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring-accent)]"
+            >
+              إضافة وحدة
+            </a>
+          </div>
         ) : null}
 
         <Input

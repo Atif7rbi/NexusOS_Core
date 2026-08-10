@@ -52,7 +52,7 @@ export function CustomerBusinessContext({
           {createReservationHref ? (
             <a
               href={createReservationHref}
-              className="motion-ui inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] border border-transparent bg-[var(--brand-primary)] px-4 text-sm font-bold text-[var(--text-inverse)] shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:bg-[var(--brand-primary-hover)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
+              className="motion-ui inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] border border-transparent bg-[var(--action-primary)] px-4 text-sm font-bold text-[var(--action-primary-foreground)] shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
             >
               <Plus size={17} aria-hidden="true" />
               {copy.createReservation}

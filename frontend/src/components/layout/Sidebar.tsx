@@ -19,6 +19,7 @@ import { getNavigationGroupsForRole } from "@/config/navigation";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAppShell } from "@/providers/AppShellProvider";
 import { useAuth } from "@/providers/AuthProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 
 const GROUP_STORAGE_KEY = "nexusos_sidebar_groups_v1";
 
@@ -70,6 +71,7 @@ function SidebarContent({
 }: SidebarContentProps) {
   const pathname = usePathname();
   const { isArabic, t } = useTranslation();
+  const { isDark } = useTheme();
   const { user } = useAuth();
   const visibleNavigationGroups =
     getNavigationGroupsForRole(user?.role ?? null);
@@ -121,14 +123,14 @@ function SidebarContent({
 
   return (
     <>
-      <div className="flex h-[82px] shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
-        <NexusBrand compact={collapsed} />
+      <div className="flex h-[82px] shrink-0 items-center justify-between border-b border-[var(--sidebar-border)] px-4">
+        <NexusBrand compact={collapsed} inverse={isDark} />
 
         {mobile ? (
           <button
             type="button"
             onClick={closeMobileSidebar}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--surface-muted)]"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-hover-text)]"
             aria-label={t("navigation.closeSidebar")}
           >
             <X size={19} />
@@ -159,7 +161,7 @@ function SidebarContent({
                       onClick={() =>
                         toggleGroup(groupKey)
                       }
-                      className="mb-2 flex h-8 w-full items-center justify-between rounded-lg px-3 text-[10px] font-bold text-[var(--sidebar-heading)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+                      className="mb-2 flex h-8 w-full items-center justify-between rounded-lg px-3 text-[10px] font-bold text-[var(--sidebar-heading)] transition-colors hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-hover-text)]"
                       aria-expanded={isExpanded}
                     >
                       <span>{t(group.labelKey)}</span>
@@ -220,13 +222,13 @@ function SidebarContent({
                               "text-[13px] font-semibold",
                               active
                                 ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)]"
-                                : "text-[var(--sidebar-text)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]",
+                                : "text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-hover-text)]",
                             ].join(" ")}
                           >
                             {active ? (
                               <span
                                 className={[
-                                  "absolute h-6 w-[3px] bg-[var(--brand-gold)]",
+                                  "absolute h-6 w-[3px] bg-[var(--sidebar-active-indicator)]",
                                   isArabic
                                     ? "-right-3 rounded-l-full"
                                     : "-left-3 rounded-r-full",
@@ -241,8 +243,8 @@ function SidebarContent({
                               }
                               className={
                                 active
-                                  ? "shrink-0 text-[var(--brand-gold-strong)]"
-                                  : "shrink-0 text-[var(--text-muted)] group-hover:text-[var(--text-primary)]"
+                                  ? "shrink-0 text-[var(--sidebar-active-indicator)]"
+                                  : "shrink-0 text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-hover-text)]"
                               }
                             />
 
@@ -255,7 +257,7 @@ function SidebarContent({
                                 {active ? (
                                   <ActiveChevron
                                     size={14}
-                                    className="text-[var(--brand-gold)]"
+                                    className="text-[var(--sidebar-active-indicator)]"
                                   />
                                 ) : null}
                               </>
@@ -273,7 +275,7 @@ function SidebarContent({
       </nav>
 
       {!mobile ? (
-        <div className="shrink-0 border-t border-[var(--border)] px-3 py-4">
+        <div className="shrink-0 border-t border-[var(--sidebar-border)] px-3 py-4">
           <button
             type="button"
             onClick={toggleSidebar}
@@ -287,8 +289,8 @@ function SidebarContent({
               collapsed
                 ? "justify-center"
                 : "gap-3 px-3",
-              "text-xs font-semibold text-[var(--text-secondary)]",
-              "hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]",
+              "text-xs font-semibold text-[var(--sidebar-text)]",
+              "hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-hover-text)]",
             ].join(" ")}
           >
             {collapsed ? (
@@ -322,7 +324,7 @@ export function Sidebar() {
       <aside
         className={[
           "hidden h-screen shrink-0 flex-col",
-          "border-[var(--border)] bg-[var(--sidebar-bg)]",
+          "border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]",
           "transition-[width] duration-200",
           "lg:sticky lg:top-0 lg:flex",
           isArabic ? "border-l" : "border-r",
@@ -340,13 +342,13 @@ export function Sidebar() {
             type="button"
             aria-label="Close sidebar"
             onClick={closeMobileSidebar}
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-[var(--backdrop)] backdrop-blur-[2px]"
           />
 
           <aside
             className={[
               "absolute inset-y-0 flex w-[286px] flex-col",
-              "border-[var(--border)] bg-[var(--sidebar-bg)]",
+              "border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]",
               "shadow-[var(--shadow-lg)]",
               isArabic
                 ? "right-0 border-l"

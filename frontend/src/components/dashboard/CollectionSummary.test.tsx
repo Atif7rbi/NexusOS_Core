@@ -1,4 +1,5 @@
 import {
+  fireEvent,
   render,
   screen,
 } from "@testing-library/react";
@@ -81,5 +82,30 @@ describe("CollectionSummary", () => {
     expect(
       screen.getByText("لا توجد بنود تحصيل مجدولة.")
     ).toBeTruthy();
+  });
+
+  it("collapses details while keeping schedule indicators visible", () => {
+    render(
+      <CollectionSummary
+        resource={{
+          data,
+          isLoading: false,
+          error: null,
+        }}
+      />
+    );
+
+    const toggle = screen.getByRole("button", {
+      name: /نظرة عامة على التحصيل/,
+    });
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("الدفعة الأولى")).toBeNull();
+    expect(screen.getByText("جداول معتمدة: 3")).toBeTruthy();
+    expect(screen.getByText("مسودات: 2")).toBeTruthy();
+    expect(screen.getByText("بدون جدول: 1")).toBeTruthy();
   });
 });

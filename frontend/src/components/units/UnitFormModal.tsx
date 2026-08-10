@@ -264,7 +264,7 @@ export function UnitFormModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="!bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="primary"
             >
               {isSubmitting ? labels.saving : labels.save}
             </Button>

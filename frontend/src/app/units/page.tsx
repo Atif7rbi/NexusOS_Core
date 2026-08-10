@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useState,
@@ -38,6 +39,7 @@ import {
 import { Pagination } from "@/components/ui/crud/Pagination";
 import { SummaryCard } from "@/components/ui/crud/SummaryCard";
 import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
+import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 import {
   formatDecimal,
   formatInteger,
@@ -87,7 +89,16 @@ const statusLabels: Record<UnitStatus, string> = {
 };
 
 export default function UnitsPage() {
+  return (
+    <Suspense fallback={null}>
+      <UnitsPageContent />
+    </Suspense>
+  );
+}
+
+function UnitsPageContent() {
   const { token } = useAuth();
+  const quickCreate = useQuickCreateQuery();
   const [units, setUnits] = useState<Unit[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [summary, setSummary] = useState<UnitSummary>(emptySummary);
@@ -114,6 +125,17 @@ export default function UnitsPage() {
   const [isProcessing, setProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (quickCreate.isRequested) {
+        setFormUnit(null);
+        setFormOpen(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [quickCreate.isRequested]);
 
   const loadUnits = useCallback(
     async (targetPage = page): Promise<void> => {
@@ -273,6 +295,7 @@ export default function UnitsPage() {
       await loadUnits(isUpdating ? page : 1);
       setFormOpen(false);
       setFormUnit(null);
+      quickCreate.clear();
       setSuccessMessage(
         isUpdating
           ? "تم تحديث الوحدة بنجاح."
@@ -347,9 +370,10 @@ export default function UnitsPage() {
                 setFormUnit(null);
                 setFormOpen(true);
               }}
-              className="gap-2 !bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
+              variant="primary"
+              leadingIcon={<Plus size={18} />}
+              className="min-w-44"
             >
-              <Plus size={18} />
               إضافة وحدة
             </Button>
           }
@@ -689,6 +713,7 @@ export default function UnitsPage() {
             if (!isSubmitting) {
               setFormOpen(false);
               setFormUnit(null);
+              quickCreate.clear();
             }
           }}
           onSubmit={submitForm}
@@ -732,8 +757,8 @@ export default function UnitsPage() {
         processingLabel="جارٍ التنفيذ..."
         confirmClassName={
           action === "archive"
-            ? "!bg-[var(--brand-gold)] !text-white hover:!bg-[var(--brand-gold-strong)]"
-            : "!bg-[var(--success)] !text-white hover:opacity-90"
+            ? "!bg-[var(--action-accent)] !text-[var(--action-accent-foreground)] hover:!bg-[var(--action-accent-hover)] focus-visible:!ring-[var(--focus-ring-accent)]"
+            : "!bg-[var(--success)] !text-[var(--success-foreground)] hover:!bg-[var(--success-hover)] focus-visible:!ring-[var(--focus-ring-success)]"
         }
         onCancel={() => {
           if (!isProcessing) {
@@ -788,7 +813,7 @@ function UnitDescriptionCell({
             type="button"
             onClick={() => setOpen(false)}
             aria-label="إغلاق"
-            className="absolute inset-0 bg-slate-950/55"
+            className="absolute inset-0 bg-[var(--backdrop)]"
           />
           <div
             role="dialog"

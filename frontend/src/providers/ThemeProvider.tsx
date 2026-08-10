@@ -10,16 +10,29 @@ import {
   type ReactNode,
 } from "react";
 
-export type ThemeMode = "light" | "dark";
+import { useAuth } from "@/providers/AuthProvider";
+
+export const THEME_PROFILES = [
+  "light-1",
+  "light-2",
+  "dark-1",
+  "dark-2",
+] as const;
+
+export type ThemeProfile = (typeof THEME_PROFILES)[number];
 
 type ThemeContextValue = {
-  theme: ThemeMode;
+  theme: ThemeProfile;
   isDark: boolean;
   toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
+  setTheme: (theme: ThemeProfile) => void;
 };
 
 const STORAGE_KEY = "ufq_theme";
+
+function getUserStorageKey(userId: number): string {
+  return `${STORAGE_KEY}:user:${userId}`;
+}
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
@@ -27,63 +40,140 @@ type ThemeProviderProps = {
   children: ReactNode;
 };
 
-function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "light";
+function normalizeStoredTheme(
+  storedTheme: string | null
+): ThemeProfile | null {
+  if (storedTheme === "light") {
+    return "light-1";
   }
 
-  const storedTheme =
-    window.localStorage.getItem(STORAGE_KEY);
+  if (storedTheme === "dark") {
+    return "dark-1";
+  }
 
-  if (storedTheme === "light" || storedTheme === "dark") {
-    return storedTheme;
+  return THEME_PROFILES.find(
+    (profile) => profile === storedTheme
+  ) ?? null;
+}
+
+function getDefaultTheme(): ThemeProfile {
+  if (typeof window === "undefined") {
+    return "light-1";
+  }
+
+  if (typeof window.matchMedia !== "function") {
+    return "light-1";
   }
 
   return window.matchMedia(
     "(prefers-color-scheme: dark)"
   ).matches
-    ? "dark"
-    : "light";
+    ? "dark-1"
+    : "light-1";
 }
 
-function applyTheme(theme: ThemeMode): void {
+function getUserTheme(userId: number): ThemeProfile {
+  const userStorageKey = getUserStorageKey(userId);
+  const storedValue = window.localStorage.getItem(userStorageKey);
+  const storedTheme = normalizeStoredTheme(storedValue);
+
+  if (storedTheme) {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return storedTheme;
+  }
+
+  if (storedValue !== null) {
+    window.localStorage.removeItem(userStorageKey);
+  }
+
+  const legacyValue = window.localStorage.getItem(STORAGE_KEY);
+  const legacyTheme = normalizeStoredTheme(legacyValue);
+
+  if (legacyTheme) {
+    window.localStorage.setItem(userStorageKey, legacyTheme);
+    window.localStorage.removeItem(STORAGE_KEY);
+    return legacyTheme;
+  }
+
+  if (legacyValue !== null) {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+
+  return getDefaultTheme();
+}
+
+function isDarkProfile(theme: ThemeProfile): boolean {
+  return theme.startsWith("dark-");
+}
+
+function applyTheme(theme: ThemeProfile): void {
   document.documentElement.dataset.theme = theme;
   document.documentElement.classList.toggle(
     "dark",
-    theme === "dark"
+    isDarkProfile(theme)
   );
 }
 
 export function ThemeProvider({
   children,
 }: ThemeProviderProps) {
+  const { user, isLoading } = useAuth();
+  const userId = isLoading ? null : (user?.id ?? null);
+  const identityKey = isLoading
+    ? "auth-loading"
+    : userId === null
+      ? "anonymous"
+      : `user-${userId}`;
+
+  return (
+    <ThemeStateProvider key={identityKey} userId={userId}>
+      {children}
+    </ThemeStateProvider>
+  );
+}
+
+function ThemeStateProvider({
+  children,
+  userId,
+}: ThemeProviderProps & { userId: number | null }) {
   const [theme, setThemeState] =
-    useState<ThemeMode>(getInitialTheme);
+    useState<ThemeProfile>(() =>
+      userId === null ? getDefaultTheme() : getUserTheme(userId)
+    );
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
   const setTheme = useCallback(
-    (nextTheme: ThemeMode): void => {
+    (nextTheme: ThemeProfile): void => {
       setThemeState(nextTheme);
 
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        nextTheme
-      );
+      if (userId !== null) {
+        window.localStorage.setItem(
+          getUserStorageKey(userId),
+          nextTheme
+        );
+      }
     },
-    []
+    [userId]
   );
 
   const toggleTheme = useCallback((): void => {
-    setTheme(theme === "light" ? "dark" : "light");
+    const matchingProfile: Record<ThemeProfile, ThemeProfile> = {
+      "light-1": "dark-1",
+      "light-2": "dark-2",
+      "dark-1": "light-1",
+      "dark-2": "light-2",
+    };
+
+    setTheme(matchingProfile[theme]);
   }, [setTheme, theme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
-      isDark: theme === "dark",
+      isDark: isDarkProfile(theme),
       toggleTheme,
       setTheme,
     }),

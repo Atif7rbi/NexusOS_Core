@@ -233,7 +233,9 @@ describe("CrmLeadsPage follow-up workflow", () => {
   });
 
   it("schedules a follow-up and refreshes details, activities, and list data", async () => {
-    services.fetchLead.mockResolvedValue(unscheduledLead);
+    services.fetchLead
+      .mockResolvedValueOnce(unscheduledLead)
+      .mockResolvedValue(scheduledLead);
     services.scheduleLeadFollowUp.mockResolvedValue(scheduledLead);
 
     render(<CrmLeadsPage />);
@@ -263,7 +265,9 @@ describe("CrmLeadsPage follow-up workflow", () => {
   });
 
   it("reschedules a follow-up and refreshes details, activities, and list data", async () => {
-    services.fetchLead.mockResolvedValue(scheduledLead);
+    services.fetchLead
+      .mockResolvedValueOnce(scheduledLead)
+      .mockResolvedValue(rescheduledLead);
     services.rescheduleLeadFollowUp.mockResolvedValue(
       rescheduledLead
     );
@@ -293,7 +297,9 @@ describe("CrmLeadsPage follow-up workflow", () => {
   });
 
   it("completes a follow-up and refreshes details, activities, and list data", async () => {
-    services.fetchLead.mockResolvedValue(scheduledLead);
+    services.fetchLead
+      .mockResolvedValueOnce(scheduledLead)
+      .mockResolvedValue(clearedLead);
     services.completeLeadFollowUp.mockResolvedValue(clearedLead);
 
     render(<CrmLeadsPage />);
@@ -321,7 +327,9 @@ describe("CrmLeadsPage follow-up workflow", () => {
   });
 
   it("cancels a follow-up and refreshes details, activities, and list data", async () => {
-    services.fetchLead.mockResolvedValue(scheduledLead);
+    services.fetchLead
+      .mockResolvedValueOnce(scheduledLead)
+      .mockResolvedValue(clearedLead);
     services.cancelLeadFollowUp.mockResolvedValue(clearedLead);
 
     render(<CrmLeadsPage />);

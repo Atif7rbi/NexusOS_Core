@@ -21,7 +21,7 @@ export function SuccessBanner({
         type="button"
         onClick={onDismiss}
         aria-label="إغلاق رسالة النجاح"
-        className="rounded-lg p-1 hover:bg-black/5"
+        className="rounded-lg p-1 hover:bg-[var(--surface-muted)]"
       >
         <X size={17} />
       </button>
