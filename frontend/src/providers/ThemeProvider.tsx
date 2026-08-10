@@ -57,19 +57,7 @@ function normalizeStoredTheme(
 }
 
 function getDefaultTheme(): ThemeProfile {
-  if (typeof window === "undefined") {
-    return "light-1";
-  }
-
-  if (typeof window.matchMedia !== "function") {
-    return "light-1";
-  }
-
-  return window.matchMedia(
-    "(prefers-color-scheme: dark)"
-  ).matches
-    ? "dark-1"
-    : "light-1";
+  return "dark-1";
 }
 
 function getUserTheme(userId: number): ThemeProfile {
