@@ -75,6 +75,9 @@ final class UnitController extends Controller
             ->where('tenant_id', $membership->tenant_id)
             ->latest();
 
+        $summaryQuery = Unit::query()
+            ->where('tenant_id', $membership->tenant_id);
+
         if (
             isset($validated['search'])
             && trim($validated['search']) !== ''
@@ -99,17 +102,20 @@ final class UnitController extends Controller
         }
 
         if (array_key_exists('archived', $validated)) {
-            $request->boolean('archived')
-                ? $query->whereNotNull('archived_at')
-                : $query->whereNull('archived_at');
+            if ($request->boolean('archived')) {
+                $query->whereNotNull('archived_at');
+                $summaryQuery->whereNotNull('archived_at');
+            } else {
+                $query->whereNull('archived_at');
+                $summaryQuery->whereNull('archived_at');
+            }
         }
 
         $units = $query->paginate(
             perPage: (int) ($validated['per_page'] ?? 20)
         );
 
-        $summary = Unit::query()
-            ->where('tenant_id', $membership->tenant_id)
+        $summary = $summaryQuery
             ->selectRaw('count(*) as total')
             ->selectRaw(
                 'count(*) filter (where status = ?) as available',
