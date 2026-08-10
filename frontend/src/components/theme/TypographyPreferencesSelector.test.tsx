@@ -26,10 +26,17 @@ describe("TypographyPreferencesSelector", () => {
     delete document.documentElement.dataset.font;
   });
 
-  it("selects and persists semantic text size and font preferences", async () => {
+  it("uses compact controls with the approved defaults and persists user selections", async () => {
     renderSelector();
 
     expect(screen.getByText("الخط وحجم النص")).toBeTruthy();
+    expect(screen.queryByText("نص تشغيلي واضح وسهل القراءة")).toBeNull();
+    expect(
+      screen.getByText("كبير").closest("button")?.getAttribute("aria-pressed")
+    ).toBe("true");
+    expect(
+      screen.getByText("Tajawal").closest("button")?.getAttribute("aria-pressed")
+    ).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /كبير جدًا/ }));
     fireEvent.click(screen.getByRole("button", { name: /Noto Sans Arabic/ }));
 

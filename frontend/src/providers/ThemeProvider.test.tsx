@@ -96,7 +96,7 @@ describe("ThemeProvider", () => {
     vi.unstubAllGlobals();
   });
 
-  it("maps the system preference to the first matching profile", async () => {
+  it("uses Dark 1 as the default profile regardless of the system preference", async () => {
     vi.stubGlobal(
       "matchMedia",
       vi.fn().mockReturnValue({ matches: true })
@@ -128,10 +128,10 @@ describe("ThemeProvider", () => {
 
     renderProvider(7);
 
-    await expectRootTheme("light-1", false);
+    await expectRootTheme("dark-1", true);
     expect(window.localStorage.getItem(userThemeKey(7))).toBeNull();
     expect(window.localStorage.getItem("ufq_theme")).toBeNull();
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
   it.each([
@@ -182,7 +182,7 @@ describe("ThemeProvider", () => {
         <ThemeProbe />
       </ThemeProvider>
     );
-    await expectRootTheme("light-1", false);
+    await expectRootTheme("dark-1", true);
 
     setCurrentUser(202);
     view.rerender(
@@ -190,7 +190,7 @@ describe("ThemeProvider", () => {
         <ThemeProbe />
       </ThemeProvider>
     );
-    await expectRootTheme("light-1", false);
+    await expectRootTheme("dark-1", true);
     expect(window.localStorage.getItem(userThemeKey(202))).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "light-2" }));
@@ -203,7 +203,7 @@ describe("ThemeProvider", () => {
         <ThemeProbe />
       </ThemeProvider>
     );
-    await expectRootTheme("light-1", false);
+    await expectRootTheme("dark-1", true);
 
     setCurrentUser(101);
     view.rerender(

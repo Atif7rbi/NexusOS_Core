@@ -96,11 +96,11 @@ describe("TypographyProvider", () => {
 
     rerenderProvider(view, null);
     await waitFor(() => {
-      expect(screen.getByText("normal:ibm-plex-sans-arabic")).toBeTruthy();
+      expect(screen.getByText("large:tajawal")).toBeTruthy();
     });
 
     rerenderProvider(view, 22);
-    expect(screen.getByText("normal:ibm-plex-sans-arabic")).toBeTruthy();
+    expect(screen.getByText("large:tajawal")).toBeTruthy();
     expect(window.localStorage.getItem("ufq_text_size:user:22")).toBeNull();
     expect(window.localStorage.getItem("ufq_font:user:22")).toBeNull();
 
@@ -116,9 +116,9 @@ describe("TypographyProvider", () => {
     renderProvider(7);
 
     await waitFor(() => {
-      expect(document.documentElement.dataset.textSize).toBe("normal");
+      expect(document.documentElement.dataset.textSize).toBe("large");
     });
-    expect(document.documentElement.dataset.font).toBe("ibm-plex-sans-arabic");
+    expect(document.documentElement.dataset.font).toBe("tajawal");
     expect(window.localStorage.getItem("ufq_text_size:user:7")).toBeNull();
     expect(window.localStorage.getItem("ufq_font:user:7")).toBeNull();
   });

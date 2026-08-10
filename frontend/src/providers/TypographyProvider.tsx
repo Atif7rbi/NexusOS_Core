@@ -37,8 +37,8 @@ type TypographyContextValue = {
 
 const TEXT_SIZE_STORAGE_KEY = "ufq_text_size";
 const FONT_STORAGE_KEY = "ufq_font";
-const DEFAULT_TEXT_SIZE: TextSizeProfile = "normal";
-const DEFAULT_FONT: FontFamily = "ibm-plex-sans-arabic";
+const DEFAULT_TEXT_SIZE: TextSizeProfile = "large";
+const DEFAULT_FONT: FontFamily = "tajawal";
 
 const TypographyContext =
   createContext<TypographyContextValue | null>(null);

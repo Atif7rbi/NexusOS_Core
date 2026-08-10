@@ -1,7 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { Check, Type } from "lucide-react";
 
 import { useTranslation } from "@/hooks/useTranslation";
@@ -16,7 +14,7 @@ import {
 type Choice<T extends string> = {
   id: T;
   label: { ar: string; en: string };
-  sampleClassName?: string;
+  className?: string;
 };
 
 const textSizeChoices: Choice<TextSizeProfile>[] = [
@@ -29,22 +27,22 @@ const fontChoices: Choice<FontFamily>[] = [
   {
     id: "ibm-plex-sans-arabic",
     label: { ar: "IBM Plex Sans Arabic", en: "IBM Plex Sans Arabic" },
-    sampleClassName: "font-preview-ibm-plex-sans-arabic",
+    className: "font-preview-ibm-plex-sans-arabic",
   },
   {
     id: "noto-sans-arabic",
     label: { ar: "Noto Sans Arabic", en: "Noto Sans Arabic" },
-    sampleClassName: "font-preview-noto-sans-arabic",
+    className: "font-preview-noto-sans-arabic",
   },
   {
     id: "tajawal",
     label: { ar: "Tajawal", en: "Tajawal" },
-    sampleClassName: "font-preview-tajawal",
+    className: "font-preview-tajawal",
   },
   {
     id: "tahoma",
     label: { ar: "Tahoma", en: "Tahoma" },
-    sampleClassName: "font-preview-tahoma",
+    className: "font-preview-tahoma",
   },
 ];
 
@@ -66,7 +64,6 @@ export function TypographyPreferencesSelector() {
         textSize: "حجم النص",
         font: "نوع الخط",
         selected: "محدد",
-        sample: "نص تشغيلي واضح وسهل القراءة",
       }
     : {
         title: "Text and font",
@@ -75,13 +72,12 @@ export function TypographyPreferencesSelector() {
         textSize: "Text size",
         font: "Font family",
         selected: "Selected",
-        sample: "Clear operational text for daily work",
       };
 
   return (
     <section
       aria-labelledby="typography-heading"
-      className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6"
+      className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
     >
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--action-primary-soft)] text-[var(--action-primary)]">
@@ -97,107 +93,86 @@ export function TypographyPreferencesSelector() {
         </div>
       </div>
 
-      <fieldset className="mt-6">
-        <legend className="type-form-label">{copy.textSize}</legend>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {textSizeChoices.map((choice) => (
-            <PreferenceCard
-              key={choice.id}
-              choice={choice}
-              selected={textSize === choice.id}
-              selectedText={copy.selected}
-              isArabic={isArabic}
-              onSelect={() => setTextSize(choice.id)}
-              preview={
-                <span
-                  className={[
-                    "block text-[var(--text-primary)]",
-                    choice.id === "normal"
-                      ? "text-[15px]"
-                      : choice.id === "large"
-                        ? "text-[17px]"
-                        : "text-[19px]",
-                  ].join(" ")}
-                >
-                  {copy.sample}
-                </span>
-              }
-            />
-          ))}
-        </div>
-      </fieldset>
+      <div className="mt-5 grid gap-5 lg:grid-cols-2 lg:gap-6">
+        <fieldset className="min-w-0">
+          <legend className="type-form-label">{copy.textSize}</legend>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {textSizeChoices.map((choice) => (
+              <CompactChoice
+                key={choice.id}
+                choice={choice}
+                selected={textSize === choice.id}
+                selectedText={copy.selected}
+                isArabic={isArabic}
+                onSelect={() => setTextSize(choice.id)}
+              />
+            ))}
+          </div>
+        </fieldset>
 
-      <fieldset className="mt-7">
-        <legend className="type-form-label">{copy.font}</legend>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {fontChoices.map((choice) => (
-            <PreferenceCard
-              key={choice.id}
-              choice={choice}
-              selected={fontFamily === choice.id}
-              selectedText={copy.selected}
-              isArabic={isArabic}
-              onSelect={() => setFontFamily(choice.id)}
-              preview={
-                <span
-                  className={[
-                    "mt-2 block type-body text-[var(--text-primary)]",
-                    choice.sampleClassName ?? "",
-                  ].join(" ")}
-                >
-                  {copy.sample}
-                </span>
-              }
-            />
-          ))}
-        </div>
-      </fieldset>
+        <fieldset className="min-w-0">
+          <legend className="type-form-label">{copy.font}</legend>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {fontChoices.map((choice) => (
+              <CompactChoice
+                key={choice.id}
+                choice={choice}
+                selected={fontFamily === choice.id}
+                selectedText={copy.selected}
+                isArabic={isArabic}
+                onSelect={() => setFontFamily(choice.id)}
+                fullWidth
+              />
+            ))}
+          </div>
+        </fieldset>
+      </div>
     </section>
   );
 }
 
-type PreferenceCardProps<T extends string> = {
+type CompactChoiceProps<T extends string> = {
   choice: Choice<T>;
   selected: boolean;
   selectedText: string;
   isArabic: boolean;
   onSelect: () => void;
-  preview: ReactNode;
+  fullWidth?: boolean;
 };
 
-function PreferenceCard<T extends string>({
+function CompactChoice<T extends string>({
   choice,
   selected,
   selectedText,
   isArabic,
   onSelect,
-  preview,
-}: PreferenceCardProps<T>) {
+  fullWidth = false,
+}: CompactChoiceProps<T>) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={onSelect}
       className={[
-        "motion-ui rounded-2xl border p-4 text-start",
+        "motion-ui inline-flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-start",
+        "type-button font-semibold",
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]",
+        fullWidth ? "w-full" : "",
+        choice.className ?? "",
         selected
-          ? "border-[var(--action-primary)] bg-[var(--action-primary-soft)]"
-          : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]",
+          ? "border-[var(--action-primary)] bg-[var(--action-primary-soft)] text-[var(--text-primary)]"
+          : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]",
       ].join(" ")}
     >
-      <span className="flex items-start justify-between gap-3">
-        <span className="type-card-title text-[var(--text-primary)]">
-          {choice.label[isArabic ? "ar" : "en"]}
-        </span>
-        {selected ? (
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--action-primary)] text-[var(--action-primary-foreground)]">
-            <Check size={14} aria-hidden="true" />
-            <span className="sr-only">{selectedText}</span>
-          </span>
-        ) : null}
+      <span className="min-w-0 truncate">
+        {choice.label[isArabic ? "ar" : "en"]}
       </span>
-      {preview}
+      {selected ? (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--action-primary)] text-[var(--action-primary-foreground)]">
+          <Check size={12} aria-hidden="true" />
+          <span className="sr-only">{selectedText}</span>
+        </span>
+      ) : null}
     </button>
   );
 }
