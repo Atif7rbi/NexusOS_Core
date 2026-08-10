@@ -54,11 +54,12 @@ describe("SystemSettingsProvider", () => {
     document.documentElement.style.removeProperty("--action-primary");
     document.documentElement.removeAttribute("lang");
     document.documentElement.removeAttribute("dir");
+    document.title = "";
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 
-  it("keeps tenant branding separate from semantic action colors", async () => {
+  it("keeps tenant branding separate from semantic action colors and derives the browser title from the company identity", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.test/api");
     vi.stubGlobal(
       "fetch",
@@ -94,5 +95,6 @@ describe("SystemSettingsProvider", () => {
     expect(
       document.documentElement.style.getPropertyValue("--brand-primary")
     ).toBe("");
+    expect(document.title).toBe("شركة الاختبار | NexusOS");
   });
 });

@@ -11,8 +11,8 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { TypographyProvider } from "@/providers/TypographyProvider";
 
 export const metadata: Metadata = {
-  title: "شركة أفق السكنية",
-  description: "نظام إدارة التطوير العقاري",
+  title: "NexusOS",
+  description: "نظام تشغيل وإدارة الأعمال",
 };
 
 export default function RootLayout({

@@ -78,6 +78,8 @@ export function SystemSettingsProvider({
 
         setSettings(payload.data);
 
+        document.title = `${payload.data.company_name_ar} | NexusOS`;
+
         document.documentElement.lang =
           payload.data.language;
 
