@@ -185,6 +185,7 @@ final class LeadsConversionConcurrencyTest extends TestCase
         $connection = config("database.connections.{$this->connectionName}");
         $environment = array_filter([
             'APP_ENV' => 'testing',
+            'APP_CONFIG_CACHE' => getenv('APP_CONFIG_CACHE') ?: null,
             'DB_CONNECTION' => $this->connectionName,
             'DB_HOST' => $connection['host'] ?? null,
             'DB_PORT' => isset($connection['port']) ? (string) $connection['port'] : null,

@@ -26,12 +26,12 @@ const textSizeChoices: Choice<TextSizeProfile>[] = [
 const fontChoices: Choice<FontFamily>[] = [
   {
     id: "ibm-plex-sans-arabic",
-    label: { ar: "IBM Plex Sans Arabic", en: "IBM Plex Sans Arabic" },
+        label: { ar: "IBM Plex", en: "IBM Plex" },
     className: "font-preview-ibm-plex-sans-arabic",
   },
   {
     id: "noto-sans-arabic",
-    label: { ar: "Noto Sans Arabic", en: "Noto Sans Arabic" },
+    label: { ar: "Noto Sans", en: "Noto Sans" },
     className: "font-preview-noto-sans-arabic",
   },
   {
@@ -48,7 +48,13 @@ const fontChoices: Choice<FontFamily>[] = [
 
 export { FONT_FAMILIES, TEXT_SIZE_PROFILES };
 
-export function TypographyPreferencesSelector() {
+type TypographyPreferencesSelectorProps = {
+  embedded?: boolean;
+};
+
+export function TypographyPreferencesSelector({
+  embedded = false,
+}: TypographyPreferencesSelectorProps) {
   const { isArabic } = useTranslation();
   const {
     textSize,
@@ -74,6 +80,47 @@ export function TypographyPreferencesSelector() {
         selected: "Selected",
       };
 
+  const controls = (
+    <div className={embedded ? "grid gap-5 lg:grid-cols-2 lg:gap-6" : "mt-5 grid gap-5 lg:grid-cols-2 lg:gap-6"}>
+      <fieldset className="min-w-0">
+        <legend className="type-form-label">{copy.textSize}</legend>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {textSizeChoices.map((choice) => (
+            <CompactChoice
+              key={choice.id}
+              choice={choice}
+              selected={textSize === choice.id}
+              selectedText={copy.selected}
+              isArabic={isArabic}
+              onSelect={() => setTextSize(choice.id)}
+            />
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="min-w-0">
+        <legend className="type-form-label">{copy.font}</legend>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {fontChoices.map((choice) => (
+            <CompactChoice
+              key={choice.id}
+              choice={choice}
+              selected={fontFamily === choice.id}
+              selectedText={copy.selected}
+              isArabic={isArabic}
+              onSelect={() => setFontFamily(choice.id)}
+              fullWidth
+            />
+          ))}
+        </div>
+      </fieldset>
+    </div>
+  );
+
+  if (embedded) {
+    return controls;
+  }
+
   return (
     <section
       aria-labelledby="typography-heading"
@@ -93,40 +140,7 @@ export function TypographyPreferencesSelector() {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2 lg:gap-6">
-        <fieldset className="min-w-0">
-          <legend className="type-form-label">{copy.textSize}</legend>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {textSizeChoices.map((choice) => (
-              <CompactChoice
-                key={choice.id}
-                choice={choice}
-                selected={textSize === choice.id}
-                selectedText={copy.selected}
-                isArabic={isArabic}
-                onSelect={() => setTextSize(choice.id)}
-              />
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset className="min-w-0">
-          <legend className="type-form-label">{copy.font}</legend>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {fontChoices.map((choice) => (
-              <CompactChoice
-                key={choice.id}
-                choice={choice}
-                selected={fontFamily === choice.id}
-                selectedText={copy.selected}
-                isArabic={isArabic}
-                onSelect={() => setFontFamily(choice.id)}
-                fullWidth
-              />
-            ))}
-          </div>
-        </fieldset>
-      </div>
+      {controls}
     </section>
   );
 }

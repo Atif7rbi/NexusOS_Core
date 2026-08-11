@@ -127,6 +127,28 @@ class ProjectsApiTest extends ApiTestCase
         ]);
     }
 
+    public function test_project_creation_uses_tenant_timezone_without_creating_company_settings(): void
+    {
+        $user = $this->createActiveUser();
+        $tenantId = $this->tenantIdFor($user);
+
+        $this->assertDatabaseMissing('system_settings', [
+            'tenant_id' => $tenantId,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/projects', [
+            'name' => 'مشروع دون أثر جانبي للإعدادات',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+        ])->assertCreated();
+
+        $this->assertDatabaseMissing('system_settings', [
+            'tenant_id' => $tenantId,
+        ]);
+    }
+
     public function test_project_tenant_id_is_required_after_phase_three_compatibility(): void
     {
         $column = DB::selectOne("

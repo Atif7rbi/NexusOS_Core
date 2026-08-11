@@ -54,9 +54,9 @@ export default function RootLayout({
       className={`${ibmPlexSansArabic.variable} ${notoSansArabic.variable} ${tajawal.variable}`}
     >
       <body>
-        <SystemSettingsProvider>
-          <LanguageProvider>
-            <AuthProvider>
+        <AuthProvider>
+          <SystemSettingsProvider>
+            <LanguageProvider>
               <ThemeProvider>
                 <TypographyProvider>
                   <AppShellProvider>
@@ -64,9 +64,9 @@ export default function RootLayout({
                   </AppShellProvider>
                 </TypographyProvider>
               </ThemeProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </SystemSettingsProvider>
+            </LanguageProvider>
+          </SystemSettingsProvider>
+        </AuthProvider>
       </body>
     </html>
   );

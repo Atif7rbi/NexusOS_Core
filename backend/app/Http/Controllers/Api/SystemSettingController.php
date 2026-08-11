@@ -6,24 +6,54 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateSystemSettingRequest;
 use App\Models\SystemSetting;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
+use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class SystemSettingController extends Controller
 {
-    public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) {}
-    public function show(): JsonResponse
+    public function __construct(
+        private readonly SaudiMobileNormalizer $phoneNormalizer,
+        private readonly ResolveActiveMembership $resolveActiveMembership,
+    ) {}
+
+    public function show(Request $request): JsonResponse
     {
-        $settings = SystemSetting::query()->firstOrFail();
+        $settings = SystemSetting::forTenant(
+            (string) $this->resolveActiveMembership
+                ->handle($request->user())
+                ->tenant_id,
+        );
+
+        $responseSettings = config('nexusos.demo_mode')
+            ? array_replace(
+                $settings->toArray(),
+                config('nexusos.demo_company_profile'),
+            )
+            : $settings;
 
         return response()->json([
-            'data' => $settings,
+            'data' => $responseSettings,
         ]);
     }
 
     public function update(
-        UpdateSystemSettingRequest $request
+        UpdateSystemSettingRequest $request,
     ): JsonResponse {
-        $settings = SystemSetting::query()->firstOrFail();
+        if (config('nexusos.demo_mode')) {
+            return response()->json([
+                'message' => 'لا يمكن تعديل بيانات الشركة المشتركة في وضع العرض التجريبي.',
+                'error' => [
+                    'code' => 'company_profile_demo_read_only',
+                ],
+            ], 403);
+        }
+
+        $settings = SystemSetting::forTenant(
+            (string) $this->resolveActiveMembership
+                ->handle($request->user())
+                ->tenant_id,
+        );
 
         $validated = $request->validated();
         if (array_key_exists('phone', $validated)) $validated['phone'] = $this->phoneNormalizer->normalizeNullable($validated['phone']);

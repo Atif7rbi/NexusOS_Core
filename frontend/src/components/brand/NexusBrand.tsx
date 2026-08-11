@@ -76,8 +76,8 @@ export function NexusBrand({
         <div className={centered ? "mt-4" : ""}>
           <p
             className={[
-              "font-extrabold tracking-[-0.035em]",
-              large ? "text-4xl" : "text-xl",
+              "nexus-brand-wordmark font-extrabold tracking-[-0.035em]",
+              large ? "nexus-brand-wordmark--large" : "",
               inverse
                 ? "text-white"
                 : "text-[var(--text-primary)]",
@@ -92,8 +92,8 @@ export function NexusBrand({
 
           <p
             className={[
-              "mt-0.5 font-medium tracking-wide",
-              large ? "text-sm" : "text-[9px]",
+              "nexus-brand-subtitle mt-0.5 font-medium tracking-wide",
+              large ? "nexus-brand-subtitle--large" : "",
               inverse
                 ? "text-white/55"
                 : "text-[var(--text-muted)]",
