@@ -74,7 +74,13 @@ export const APPEARANCE_PROFILE_PREVIEWS: ProfilePreview[] = [
   },
 ];
 
-export function AppearanceProfileSelector() {
+type AppearanceProfileSelectorProps = {
+  embedded?: boolean;
+};
+
+export function AppearanceProfileSelector({
+  embedded = false,
+}: AppearanceProfileSelectorProps) {
   const { isArabic } = useTranslation();
   const { theme, setTheme } = useTheme();
 
@@ -92,6 +98,80 @@ export function AppearanceProfileSelector() {
         selected: "Selected",
       };
 
+  const controls = (
+    <div className={embedded ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-4" : "mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"}>
+      {APPEARANCE_PROFILE_PREVIEWS.map((profile) => {
+        const selected = theme === profile.id;
+
+        return (
+          <button
+            key={profile.id}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => setTheme(profile.id)}
+            className={[
+              "motion-ui overflow-hidden rounded-2xl border p-2.5 text-start",
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]",
+              selected
+                ? "border-[var(--action-primary)] shadow-[var(--shadow-md)]"
+                : "border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]",
+            ].join(" ")}
+          >
+            <span
+              className="flex h-16 overflow-hidden rounded-xl border border-black/10"
+              style={{ backgroundColor: profile.canvas }}
+              aria-hidden="true"
+            >
+              <span
+                className="w-1/4"
+                style={{ backgroundColor: profile.sidebar }}
+              />
+              <span className="flex flex-1 flex-col gap-1.5 p-2">
+                <span
+                  className="h-3 rounded-md"
+                  style={{ backgroundColor: profile.surface }}
+                />
+                <span
+                  className="h-5 w-2/3 rounded-lg"
+                  style={{ backgroundColor: profile.action }}
+                />
+                <span
+                  className="mt-auto h-2 rounded-md"
+                  style={{ backgroundColor: profile.surface }}
+                />
+              </span>
+            </span>
+
+            <span className="mt-2 flex items-start justify-between gap-2">
+              <span>
+                <span className="block text-sm font-bold text-[var(--text-primary)]">
+                  {profile.label}
+                </span>
+                <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">
+                  {profile.description[isArabic ? "ar" : "en"]}
+                </span>
+              </span>
+
+              {selected ? (
+                <span
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--action-primary)] text-[var(--action-primary-foreground)]"
+                  title={copy.selected}
+                >
+                  <Check size={12} aria-hidden="true" />
+                  <span className="sr-only">{copy.selected}</span>
+                </span>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  if (embedded) {
+    return controls;
+  }
+
   return (
     <section
       aria-labelledby="appearance-heading"
@@ -106,78 +186,7 @@ export function AppearanceProfileSelector() {
         </p>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {APPEARANCE_PROFILE_PREVIEWS.map((profile) => {
-          const selected = theme === profile.id;
-
-          return (
-            <button
-              key={profile.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setTheme(profile.id)}
-              className={[
-                "motion-ui overflow-hidden rounded-2xl border p-3 text-start",
-                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]",
-                selected
-                  ? "border-[var(--action-primary)] shadow-[var(--shadow-md)]"
-                  : "border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]",
-              ].join(" ")}
-            >
-              <span
-                className="flex h-24 overflow-hidden rounded-xl border border-black/10"
-                style={{ backgroundColor: profile.canvas }}
-                aria-hidden="true"
-              >
-                <span
-                  className="w-1/4"
-                  style={{ backgroundColor: profile.sidebar }}
-                />
-                <span className="flex flex-1 flex-col gap-2 p-3">
-                  <span
-                    className="h-4 rounded-md"
-                    style={{ backgroundColor: profile.surface }}
-                  />
-                  <span
-                    className="h-7 w-2/3 rounded-lg"
-                    style={{ backgroundColor: profile.action }}
-                  >
-                    <span
-                      className="mx-auto mt-2 block h-1 w-1/2 rounded-full opacity-80"
-                      style={{ backgroundColor: profile.actionText }}
-                    />
-                  </span>
-                  <span
-                    className="mt-auto h-3 rounded-md"
-                    style={{ backgroundColor: profile.surface }}
-                  />
-                </span>
-              </span>
-
-              <span className="mt-3 flex items-start justify-between gap-3">
-                <span>
-                  <span className="block text-sm font-bold text-[var(--text-primary)]">
-                    {profile.label}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">
-                    {profile.description[isArabic ? "ar" : "en"]}
-                  </span>
-                </span>
-
-                {selected ? (
-                  <span
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--action-primary)] text-[var(--action-primary-foreground)]"
-                    title={copy.selected}
-                  >
-                    <Check size={14} aria-hidden="true" />
-                    <span className="sr-only">{copy.selected}</span>
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {controls}
     </section>
   );
 }

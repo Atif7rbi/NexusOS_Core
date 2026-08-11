@@ -99,4 +99,13 @@ describe("Sidebar brand identity", () => {
       screen.getByTestId("nexus-brand").getAttribute("data-inverse")
     ).toBe("true");
   });
+
+  it("uses the expanded width and no-wrap navigation contract for Extra Large typography", () => {
+    const { container } = render(<Sidebar />);
+    const sidebar = container.querySelector("aside");
+
+    expect(sidebar?.className).toContain("w-[272px]");
+    expect(container.innerHTML).toContain("whitespace-nowrap");
+    expect(container.innerHTML).not.toContain("flex-1 truncate");
+  });
 });

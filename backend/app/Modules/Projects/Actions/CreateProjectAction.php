@@ -27,7 +27,7 @@ class CreateProjectAction
             $actorId,
             $data,
         ): Project {
-            $timezone = SystemSetting::query()->value('timezone')
+            $timezone = SystemSetting::forTenant($tenantId)->timezone
                 ?? config('app.timezone');
 
             $year = now($timezone)->year;

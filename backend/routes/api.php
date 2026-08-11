@@ -15,12 +15,12 @@ use App\Modules\Units\Controllers\UnitController;
 use App\Modules\Users\Controllers\TenantUserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/system-settings', [SystemSettingController::class, 'show']);
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
     Route::get('/auth/user', [AuthController::class, 'user']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/system-settings', [SystemSettingController::class, 'show']);
     Route::put('/system-settings', [SystemSettingController::class, 'update']);
 
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');

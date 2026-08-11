@@ -27,3 +27,17 @@ export type SystemSettings = {
 export type SystemSettingsResponse = {
   data: SystemSettings;
 };
+
+export type CompanyProfileInput = Pick<
+  SystemSettings,
+  | "company_name_ar"
+  | "company_name_en"
+  | "short_name_ar"
+  | "short_name_en"
+  | "phone"
+  | "email"
+  | "address"
+  | "website"
+  | "commercial_registration"
+  | "vat_number"
+>;

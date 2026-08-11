@@ -38,7 +38,7 @@ describe("TypographyPreferencesSelector", () => {
       screen.getByText("Tajawal").closest("button")?.getAttribute("aria-pressed")
     ).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /كبير جدًا/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Noto Sans Arabic/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Noto Sans/ }));
 
     await waitFor(() => {
       expect(document.documentElement.dataset.textSize).toBe("extra-large");
@@ -46,5 +46,7 @@ describe("TypographyPreferencesSelector", () => {
     expect(document.documentElement.dataset.font).toBe("noto-sans-arabic");
     expect(window.localStorage.getItem("ufq_text_size:user:7")).toBe("extra-large");
     expect(window.localStorage.getItem("ufq_font:user:7")).toBe("noto-sans-arabic");
+    expect(screen.getByText("IBM Plex")).toBeTruthy();
+    expect(screen.getByText("Noto Sans")).toBeTruthy();
   });
 });

@@ -17,7 +17,7 @@ class UpdateSystemSettingRequest extends FormRequest
     }
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->canManageUsers() ?? false;
     }
 
     /**
