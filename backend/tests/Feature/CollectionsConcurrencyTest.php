@@ -281,6 +281,7 @@ final class CollectionsConcurrencyTest extends TestCase
         $connection = config("database.connections.{$connectionName}");
         $environment = array_filter([
             'APP_ENV' => 'testing',
+            'APP_CONFIG_CACHE' => getenv('APP_CONFIG_CACHE') ?: null,
             'DB_CONNECTION' => $connectionName,
             'DB_HOST' => $connection['host'] ?? null,
             'DB_PORT' => isset($connection['port']) ? (string) $connection['port'] : null,
