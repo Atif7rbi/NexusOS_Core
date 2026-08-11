@@ -38,6 +38,8 @@ const settingsState = vi.hoisted(() => ({
   created_at: "",
   updated_at: "",
   isLoading: false,
+  hasLoadedSettings: true,
+  loadError: false,
   isDemoMode: false,
   applyCompanyProfile: services.applyCompanyProfile,
   saveDemoCompanyProfile: services.saveDemoCompanyProfile,
@@ -65,6 +67,8 @@ describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState.user = { role: "administrator" };
+    settingsState.hasLoadedSettings = true;
+    settingsState.loadError = false;
     settingsState.isDemoMode = false;
     services.updateCompanyProfile.mockResolvedValue(settingsState);
   });
@@ -101,6 +105,7 @@ describe("SettingsPage", () => {
 
   it("keeps Demo company profile changes local instead of calling the API", async () => {
     settingsState.isDemoMode = true;
+    settingsState.hasLoadedSettings = false;
     render(<SettingsPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "حفظ التغييرات" }));
@@ -110,6 +115,21 @@ describe("SettingsPage", () => {
     });
     expect(services.updateCompanyProfile).not.toHaveBeenCalled();
     expect(screen.getByRole("status").textContent).toContain("محليًا");
+  });
+
+  it("does not expose fallback company settings for live editing after the settings request fails", () => {
+    settingsState.hasLoadedSettings = false;
+    settingsState.loadError = true;
+
+    render(<SettingsPage />);
+
+    expect(
+      screen.getByText(/تعذر تحميل بيانات الشركة/)
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "حفظ التغييرات" })
+    ).toBeNull();
+    expect(services.updateCompanyProfile).not.toHaveBeenCalled();
   });
 
   it("renders the company profile as read-only for non-administrators", () => {

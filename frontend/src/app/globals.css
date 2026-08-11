@@ -409,10 +409,18 @@ html[data-font="tahoma"] {
   line-height: 1.2;
 }
 
+.nexus-brand-wordmark--large {
+  font-size: 36px !important;
+}
+
 .nexus-brand-subtitle {
   font-size: 12px !important;
   line-height: 1.3;
   white-space: nowrap;
+}
+
+.nexus-brand-subtitle--large {
+  font-size: 14px !important;
 }
 
 * {

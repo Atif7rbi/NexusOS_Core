@@ -15,6 +15,7 @@ import {
   SystemSettingsProvider,
   useSystemSettings,
 } from "@/providers/SystemSettingsProvider";
+import { LanguageProvider, useLanguage } from "@/providers/LanguageProvider";
 import type { SystemSettings } from "@/types/system-settings";
 
 const authState = vi.hoisted(() => ({
@@ -58,6 +59,8 @@ function SettingsProbe() {
   return (
     <>
       <span>{settings.company_name_ar}</span>
+      <span>{settings.hasLoadedSettings ? "settings loaded" : "settings pending"}</span>
+      <span>{settings.loadError ? "settings error" : "settings ready"}</span>
       <button
         type="button"
         onClick={() =>
@@ -79,6 +82,12 @@ function SettingsProbe() {
       </button>
     </>
   );
+}
+
+function LanguageProbe() {
+  const { direction, locale } = useLanguage();
+
+  return <span>{`${locale}:${direction}`}</span>;
 }
 
 describe("SystemSettingsProvider", () => {
@@ -133,6 +142,53 @@ describe("SystemSettingsProvider", () => {
       document.documentElement.style.getPropertyValue("--brand-primary")
     ).toBe("");
     expect(document.title).toBe("شركة الاختبار | NexusOS");
+    expect(screen.getByText("settings loaded")).toBeTruthy();
+  });
+
+  it("keeps fallback settings non-authoritative when the live request fails", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.test/api");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false })
+    );
+
+    render(
+      <SystemSettingsProvider>
+        <SettingsProbe />
+      </SystemSettingsProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("settings error")).toBeTruthy();
+    });
+
+    expect(screen.getByText("settings pending")).toBeTruthy();
+  });
+
+  it("does not override the user-selected language or direction after loading settings", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.test/api");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ data: settings }),
+      })
+    );
+    window.localStorage.setItem("ufq_locale", "en-US");
+
+    render(
+      <SystemSettingsProvider>
+        <LanguageProvider>
+          <LanguageProbe />
+        </LanguageProvider>
+      </SystemSettingsProvider>
+    );
+
+    await screen.findByText("en-US:ltr");
+    await waitFor(() => {
+      expect(document.documentElement.lang).toBe("en-US");
+      expect(document.documentElement.dir).toBe("ltr");
+    });
   });
 
   it("keeps Demo company profile overrides local to the current browser", async () => {

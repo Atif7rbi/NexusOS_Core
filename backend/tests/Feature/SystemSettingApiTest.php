@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\SystemSetting;
+use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
@@ -14,16 +15,20 @@ class SystemSettingApiTest extends ApiTestCase
         $user = $this->createActiveUser();
         Sanctum::actingAs($user);
 
+        $membership = TenantUser::query()
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        $tenant = Tenant::query()->findOrFail($membership->tenant_id);
+
         $this->getJson('/api/system-settings')
             ->assertOk()
-            ->assertJsonPath('data.company_name_ar', 'شركة أفق السكنية')
-            ->assertJsonPath('data.short_name_ar', 'أفق')
-            ->assertJsonPath('data.timezone', 'Asia/Riyadh');
+            ->assertJsonPath('data.company_name_ar', $tenant->name)
+            ->assertJsonPath('data.timezone', $tenant->timezone)
+            ->assertJsonPath('data.currency', $tenant->currency);
 
-        $membership = TenantUser::query()->where('user_id', $user->id)->firstOrFail();
         $this->assertDatabaseHas('system_settings', [
             'tenant_id' => $membership->tenant_id,
-            'company_name_ar' => 'شركة أفق السكنية',
+            'company_name_ar' => $tenant->name,
         ]);
     }
 
@@ -111,6 +116,42 @@ class SystemSettingApiTest extends ApiTestCase
         self::assertNotSame('شركة المستأجر الأول', SystemSetting::forTenant((string) $secondMembership->tenant_id)->company_name_ar);
     }
 
+    public function test_new_tenant_settings_are_derived_from_that_tenant_not_ufq_identity(): void
+    {
+        $tenant = Tenant::factory()->create([
+            'name' => 'شركة المستأجر الجديد',
+            'timezone' => 'UTC',
+            'locale' => 'en-US',
+            'currency' => 'USD',
+        ]);
+
+        $settings = SystemSetting::forTenant((string) $tenant->id);
+
+        self::assertSame('شركة المستأجر الجديد', $settings->company_name_ar);
+        self::assertSame('شركة المستأجر الجديد', $settings->short_name_ar);
+        self::assertSame('UTC', $settings->timezone);
+        self::assertSame('en-US', $settings->language);
+        self::assertSame('USD', $settings->currency);
+        self::assertNotSame('شركة أفق السكنية', $settings->company_name_ar);
+        self::assertNotSame('Ufq', $settings->short_name_en);
+    }
+
+    public function test_existing_tenant_company_profile_is_not_replaced_by_new_defaults(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $existing = SystemSetting::query()->create([
+            'tenant_id' => $tenant->id,
+            'company_name_ar' => 'شركة أفق السكنية',
+            'short_name_ar' => 'أفق',
+        ]);
+
+        $resolved = SystemSetting::forTenant((string) $tenant->id);
+
+        self::assertSame($existing->id, $resolved->id);
+        self::assertSame('شركة أفق السكنية', $resolved->company_name_ar);
+        self::assertSame('أفق', $resolved->short_name_ar);
+    }
+
     public function test_company_profile_validation_and_phone_normalization_are_preserved(): void
     {
         Sanctum::actingAs($this->createActiveUser([
@@ -130,6 +171,72 @@ class SystemSettingApiTest extends ApiTestCase
             'website',
             'phone',
         ]);
+    }
+
+    public function test_update_rejects_invalid_branding_and_regional_values(): void
+    {
+        Sanctum::actingAs($this->createActiveUser([
+            'role' => User::ROLE_ADMINISTRATOR,
+        ]));
+
+        $this->putJson('/api/system-settings', [
+            'primary_color' => 'blue',
+            'secondary_color' => '#12345',
+            'timezone' => 'Invalid/Timezone',
+            'currency' => 'SA',
+            'email' => 'invalid-email',
+            'website' => 'not-a-url',
+        ])->assertUnprocessable()->assertJsonValidationErrors([
+            'primary_color',
+            'secondary_color',
+            'timezone',
+            'currency',
+            'email',
+            'website',
+        ]);
+    }
+
+    public function test_partial_update_preserves_existing_settings_values(): void
+    {
+        $user = $this->createActiveUser([
+            'role' => User::ROLE_ADMINISTRATOR,
+        ]);
+        Sanctum::actingAs($user);
+
+        $membership = TenantUser::query()
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        $settings = SystemSetting::forTenant((string) $membership->tenant_id);
+
+        $this->putJson('/api/system-settings', [
+            'phone' => ' ٠٥٠٠٠٠٠٠٠٠ ',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.phone', '0500000000')
+            ->assertJsonPath('data.company_name_ar', $settings->company_name_ar)
+            ->assertJsonPath('data.currency', $settings->currency);
+    }
+
+    public function test_phone_raw_http_boundary_is_preserved(): void
+    {
+        Sanctum::actingAs($this->createActiveUser([
+            'role' => User::ROLE_ADMINISTRATOR,
+        ]));
+
+        foreach ([
+            "\0".'0500000000',
+            "0500000000\0",
+            "0500000000\u{00A0}",
+            '+966500000000',
+        ] as $phone) {
+            $this->putJson('/api/system-settings', ['phone' => $phone])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('phone');
+        }
+
+        $this->putJson('/api/system-settings', [
+            'phone' => " \t\r\n\v\f",
+        ])->assertOk()->assertJsonPath('data.phone', null);
     }
 
     public function test_demo_mode_rejects_central_company_profile_mutation(): void

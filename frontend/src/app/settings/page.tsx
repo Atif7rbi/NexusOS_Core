@@ -78,6 +78,10 @@ export default function SettingsPage() {
   const canManageCompany = Boolean(
     user?.role === "administrator" || user?.role === "system_owner"
   );
+  const canEditCompany =
+    canManageCompany &&
+    (settings.isDemoMode ||
+      (settings.hasLoadedSettings && !settings.loadError));
 
   const labels = useMemo(
     () =>
@@ -110,6 +114,8 @@ export default function SettingsPage() {
             saved: "تم حفظ بيانات الشركة بنجاح.",
             saveFailed: "تعذر حفظ بيانات الشركة.",
             load: "جارٍ تحميل بيانات الشركة...",
+            loadFailed:
+              "تعذر تحميل بيانات الشركة. لن يتم تمكين الحفظ حتى تنجح إعادة تحميل الإعدادات.",
             noPermission: "بيانات الشركة متاحة للعرض فقط. يلزم حساب مسؤول لتعديلها.",
             demoSaved:
               "تم حفظ تخصيصك محليًا لهذا المتصفح فقط. لم تتغير بيانات العرض المشتركة.",
@@ -146,6 +152,8 @@ export default function SettingsPage() {
             saved: "Company profile saved successfully.",
             saveFailed: "Unable to save company profile.",
             load: "Loading company profile...",
+            loadFailed:
+              "Unable to load the company profile. Saving stays disabled until settings load successfully.",
             noPermission:
               "Company profile is read-only. An administrator account is required to make changes.",
             demoSaved:
@@ -172,7 +180,19 @@ export default function SettingsPage() {
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
 
-    if (!canManageCompany || !token) {
+    if (
+      !canManageCompany ||
+      !token ||
+      (!settings.isDemoMode &&
+        (!settings.hasLoadedSettings || settings.loadError))
+    ) {
+      if (
+        !settings.isDemoMode &&
+        (!settings.hasLoadedSettings || settings.loadError)
+      ) {
+        setError(labels.loadFailed);
+      }
+
       return;
     }
 
@@ -312,9 +332,16 @@ export default function SettingsPage() {
               className="mt-6 h-36 animate-pulse rounded-2xl bg-[var(--surface-muted)]"
               aria-label={labels.load}
             />
+          ) : !settings.isDemoMode && settings.loadError ? (
+            <p
+              role="alert"
+              className="type-secondary mt-6 font-semibold text-[var(--danger)]"
+            >
+              {labels.loadFailed}
+            </p>
           ) : (
             <form className="mt-6 space-y-5" onSubmit={(event) => void submit(event)}>
-              <fieldset disabled={!canManageCompany || saving} className="grid gap-4 md:grid-cols-2">
+              <fieldset disabled={!canEditCompany || saving} className="grid gap-4 md:grid-cols-2">
                 <Input label={labels.companyNameAr} name="company_name_ar" value={form.company_name_ar} onChange={(event) => updateField("company_name_ar", event.target.value)} required />
                 <Input label={labels.companyNameEn} name="company_name_en" value={form.company_name_en ?? ""} onChange={(event) => updateField("company_name_en", event.target.value)} />
                 <Input label={labels.shortNameAr} name="short_name_ar" value={form.short_name_ar} onChange={(event) => updateField("short_name_ar", event.target.value)} required />
@@ -339,7 +366,7 @@ export default function SettingsPage() {
               {error ? <p role="alert" className="type-secondary font-semibold text-[var(--danger)]">{error}</p> : null}
               {success ? <p role="status" className="type-secondary font-semibold text-[var(--success)]">{success}</p> : null}
 
-              {canManageCompany ? (
+              {canEditCompany ? (
                 <Button type="submit" isLoading={saving} leadingIcon={<Save size={17} />}>
                   {labels.save}
                 </Button>

@@ -47,6 +47,8 @@ const defaultSettings: SystemSettings = {
 
 type SystemSettingsContextValue = SystemSettings & {
   isLoading: boolean;
+  hasLoadedSettings: boolean;
+  loadError: boolean;
   isDemoMode: boolean;
   applyCompanyProfile: (settings: SystemSettings) => void;
   saveDemoCompanyProfile: (profile: CompanyProfileInput) => void;
@@ -56,6 +58,8 @@ const SystemSettingsContext =
   createContext<SystemSettingsContextValue>({
     ...defaultSettings,
     isLoading: false,
+    hasLoadedSettings: false,
+    loadError: false,
     isDemoMode: false,
     applyCompanyProfile: () => undefined,
     saveDemoCompanyProfile: () => undefined,
@@ -89,8 +93,6 @@ function getDemoCompanyProfileOverride(): Partial<CompanyProfileInput> {
 
 function applyDocumentSettings(settings: SystemSettings): void {
   document.title = `${settings.company_name_ar} | NexusOS`;
-  document.documentElement.lang = settings.language;
-  document.documentElement.dir = "rtl";
   document.documentElement.style.setProperty(
     "--company-primary",
     settings.primary_color
@@ -130,11 +132,14 @@ function SystemSettingsStateProvider({
   isAuthLoading: boolean;
 }) {
   const demoMode = isDemoMode();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const [settings, setSettings] =
     useState<SystemSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(
-    Boolean(token && process.env.NEXT_PUBLIC_API_BASE_URL)
+    Boolean(token && apiBaseUrl)
   );
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const applyCompanyProfile = useCallback(
     (nextSettings: SystemSettings): void => {
@@ -173,8 +178,6 @@ function SystemSettingsStateProvider({
       return;
     }
 
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-
     if (!apiBaseUrl) {
       return;
     }
@@ -190,7 +193,11 @@ function SystemSettingsStateProvider({
           },
         });
 
-        if (!response.ok || !active) {
+        if (!response.ok) {
+          throw new Error("Unable to load system settings.");
+        }
+
+        if (!active) {
           return;
         }
 
@@ -199,8 +206,12 @@ function SystemSettingsStateProvider({
         };
 
         applyCompanyProfile(payload.data);
+        setHasLoadedSettings(true);
       } catch {
-        // Keep safe defaults when the API is unavailable.
+        if (active) {
+          setHasLoadedSettings(false);
+          setLoadError(true);
+        }
       } finally {
         if (active) {
           setIsLoading(false);
@@ -213,17 +224,29 @@ function SystemSettingsStateProvider({
     return () => {
       active = false;
     };
-  }, [applyCompanyProfile, isAuthLoading, token]);
+  }, [apiBaseUrl, applyCompanyProfile, isAuthLoading, token]);
 
   const value = useMemo<SystemSettingsContextValue>(
     () => ({
       ...settings,
       isLoading,
+      hasLoadedSettings,
+      loadError: loadError || Boolean(token && !apiBaseUrl),
       isDemoMode: demoMode,
       applyCompanyProfile,
       saveDemoCompanyProfile,
     }),
-    [applyCompanyProfile, demoMode, isLoading, saveDemoCompanyProfile, settings]
+    [
+      applyCompanyProfile,
+      demoMode,
+      hasLoadedSettings,
+      isLoading,
+      loadError,
+      saveDemoCompanyProfile,
+      settings,
+      token,
+      apiBaseUrl,
+    ]
   );
 
   return (

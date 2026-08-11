@@ -27,5 +27,18 @@ describe("NexusBrand typography contract", () => {
     expect(css).toMatch(/\.nexus-brand-wordmark\s*\{[\s\S]*font-size:\s*20px !important;/);
     expect(css).toMatch(/\.nexus-brand-subtitle\s*\{[\s\S]*font-size:\s*12px !important;/);
     expect(css).toMatch(/\.nexus-brand-subtitle\s*\{[\s\S]*white-space:\s*nowrap;/);
+    expect(css).toMatch(/\.nexus-brand-wordmark--large\s*\{[\s\S]*font-size:\s*36px !important;/);
+    expect(css).toMatch(/\.nexus-brand-subtitle--large\s*\{[\s\S]*font-size:\s*14px !important;/);
+  });
+
+  it("keeps a distinct fixed large brand variant", () => {
+    render(<NexusBrand large inverse />);
+
+    expect(screen.getByText("Nexus", { exact: false }).className).toContain(
+      "nexus-brand-wordmark--large"
+    );
+    expect(screen.getByText("Business Operating System").className).toContain(
+      "nexus-brand-subtitle--large"
+    );
   });
 });

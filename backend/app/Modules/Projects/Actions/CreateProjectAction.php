@@ -2,7 +2,7 @@
 
 namespace App\Modules\Projects\Actions;
 
-use App\Models\SystemSetting;
+use App\Models\Tenant;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Shared\Contracts\BusinessNumberGeneratorInterface;
@@ -27,7 +27,9 @@ class CreateProjectAction
             $actorId,
             $data,
         ): Project {
-            $timezone = SystemSetting::forTenant($tenantId)->timezone
+            $timezone = Tenant::query()
+                ->whereKey($tenantId)
+                ->value('timezone')
                 ?? config('app.timezone');
 
             $year = now($timezone)->year;
