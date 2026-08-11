@@ -194,11 +194,18 @@ describe("SystemSettingsProvider", () => {
   it("keeps Demo company profile overrides local to the current browser", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.test/api");
     vi.stubEnv("NEXT_PUBLIC_DEMO_MODE", "true");
+    const demoSettings: SystemSettings = {
+      ...settings,
+      company_name_ar: "شركة أسوار للتطوير العقاري",
+      company_name_en: "Aswar Real Estate Development",
+      short_name_ar: "أسوار",
+      short_name_en: "Aswar",
+    };
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: vi.fn().mockResolvedValue({ data: settings }),
+        json: vi.fn().mockResolvedValue({ data: demoSettings }),
       })
     );
 
@@ -208,7 +215,7 @@ describe("SystemSettingsProvider", () => {
       </SystemSettingsProvider>
     );
 
-    await screen.findByText("شركة الاختبار");
+    await screen.findByText("شركة أسوار للتطوير العقاري");
     screen.getByRole("button", { name: "save demo" }).click();
 
     await waitFor(() => {
@@ -220,12 +227,15 @@ describe("SystemSettingsProvider", () => {
     ).toContain("شركة محلية");
 
     view.unmount();
+
+    window.localStorage.removeItem("nexusos_demo_company_profile_v1");
     render(
       <SystemSettingsProvider>
         <SettingsProbe />
       </SystemSettingsProvider>
     );
 
-    await screen.findByText("شركة محلية");
+    await screen.findByText("شركة أسوار للتطوير العقاري");
+    expect(document.title).toBe("شركة أسوار للتطوير العقاري | NexusOS");
   });
 });

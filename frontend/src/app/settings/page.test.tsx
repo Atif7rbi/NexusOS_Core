@@ -105,7 +105,6 @@ describe("SettingsPage", () => {
 
   it("keeps Demo company profile changes local instead of calling the API", async () => {
     settingsState.isDemoMode = true;
-    settingsState.hasLoadedSettings = false;
     render(<SettingsPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "حفظ التغييرات" }));

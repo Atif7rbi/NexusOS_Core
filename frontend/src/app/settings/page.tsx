@@ -80,8 +80,8 @@ export default function SettingsPage() {
   );
   const canEditCompany =
     canManageCompany &&
-    (settings.isDemoMode ||
-      (settings.hasLoadedSettings && !settings.loadError));
+    settings.hasLoadedSettings &&
+    !settings.loadError;
 
   const labels = useMemo(
     () =>
@@ -183,13 +183,10 @@ export default function SettingsPage() {
     if (
       !canManageCompany ||
       !token ||
-      (!settings.isDemoMode &&
-        (!settings.hasLoadedSettings || settings.loadError))
+      !settings.hasLoadedSettings ||
+      settings.loadError
     ) {
-      if (
-        !settings.isDemoMode &&
-        (!settings.hasLoadedSettings || settings.loadError)
-      ) {
+      if (!settings.hasLoadedSettings || settings.loadError) {
         setError(labels.loadFailed);
       }
 
@@ -332,7 +329,7 @@ export default function SettingsPage() {
               className="mt-6 h-36 animate-pulse rounded-2xl bg-[var(--surface-muted)]"
               aria-label={labels.load}
             />
-          ) : !settings.isDemoMode && settings.loadError ? (
+          ) : settings.loadError ? (
             <p
               role="alert"
               className="type-secondary mt-6 font-semibold text-[var(--danger)]"

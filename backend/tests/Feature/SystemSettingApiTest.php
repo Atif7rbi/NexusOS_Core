@@ -252,4 +252,43 @@ class SystemSettingApiTest extends ApiTestCase
             ->assertForbidden()
             ->assertJsonPath('error.code', 'company_profile_demo_read_only');
     }
+
+    public function test_demo_mode_returns_aswar_baseline_without_mutating_tenant_settings(): void
+    {
+        $user = $this->createActiveUser();
+        $membership = TenantUser::query()
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        $storedSettings = SystemSetting::forTenant(
+            (string) $membership->tenant_id,
+        );
+        $storedCompanyName = $storedSettings->company_name_ar;
+
+        config([
+            'nexusos.demo_mode' => true,
+            'nexusos.demo_company_profile' => [
+                'company_name_ar' => 'شركة أسوار للتطوير العقاري',
+                'company_name_en' => 'Aswar Real Estate Development',
+                'short_name_ar' => 'أسوار',
+                'short_name_en' => 'Aswar',
+            ],
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/system-settings')
+            ->assertOk()
+            ->assertJsonPath(
+                'data.company_name_ar',
+                'شركة أسوار للتطوير العقاري',
+            )
+            ->assertJsonPath(
+                'data.company_name_en',
+                'Aswar Real Estate Development',
+            )
+            ->assertJsonPath('data.short_name_ar', 'أسوار')
+            ->assertJsonPath('data.short_name_en', 'Aswar');
+
+        $storedSettings->refresh();
+        self::assertSame($storedCompanyName, $storedSettings->company_name_ar);
+    }
 }

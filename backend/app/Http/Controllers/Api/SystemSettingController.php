@@ -25,8 +25,15 @@ class SystemSettingController extends Controller
                 ->tenant_id,
         );
 
+        $responseSettings = config('nexusos.demo_mode')
+            ? array_replace(
+                $settings->toArray(),
+                config('nexusos.demo_company_profile'),
+            )
+            : $settings;
+
         return response()->json([
-            'data' => $settings,
+            'data' => $responseSettings,
         ]);
     }
 
