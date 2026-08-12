@@ -71,6 +71,24 @@ class TenantUsersApiTest extends TestCase
             'status' => TenantUser::STATUS_ACTIVE,
         ]);
     }
+
+    public function test_system_owner_has_the_same_user_management_authority(): void
+    {
+        [$owner] = $this->createCompanyAdministrator(
+            User::ROLE_SYSTEM_OWNER,
+        );
+        Sanctum::actingAs($owner);
+
+        $this->getJson('/api/users')->assertOk();
+
+        $this->postJson('/api/users', [
+            'name' => 'مسوق عقاري',
+            'email' => 'marketer@example.com',
+            'role' => User::ROLE_SALES,
+            'password' => 'Password8',
+            'password_confirmation' => 'Password8',
+        ])->assertCreated();
+    }
     public function test_user_phone_normalization_and_raw_http_boundary(): void
     {
         [$administrator] = $this->createCompanyAdministrator(); Sanctum::actingAs($administrator);
@@ -272,7 +290,9 @@ class TenantUsersApiTest extends TestCase
         )->assertForbidden();
     }
 
-    private function createCompanyAdministrator(): array
+    private function createCompanyAdministrator(
+        string $role = User::ROLE_ADMINISTRATOR,
+    ): array
     {
         $tenant = Tenant::query()->create([
             'name' => 'شركة أفق',
@@ -284,7 +304,7 @@ class TenantUsersApiTest extends TestCase
         ]);
 
         $administrator = User::factory()->create([
-            'role' => User::ROLE_ADMINISTRATOR,
+            'role' => $role,
             'status' => User::STATUS_ACTIVE,
         ]);
 

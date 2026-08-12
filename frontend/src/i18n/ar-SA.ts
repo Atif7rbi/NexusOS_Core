@@ -41,7 +41,7 @@ export const arSA: TranslationDictionary = {
   "roles.systemOwner": "مالك النظام",
   "roles.administrator": "مدير الشركة",
   "roles.projectManager": "مدير مشاريع",
-  "roles.sales": "المبيعات",
+  "roles.sales": "مسوق عقاري",
   "roles.accountant": "محاسب",
   "roles.employee": "موظف",
 

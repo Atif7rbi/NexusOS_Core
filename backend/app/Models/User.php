@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -69,12 +70,12 @@ class User extends Authenticatable
 
     public function isAdministrator(): bool
     {
-        return $this->role === self::ROLE_ADMINISTRATOR;
+        return TenantAdministratorAuthority::allows($this);
     }
 
     public function canManageUsers(): bool
     {
-        return $this->isSystemOwner() || $this->isAdministrator();
+        return TenantAdministratorAuthority::allows($this);
     }
 
     public function tenantMemberships(): HasMany

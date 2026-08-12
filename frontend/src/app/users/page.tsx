@@ -21,6 +21,7 @@ import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
 import { UserFormModal } from "@/components/users/UserFormModal";
 import { UsersOverview } from "@/components/users/UsersOverview";
 import { useTranslation } from "@/hooks/useTranslation";
+import { canAdministrateTenant } from "@/lib/tenant-administrator";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createTenantUser,
@@ -47,8 +48,7 @@ export default function UsersPage() {
   const { isArabic } = useTranslation();
   const { token, user } = useAuth();
 
-  const canManageUsers =
-    user?.role === "administrator";
+  const canManageUsers = canAdministrateTenant(user?.role);
 
   const [users, setUsers] = useState<TenantUser[]>(
     []
@@ -175,14 +175,14 @@ export default function UsersPage() {
       ? {
           administrator: "مدير النظام",
           project_manager: "مدير مشاريع",
-          sales: "مبيعات",
+          sales: "مسوق عقاري",
           accountant: "محاسب",
           employee: "موظف",
         }
       : {
           administrator: "Administrator",
           project_manager: "Project manager",
-          sales: "Sales",
+          sales: "Real Estate Marketer",
           accountant: "Accountant",
           employee: "Employee",
         };

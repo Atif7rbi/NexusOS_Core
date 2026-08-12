@@ -14,6 +14,7 @@ use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Enums\LostReason;
 use App\Modules\Leads\Enums\NextActionType;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use App\Modules\Units\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -90,7 +91,7 @@ final class Lead extends Model
 
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        if ($user->role === User::ROLE_ADMINISTRATOR) {
+        if (TenantAdministratorAuthority::allows($user)) {
             return $query;
         }
 

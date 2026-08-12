@@ -41,7 +41,7 @@ export const enUS: TranslationDictionary = {
   "roles.systemOwner": "System Owner",
   "roles.administrator": "Company Administrator",
   "roles.projectManager": "Project Manager",
-  "roles.sales": "Sales",
+  "roles.sales": "Real Estate Marketer",
   "roles.accountant": "Accountant",
   "roles.employee": "Employee",
 

@@ -6,19 +6,18 @@ namespace App\Modules\Collections\Support;
 
 use App\Models\User;
 use App\Modules\Collections\Http\Exceptions\RoleNotAuthorizedException;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 
 final class CollectionScheduleAuthorization
 {
     /** @var array<int, string> */
     private const DRAFT_ROLES = [
-        User::ROLE_ADMINISTRATOR,
         User::ROLE_SALES,
         User::ROLE_ACCOUNTANT,
     ];
 
     /** @var array<int, string> */
     private const FINANCIAL_COMMAND_ROLES = [
-        User::ROLE_ADMINISTRATOR,
         User::ROLE_ACCOUNTANT,
     ];
 
@@ -45,16 +44,19 @@ final class CollectionScheduleAuthorization
 
     public function canSaveDraft(User $user): bool
     {
-        return in_array($user->role, self::DRAFT_ROLES, true);
+        return TenantAdministratorAuthority::allows($user)
+            || in_array($user->role, self::DRAFT_ROLES, true);
     }
 
     public function canFinalize(User $user): bool
     {
-        return in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
+        return TenantAdministratorAuthority::allows($user)
+            || in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
     }
 
     public function canAmend(User $user): bool
     {
-        return in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
+        return TenantAdministratorAuthority::allows($user)
+            || in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
     }
 }

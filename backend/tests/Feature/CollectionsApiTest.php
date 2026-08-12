@@ -86,6 +86,19 @@ final class CollectionsApiTest extends ApiTestCase
             ->assertJsonMissingPath('data.schedule.cancelled_history');
     }
 
+    public function test_system_owner_has_administrator_collection_authority(): void
+    {
+        $context = $this->apiContext(User::ROLE_SYSTEM_OWNER);
+
+        $this->postJson($this->scheduleUrl($context).'/draft', [
+            'lines' => [$this->linePayload(1, '1000.00', '2026-08-01')],
+        ])->assertOk();
+
+        $this->postJson($this->scheduleUrl($context).'/finalize')
+            ->assertOk()
+            ->assertJsonPath('data.schedule.derived_state', 'scheduled');
+    }
+
     public function test_save_draft_empty_lines_deletes_an_existing_draft_and_returns_absent(): void
     {
         $context = $this->apiContext(User::ROLE_ADMINISTRATOR);

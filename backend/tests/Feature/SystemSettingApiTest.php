@@ -76,6 +76,21 @@ class SystemSettingApiTest extends ApiTestCase
         ]);
     }
 
+    public function test_system_owner_has_the_same_company_profile_mutation_authority(): void
+    {
+        $user = $this->createActiveUser([
+            'role' => User::ROLE_SYSTEM_OWNER,
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/system-settings', [
+            'company_name_ar' => 'شركة مالك النظام',
+            'short_name_ar' => 'المالك',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.company_name_ar', 'شركة مالك النظام');
+    }
+
     public function test_non_administrator_cannot_mutate_company_profile(): void
     {
         Sanctum::actingAs($this->createActiveUser([
