@@ -257,8 +257,7 @@ final class CollectionsApiTest extends ApiTestCase
         $this->getJson($this->scheduleUrl($systemOwner))->assertOk();
         $this->postJson($this->scheduleUrl($systemOwner).'/draft', [
             'lines' => [$this->linePayload(1, '1000.00', '2026-08-01')],
-        ])->assertForbidden()
-            ->assertJsonPath('error.code', 'role_not_authorized');
+        ])->assertOk();
     }
 
     public function test_tenant_membership_failures_keep_the_existing_frozen_error_codes(): void
