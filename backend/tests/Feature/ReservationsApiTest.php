@@ -118,7 +118,7 @@ final class ReservationsApiTest extends ApiTestCase
             ->assertUnprocessable()->assertJsonValidationErrors(['unit_id']);
 
         $soldUnit = $this->createAvailableUnit();
-        $this->patchJson("/api/units/{$soldUnit}", ['status' => 'sold'])->assertOk();
+        Unit::query()->whereKey($soldUnit)->update(['status' => 'sold']);
         $this->postJson('/api/reservations', ['unit_id' => $soldUnit, 'customer_id' => $customerId])
             ->assertUnprocessable()->assertJsonValidationErrors(['unit_id']);
 

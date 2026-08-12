@@ -41,6 +41,11 @@ import { SummaryCard } from "@/components/ui/crud/SummaryCard";
 import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
 import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 import {
+  canCreateProject,
+  canCreateUnitForProject,
+  canWriteUnit,
+} from "@/lib/project-authorization";
+import {
   formatDecimal,
   formatInteger,
   formatMoney,
@@ -97,8 +102,11 @@ export default function UnitsPage() {
 }
 
 function UnitsPageContent() {
-  const { token } = useAuth();
-  const quickCreate = useQuickCreateQuery();
+  const { token, user } = useAuth();
+  const {
+    isRequested: isQuickCreateRequested,
+    clear: clearQuickCreate,
+  } = useQuickCreateQuery();
   const [units, setUnits] = useState<Unit[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [summary, setSummary] = useState<UnitSummary>(emptySummary);
@@ -125,17 +133,23 @@ function UnitsPageContent() {
   const [isProcessing, setProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const writableProjects = projects.filter((project) =>
+    canCreateUnitForProject(user, project)
+  );
+  const canCreate = canCreateProject(user?.role);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      if (quickCreate.isRequested) {
+      if (isQuickCreateRequested && canCreate) {
         setFormUnit(null);
         setFormOpen(true);
+      } else if (isQuickCreateRequested) {
+        clearQuickCreate();
       }
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [quickCreate.isRequested]);
+  }, [canCreate, clearQuickCreate, isQuickCreateRequested]);
 
   const loadUnits = useCallback(
     async (targetPage = page): Promise<void> => {
@@ -295,7 +309,7 @@ function UnitsPageContent() {
       await loadUnits(isUpdating ? page : 1);
       setFormOpen(false);
       setFormUnit(null);
-      quickCreate.clear();
+        clearQuickCreate();
       setSuccessMessage(
         isUpdating
           ? "تم تحديث الوحدة بنجاح."
@@ -364,6 +378,7 @@ function UnitsPageContent() {
           title="الوحدات"
           description="إدارة الوحدات والأسعار والحالة"
           action={
+            canCreate ?
             <Button
               type="button"
               onClick={() => {
@@ -376,6 +391,7 @@ function UnitsPageContent() {
             >
               إضافة وحدة
             </Button>
+            : undefined
           }
         />
 
@@ -643,7 +659,7 @@ function UnitsPageContent() {
                           <Eye size={17} />
                         </button>
 
-                        {!unit.archived_at ? (
+                        {!unit.archived_at && canWriteUnit(user, unit) ? (
                           <>
                             <button
                               type="button"
@@ -666,7 +682,7 @@ function UnitsPageContent() {
                               <Archive size={17} />
                             </button>
                           </>
-                        ) : (
+                        ) : unit.archived_at && canWriteUnit(user, unit) ? (
                           <button
                             type="button"
                             onClick={() => {
@@ -679,7 +695,7 @@ function UnitsPageContent() {
                           >
                             <RotateCcw size={17} />
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -707,13 +723,13 @@ function UnitsPageContent() {
           key={formUnit?.id ?? "new-unit"}
           isOpen
           unit={formUnit}
-          projects={projects}
+          projects={writableProjects}
           isSubmitting={isSubmitting}
           onClose={() => {
             if (!isSubmitting) {
               setFormOpen(false);
               setFormUnit(null);
-              quickCreate.clear();
+          clearQuickCreate();
             }
           }}
           onSubmit={submitForm}

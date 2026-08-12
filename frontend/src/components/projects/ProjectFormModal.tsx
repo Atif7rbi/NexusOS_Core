@@ -17,6 +17,7 @@ import { FormErrorBanner } from "@/components/ui/FormErrorBanner";
 import { Input } from "@/components/ui/Input";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { useTranslation } from "@/hooks/useTranslation";
+import type { AuthUser } from "@/types/auth";
 import type {
   Project,
   ProjectFormPayload,
@@ -28,6 +29,8 @@ type ProjectFormModalProps = {
   isOpen: boolean;
   project: Project | null;
   projectManagers: ProjectManager[];
+  currentUser: AuthUser | null;
+  canManageProjectManager: boolean;
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (
@@ -84,10 +87,18 @@ function dateInputValue(
 }
 
 function createInitialForm(
-  project: Project | null
+  project: Project | null,
+  currentUser: AuthUser | null,
+  canManageProjectManager: boolean
 ): ProjectFormState {
   if (!project) {
-    return { ...emptyForm };
+    return {
+      ...emptyForm,
+      project_manager_id:
+        !canManageProjectManager && currentUser?.role === "project_manager"
+          ? String(currentUser.id)
+          : "",
+    };
   }
 
   return {
@@ -128,6 +139,8 @@ export function ProjectFormModal({
   isOpen,
   project,
   projectManagers,
+  currentUser,
+  canManageProjectManager,
   isSubmitting,
   onClose,
   onSubmit,
@@ -136,7 +149,7 @@ export function ProjectFormModal({
 
   const [form, setForm] =
     useState<ProjectFormState>(
-      () => createInitialForm(project)
+      () => createInitialForm(project, currentUser, canManageProjectManager)
     );
 
   const {
@@ -329,9 +342,15 @@ export function ProjectFormModal({
         form.actual_start_date || null,
       actual_end_date:
         form.actual_end_date || null,
-      project_manager_id: form.project_manager_id
-        ? Number(form.project_manager_id)
-        : null,
+      ...(
+        canManageProjectManager || (!project && currentUser?.role === "project_manager")
+          ? {
+              project_manager_id: form.project_manager_id
+                ? Number(form.project_manager_id)
+                : null,
+            }
+          : {}
+      ),
     };
 
     try {
@@ -531,6 +550,7 @@ export function ProjectFormModal({
               </div>
             </section>
 
+            {canManageProjectManager ? (
             <section>
               <SelectField
                 label={labels.projectManager}
@@ -552,6 +572,17 @@ export function ProjectFormModal({
                 error={fieldErrors.project_manager_id?.[0]}
               />
             </section>
+            ) : !project && currentUser?.role === "project_manager" ? (
+              <section>
+                <Input
+                  label={labels.projectManager}
+                  name="project_manager_id"
+                  value={currentUser.name}
+                  disabled
+                  readOnly
+                />
+              </section>
+            ) : null}
 
             <section>
               <div className="grid gap-5 md:grid-cols-2">
