@@ -7,6 +7,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Modules\Leads\Support\EnsureTenantUserCanBePaused;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use App\Modules\Users\Requests\StoreTenantUserRequest;
 use App\Modules\Users\Requests\UpdateTenantUserRequest;
 use Illuminate\Database\Eloquent\Builder;
@@ -323,8 +324,8 @@ class TenantUserController extends Controller
         Request $request
     ): void {
         abort_unless(
-            $request->user()?->role
-                === User::ROLE_ADMINISTRATOR,
+            $request->user() instanceof User
+                && TenantAdministratorAuthority::allows($request->user()),
             403,
             'ليس لديك صلاحية لإدارة المستخدمين.'
         );

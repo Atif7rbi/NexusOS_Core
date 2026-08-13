@@ -47,6 +47,7 @@ final class UpdateUnitAction
                 $data['archived_by'],
                 $data['restored_by'],
                 $data['archived_at'],
+                $data['status'],
             );
 
             $data['updated_by'] = $actorId;

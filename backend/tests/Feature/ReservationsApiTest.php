@@ -47,7 +47,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_active_project_available_unit_and_customer_can_be_reserved_with_default_expiry(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $customerId = $this->createCustomer();
@@ -79,7 +79,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_reservation_validates_expiry_and_only_allows_mutable_fields_to_be_updated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -109,7 +109,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_ineligible_project_unit_and_customer_cannot_be_reserved(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $customerId = $this->createCustomer();
 
@@ -118,7 +118,7 @@ final class ReservationsApiTest extends ApiTestCase
             ->assertUnprocessable()->assertJsonValidationErrors(['unit_id']);
 
         $soldUnit = $this->createAvailableUnit();
-        $this->patchJson("/api/units/{$soldUnit}", ['status' => 'sold'])->assertOk();
+        Unit::query()->whereKey($soldUnit)->update(['status' => 'sold']);
         $this->postJson('/api/reservations', ['unit_id' => $soldUnit, 'customer_id' => $customerId])
             ->assertUnprocessable()->assertJsonValidationErrors(['unit_id']);
 
@@ -130,7 +130,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_only_one_active_reservation_can_exist_for_a_unit_and_database_constraint_is_enforced(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $first = $this->postJson('/api/reservations', ['unit_id' => $unitId, 'customer_id' => $this->createCustomer()])
@@ -153,7 +153,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_database_rejects_an_expiry_at_or_before_the_reservation_time(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $customerId = $this->createCustomer();
@@ -171,7 +171,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_active_reservation_can_be_cancelled_but_cannot_be_cancelled_or_updated_again(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -189,7 +189,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_expiration_job_expires_the_reservation_and_releases_the_unit_for_a_new_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $reservationId = $this->postJson('/api/reservations', [
@@ -213,8 +213,8 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_reservations_are_tenant_scoped_and_can_be_listed_filtered_and_summarized(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($tenantAUser);
         $reservationId = $this->createReservation();
 
@@ -237,8 +237,8 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_available_units_returns_only_units_eligible_for_reservation(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($tenantAUser);
 
         $eligibleUnit = $this->createAvailableUnit();
@@ -252,15 +252,12 @@ final class ReservationsApiTest extends ApiTestCase
         ])->assertCreated();
 
         $soldUnit = $this->createAvailableUnit();
-        $this->patchJson("/api/units/{$soldUnit}", [
-            'status' => 'sold',
-        ])->assertOk();
+        Unit::query()->whereKey($soldUnit)->update(['status' => 'sold']);
 
         $this->createAvailableUnit(false);
 
         $archivedUnit = $this->createAvailableUnit();
-        $this->patchJson("/api/units/{$archivedUnit}/archive")
-            ->assertOk();
+        $this->archiveUnitFixture($archivedUnit);
 
         Sanctum::actingAs($tenantBUser);
         $this->createAvailableUnit();
@@ -287,7 +284,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_creating_reservation_marks_unit_as_reserved(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $unitId = $this->createAvailableUnit();
@@ -305,7 +302,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_cancelling_reservation_releases_unit_back_to_available(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $reservationId = $this->createReservation();
@@ -325,7 +322,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_expiring_reservation_releases_unit_back_to_available(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $unitId = $this->createAvailableUnit();
@@ -368,12 +365,17 @@ final class ReservationsApiTest extends ApiTestCase
     {
         $this->unitCount++;
         $projectId = $this->createProject($activeProject);
-        return (string) $this->postJson('/api/units', [
+
+        return (string) Unit::query()->create([
+            'tenant_id' => $this->tenantIdFor(auth()->user()),
             'project_id' => $projectId,
             'unit_number' => "U-{$this->unitCount}",
             'unit_type' => 'apartment',
+            'status' => 'available',
             'selling_price' => 500000,
-        ])->assertCreated()->json('data.unit.id');
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ])->id;
     }
 
     private function createCustomer(): string
@@ -386,19 +388,42 @@ final class ReservationsApiTest extends ApiTestCase
         ])->assertCreated()->json('data.customer.id');
     }
 
+    private function archiveUnitFixture(string $unitId): void
+    {
+        Unit::query()
+            ->whereKey($unitId)
+            ->update([
+                'archived_at' => now(),
+                'archived_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+            ]);
+    }
+
     private function createProject(bool $active): string
     {
         $this->projectCount++;
-        $projectId = (string) $this->postJson('/api/projects', [
-            'name' => "مشروع الحجز {$this->projectCount}", 'project_type' => 'residential', 'city' => 'الرياض',
-        ])->assertCreated()->json('data.project.id');
-        if ($active) {
-            Project::query()
-                ->whereKey($projectId)
-                ->update(['status' => ProjectStatus::Active->value]);
-        }
+        $year = now('Asia/Riyadh')->year;
+        $sequence = (int) Project::query()
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number') + 1;
 
-        return $projectId;
+        return (string) Project::query()->create([
+            'tenant_id' => $this->tenantIdFor(auth()->user()),
+            'project_number' => sprintf('PRJ-%d-%03d', $year, $sequence),
+            'project_number_year' => $year,
+            'project_sequence_number' => $sequence,
+            'name' => "مشروع الحجز {$this->projectCount}",
+            'project_type' => 'residential',
+            'status' => $active
+                ? ProjectStatus::Active->value
+                : ProjectStatus::Draft->value,
+            'country_code' => 'SA',
+            'city' => 'الرياض',
+            'currency' => 'SAR',
+            'data_origin' => 'user',
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ])->id;
     }
 
     private function tenantIdFor(User $user): string

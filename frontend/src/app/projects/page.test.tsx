@@ -18,6 +18,10 @@ const services = vi.hoisted(() => ({
   }),
 }));
 
+const auth = vi.hoisted(() => ({
+  user: { id: 1, role: "administrator" },
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: services.routerReplace }),
   useSearchParams: () =>
@@ -25,7 +29,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/providers/AuthProvider", () => ({
-  useAuth: () => ({ token: "token" }),
+  useAuth: () => ({
+    token: "token",
+    user: auth.user,
+  }),
 }));
 
 vi.mock("@/hooks/useTranslation", () => ({
@@ -104,6 +111,7 @@ describe("ProjectsPage quick create", () => {
       data: { users: { data: [] } },
     });
     services.createProject.mockResolvedValue({});
+    auth.user = { id: 1, role: "administrator" };
   });
 
   it("keeps the regular projects route out of create mode", async () => {
@@ -162,5 +170,17 @@ describe("ProjectsPage quick create", () => {
       expect(services.createProject).toHaveBeenCalledTimes(1);
       expect(window.location.search).toBe("?status=active&page=2");
     });
+  });
+
+  it("does not expose the create flow to read-only roles", async () => {
+    auth.user = { id: 2, role: "sales" };
+    window.history.replaceState(null, "", "/projects/?create=1");
+
+    render(<ProjectsPage />);
+
+    await waitFor(() => {
+      expect(window.location.search).toBe("");
+    });
+    expect(screen.queryByText("project-create-modal")).toBeNull();
   });
 });

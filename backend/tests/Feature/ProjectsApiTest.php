@@ -25,6 +25,13 @@ class ProjectsApiTest extends ApiTestCase
         parent::tearDown();
     }
 
+    protected function createActiveUser(array $attributes = []): User
+    {
+        return parent::createActiveUser(array_merge([
+            'role' => User::ROLE_ADMINISTRATOR,
+        ], $attributes));
+    }
+
     public function test_guest_cannot_access_projects(): void
     {
         $this->getJson('/api/projects')
@@ -466,7 +473,9 @@ class ProjectsApiTest extends ApiTestCase
     public function test_authenticated_user_can_assign_and_remove_project_manager(): void
     {
         $user = $this->createActiveUser();
-        $manager = $this->createActiveUser();
+        $manager = $this->createProjectManagerForTenant(
+            $this->tenantIdFor($user),
+        );
 
         Sanctum::actingAs($user);
 
@@ -718,9 +727,9 @@ class ProjectsApiTest extends ApiTestCase
             ->assertOk();
 
         $unitId = $this->createUnitForProject($projectId, 'A-501');
-        $this->patchJson("/api/units/{$unitId}", [
+        DB::table('units')->where('id', $unitId)->update([
             'status' => 'sold',
-        ])->assertOk();
+        ]);
 
         $this->patchJson("/api/projects/{$projectId}/cancel")
             ->assertUnprocessable()
@@ -782,6 +791,130 @@ class ProjectsApiTest extends ApiTestCase
         ]);
     }
 
+    public function test_project_manager_is_limited_to_own_projects_and_self_assignment_on_create(): void
+    {
+        $administrator = $this->createActiveUser();
+        $tenantId = $this->tenantIdFor($administrator);
+        $firstManager = $this->createProjectManagerForTenant($tenantId);
+        $secondManager = $this->createProjectManagerForTenant($tenantId);
+
+        Sanctum::actingAs($administrator);
+
+        $firstProjectId = $this->postJson('/api/projects', [
+            'name' => 'مشروع المدير الأول',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+            'project_manager_id' => $firstManager->id,
+        ])->assertCreated()->json('data.project.id');
+
+        $secondProjectId = $this->postJson('/api/projects', [
+            'name' => 'مشروع المدير الثاني',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+            'project_manager_id' => $secondManager->id,
+        ])->assertCreated()->json('data.project.id');
+
+        Sanctum::actingAs($firstManager);
+
+        $this->postJson('/api/projects', [
+            'name' => 'مشروع المدير لنفسه',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+            'project_manager_id' => $firstManager->id,
+        ])->assertCreated();
+
+        $this->postJson('/api/projects', [
+            'name' => 'محاولة إسناد مدير آخر',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+            'project_manager_id' => $secondManager->id,
+        ])->assertForbidden();
+
+        $this->patchJson("/api/projects/{$firstProjectId}", [
+            'name' => 'مشروع المدير الأول بعد التعديل',
+        ])->assertOk();
+
+        $this->patchJson("/api/projects/{$secondProjectId}", [
+            'name' => 'محاولة تعديل مشروع مدير آخر',
+        ])->assertForbidden();
+
+        $this->patchJson("/api/projects/{$firstProjectId}", [
+            'project_manager_id' => null,
+        ])->assertForbidden();
+
+        $this->patchJson("/api/projects/{$firstProjectId}/activate")
+            ->assertOk();
+        $this->patchJson("/api/projects/{$firstProjectId}/revert-to-draft")
+            ->assertOk();
+        $this->patchJson("/api/projects/{$firstProjectId}/cancel")
+            ->assertForbidden();
+        $this->patchJson("/api/projects/{$firstProjectId}/archive")
+            ->assertForbidden();
+    }
+
+    public function test_project_manager_assignment_requires_an_active_same_tenant_project_manager(): void
+    {
+        $administrator = $this->createActiveUser();
+        $tenantId = $this->tenantIdFor($administrator);
+        $crossTenantManager = $this->createActiveUser([
+            'role' => User::ROLE_PROJECT_MANAGER,
+        ]);
+        $inactiveManager = $this->createTenantUser(
+            $tenantId,
+            User::ROLE_PROJECT_MANAGER,
+            TenantUser::STATUS_PAUSED,
+        );
+        $employee = $this->createTenantUser($tenantId, User::ROLE_EMPLOYEE);
+
+        Sanctum::actingAs($administrator);
+
+        foreach ([$crossTenantManager, $inactiveManager, $employee] as $candidate) {
+            $this->postJson('/api/projects', [
+                'name' => "مشروع مدير غير مؤهل {$candidate->id}",
+                'project_type' => 'residential',
+                'city' => 'الرياض',
+                'project_manager_id' => $candidate->id,
+            ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['project_manager_id']);
+        }
+    }
+
+    public function test_sales_accountant_and_employee_are_read_only_for_projects(): void
+    {
+        $administrator = $this->createActiveUser();
+        $tenantId = $this->tenantIdFor($administrator);
+
+        Sanctum::actingAs($administrator);
+
+        $projectId = $this->postJson('/api/projects', [
+            'name' => 'مشروع القراءة فقط',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+        ])->assertCreated()->json('data.project.id');
+
+        foreach ([
+            User::ROLE_SALES,
+            User::ROLE_ACCOUNTANT,
+            User::ROLE_EMPLOYEE,
+        ] as $role) {
+            $user = $this->createTenantUser($tenantId, $role);
+            Sanctum::actingAs($user);
+
+            $this->getJson("/api/projects/{$projectId}")->assertOk();
+            $this->postJson('/api/projects', [
+                'name' => "مشروع غير مصرح {$role}",
+                'project_type' => 'residential',
+                'city' => 'الرياض',
+            ])->assertForbidden();
+            $this->patchJson("/api/projects/{$projectId}", [
+                'name' => 'محاولة تعديل غير مصرح بها',
+            ])->assertForbidden();
+            $this->patchJson("/api/projects/{$projectId}/archive")
+                ->assertForbidden();
+        }
+    }
+
     private function createProjectForLifecycle(string $name): string
     {
         return $this->postJson('/api/projects', [
@@ -811,6 +944,33 @@ class ProjectsApiTest extends ApiTestCase
             'name' => 'عميل اختبار',
             'phone' => $phone,
         ])->assertCreated()->json('data.customer.id');
+    }
+
+    private function createProjectManagerForTenant(string $tenantId): User
+    {
+        return $this->createTenantUser(
+            $tenantId,
+            User::ROLE_PROJECT_MANAGER,
+        );
+    }
+
+    private function createTenantUser(
+        string $tenantId,
+        string $role,
+        string $membershipStatus = TenantUser::STATUS_ACTIVE,
+    ): User {
+        $user = User::factory()->create([
+            'role' => $role,
+            'status' => User::STATUS_ACTIVE,
+        ]);
+
+        TenantUser::factory()->create([
+            'tenant_id' => $tenantId,
+            'user_id' => $user->id,
+            'status' => $membershipStatus,
+        ]);
+
+        return $user;
     }
 
     private function tenantIdFor(User $user): string

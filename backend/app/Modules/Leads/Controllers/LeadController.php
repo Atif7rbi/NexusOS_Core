@@ -34,6 +34,7 @@ use App\Modules\Leads\Requests\ReopenLeadRequest;
 use App\Modules\Leads\Requests\RestoreLeadRequest;
 use App\Modules\Leads\Requests\StoreLeadRequest;
 use App\Modules\Leads\Requests\UpdateLeadRequest;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use App\Modules\Leads\Support\LeadAuthorization;
 use App\Modules\Leads\Support\LeadResponseAssembler;
 use App\Modules\Leads\Support\LeadsIndexQuery;
@@ -274,7 +275,7 @@ final class LeadController extends Controller
         $actor      = $this->actor($request);
 
         // Authorization: administrator, or sales/employee on own Lead
-        if ($actor->role !== User::ROLE_ADMINISTRATOR) {
+        if (! TenantAdministratorAuthority::allows($actor)) {
             $leadRecord = Lead::query()
                 ->where('tenant_id', (string) $membership->tenant_id)
                 ->whereKey($lead)

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Leads\Requests;
 
-use App\Models\User;
 use App\Modules\Leads\Enums\LeadSource;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use App\Modules\Shared\Phone\Rules\SaudiMobileRule;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use Closure;
@@ -35,7 +35,8 @@ final class StoreLeadRequest extends LeadRequest
      */
     public function rules(): array
     {
-        $administrator = $this->user()?->role === User::ROLE_ADMINISTRATOR;
+        $administrator = $this->user() !== null
+            && TenantAdministratorAuthority::allows($this->user());
 
         return [
             'name' => ['required', 'string', $this->notBlank(), 'max:255'],

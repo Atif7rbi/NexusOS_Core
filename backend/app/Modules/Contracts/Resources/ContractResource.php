@@ -31,12 +31,19 @@ final class ContractResource extends JsonResource
                 return [
                     'id' => $reservation->id,
                     'status' => $reservation->status->value,
+                    'created_by' => $reservation->created_by,
                     'unit' => $reservation->relationLoaded('unit') && $reservation->unit !== null
                         ? [
                             'id' => $reservation->unit->id,
                             'project_id' => $reservation->unit->project_id,
                             'unit_number' => $reservation->unit->unit_number,
                             'status' => $reservation->unit->status->value,
+                            'project' => $reservation->unit->relationLoaded('project') && $reservation->unit->project !== null
+                                ? [
+                                    'id' => $reservation->unit->project->id,
+                                    'project_manager_id' => $reservation->unit->project->project_manager_id,
+                                ]
+                                : null,
                         ]
                         : null,
                     'customer' => $reservation->relationLoaded('customer') && $reservation->customer !== null

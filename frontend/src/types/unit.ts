@@ -10,13 +10,12 @@ export type UnitType =
 
 export type UnitStatus = "available" | "reserved" | "sold";
 
-export type ManuallyAssignableUnitStatus = Exclude<UnitStatus, "reserved">;
-
 export type UnitProject = {
   id: string;
   project_number: string;
   name: string;
   currency: string;
+  project_manager_id: number | null;
 };
 
 export type Unit = {
@@ -42,7 +41,6 @@ export type UnitFormPayload = {
   project_id: string;
   unit_number: string;
   unit_type: UnitType;
-  status?: ManuallyAssignableUnitStatus;
   selling_price: number;
   area?: number | null;
   floor?: number | null;

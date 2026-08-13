@@ -15,6 +15,12 @@ import {
   shortContractId,
 } from "@/components/contracts/contract-presenters";
 import { DataTable } from "@/components/ui/crud/DataTable";
+import {
+  canCancelContract,
+  canCompleteContract,
+  canEditOrActivateContract,
+} from "@/lib/commercial-authorization";
+import type { AuthUser } from "@/types/auth";
 import type {
   Contract,
   ContractLifecycleAction,
@@ -22,6 +28,7 @@ import type {
 
 type ContractsTableProps = {
   contracts: Contract[];
+  currentUser: AuthUser | null;
   onDetails: (contract: Contract) => void;
   onEdit: (contract: Contract) => void;
   onLifecycle: (
@@ -32,6 +39,7 @@ type ContractsTableProps = {
 
 export function ContractsTable({
   contracts,
+  currentUser,
   onDetails,
   onEdit,
   onLifecycle,
@@ -87,7 +95,7 @@ export function ContractsTable({
                   <Eye size={17} />
                 </ActionButton>
 
-                {contract.status === "draft" ? (
+                {canEditOrActivateContract(currentUser, contract) ? (
                   <>
                     <ActionButton
                       label="تعديل العقد"
@@ -106,7 +114,7 @@ export function ContractsTable({
                   </>
                 ) : null}
 
-                {contract.status === "active" ? (
+                {canCompleteContract(currentUser, contract) ? (
                   <ActionButton
                     label="إكمال العقد"
                     tone="success"
@@ -116,8 +124,7 @@ export function ContractsTable({
                   </ActionButton>
                 ) : null}
 
-                {contract.status === "draft" ||
-                contract.status === "active" ? (
+                {canCancelContract(currentUser, contract) ? (
                   <ActionButton
                     label="إلغاء العقد"
                     tone="danger"

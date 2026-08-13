@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { canEditOrArchiveCustomer } from "@/lib/commercial-authorization";
+import type { AuthUser } from "@/types/auth";
 import { CustomerBusinessContext } from "@/components/customers/CustomerBusinessContext";
 import { formatDateTime } from "@/lib/date-format";
 import type { CustomerBusinessContext as BusinessContext } from "@/types/customer-business-context";
@@ -24,6 +26,7 @@ import type {
 
 type CustomerDetailsViewProps = {
   customer: Customer | null;
+  currentUser?: AuthUser | null;
   businessContext: BusinessContext | null;
   isArabic: boolean;
   isLoading: boolean;
@@ -37,6 +40,7 @@ type CustomerDetailsViewProps = {
 
 export function CustomerDetailsView({
   customer,
+  currentUser = null,
   businessContext,
   isArabic,
   isLoading,
@@ -237,7 +241,7 @@ export function CustomerDetailsView({
             </div>
           </div>
 
-          {!isArchived ? (
+          {!isArchived && canEditOrArchiveCustomer(currentUser, customer) ? (
             <Button
               type="button"
               variant="secondary"

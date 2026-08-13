@@ -9,10 +9,12 @@ use App\Models\User;
 use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Exceptions\LeadActionNotAuthorizedException;
 use App\Modules\Leads\Models\Lead;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 
 final class LeadAuthorization
 {
     private const CRM_ROLES = [
+        User::ROLE_SYSTEM_OWNER,
         User::ROLE_ADMINISTRATOR,
         User::ROLE_SALES,
         User::ROLE_EMPLOYEE,
@@ -75,7 +77,7 @@ final class LeadAuthorization
 
     public function isAdministrator(User $actor): bool
     {
-        return $actor->role === User::ROLE_ADMINISTRATOR;
+        return TenantAdministratorAuthority::allows($actor);
     }
 
     public function allowedActions(Lead $lead, User $actor): array

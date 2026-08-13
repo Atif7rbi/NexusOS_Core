@@ -173,14 +173,14 @@ export function UserFormModal({
       ? {
           administrator: "مدير النظام",
           project_manager: "مدير مشاريع",
-          sales: "مبيعات",
+          sales: "مسوق عقاري",
           accountant: "محاسب",
           employee: "موظف",
         }
       : {
           administrator: "Administrator",
           project_manager: "Project manager",
-          sales: "Sales",
+          sales: "Real Estate Marketer",
           accountant: "Accountant",
           employee: "Employee",
         };

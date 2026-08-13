@@ -26,6 +26,7 @@ final class ResolveCollectionScheduleContract
         }
 
         $contract = Contract::query()
+            ->with('reservation:id,created_by')
             ->where('tenant_id', $membership->tenant_id)
             ->whereKey((string) $request->route('contract'))
             ->first();

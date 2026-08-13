@@ -22,6 +22,8 @@ use App\Modules\Contracts\Models\Contract;
 use App\Modules\Contracts\Requests\StoreContractRequest;
 use App\Modules\Contracts\Requests\UpdateContractRequest;
 use App\Modules\Contracts\Resources\ContractResource;
+use App\Modules\Contracts\Support\ContractAuthorization;
+use App\Modules\Reservations\Models\Reservation;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +32,10 @@ use Illuminate\Validation\ValidationException;
 
 final class ContractController extends Controller
 {
-    public function __construct(private readonly ResolveActiveMembership $resolveActiveMembership) {}
+    public function __construct(
+        private readonly ResolveActiveMembership $resolveActiveMembership,
+        private readonly ContractAuthorization $authorization,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -43,8 +48,9 @@ final class ContractController extends Controller
         ]);
 
         $query = Contract::query()->with([
-            'reservation:id,unit_id,customer_id,status',
+            'reservation:id,unit_id,customer_id,status,created_by',
             'reservation.unit:id,project_id,unit_number,status',
+            'reservation.unit.project:id,project_manager_id',
             'reservation.customer:id,name,status',
         ])->where('tenant_id', $membership->tenant_id)->latest();
 
@@ -83,6 +89,13 @@ final class ContractController extends Controller
     public function store(StoreContractRequest $request, CreateContractAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->authorization->assertCanCreate(
+            $request->user(),
+            $this->findReservation(
+                (string) $membership->tenant_id,
+                $request->validated('reservation_id'),
+            ),
+        );
         try {
             $contract = $action->execute(
                 (string) $membership->tenant_id,
@@ -119,6 +132,10 @@ final class ContractController extends Controller
     public function update(UpdateContractRequest $request, string $contract, UpdateContractAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->authorization->assertCanUpdateOrActivate(
+            $request->user(),
+            $this->findContract((string) $membership->tenant_id, $contract),
+        );
         try {
             $record = $action->execute(
                 (string) $membership->tenant_id,
@@ -139,6 +156,10 @@ final class ContractController extends Controller
     public function activate(Request $request, string $contract, ActivateContractAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->authorization->assertCanUpdateOrActivate(
+            $request->user(),
+            $this->findContract((string) $membership->tenant_id, $contract),
+        );
         try {
             $record = $action->execute((string) $membership->tenant_id, $contract, $request->user()->id);
         } catch (ContractNotDraftException|ContractReservationStateException|ContractUnitStateException $exception) {
@@ -154,6 +175,8 @@ final class ContractController extends Controller
     public function complete(Request $request, string $contract, CompleteContractAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->findContract((string) $membership->tenant_id, $contract);
+        $this->authorization->assertCanComplete($request->user());
         try {
             $record = $action->execute((string) $membership->tenant_id, $contract, $request->user()->id);
         } catch (ContractNotActiveException $exception) {
@@ -169,6 +192,10 @@ final class ContractController extends Controller
     public function cancel(Request $request, string $contract, CancelContractAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->authorization->assertCanCancel(
+            $request->user(),
+            $this->findContract((string) $membership->tenant_id, $contract),
+        );
         try {
             $record = $action->execute((string) $membership->tenant_id, $contract, $request->user()->id);
         } catch (ContractCannotBeCancelledException|ContractReservationStateException|ContractUnitStateException $exception) {
@@ -184,5 +211,23 @@ final class ContractController extends Controller
     private function throwValidationException(string $field, string $message): never
     {
         throw ValidationException::withMessages([$field => [$message]]);
+    }
+
+    private function findReservation(string $tenantId, string $reservation): Reservation
+    {
+        return Reservation::query()
+            ->with('unit.project:id,project_manager_id')
+            ->where('tenant_id', $tenantId)
+            ->whereKey($reservation)
+            ->firstOrFail();
+    }
+
+    private function findContract(string $tenantId, string $contract): Contract
+    {
+        return Contract::query()
+            ->with('reservation.unit.project:id,project_manager_id')
+            ->where('tenant_id', $tenantId)
+            ->whereKey($contract)
+            ->firstOrFail();
     }
 }

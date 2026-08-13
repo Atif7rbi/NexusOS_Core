@@ -18,9 +18,15 @@ import type {
   CustomerStatus,
   CustomerType,
 } from "@/types/customer";
+import type { AuthUser } from "@/types/auth";
+import {
+  canEditOrArchiveCustomer,
+  canRestoreCustomer,
+} from "@/lib/commercial-authorization";
 
 type CustomerCardProps = {
   customer: Customer;
+  currentUser: AuthUser | null;
   isArabic: boolean;
   onOpen: () => void;
   onEdit: () => void;
@@ -30,6 +36,7 @@ type CustomerCardProps = {
 
 export function CustomerCard({
   customer,
+  currentUser,
   isArabic,
   onOpen,
   onEdit,
@@ -176,7 +183,7 @@ export function CustomerCard({
             : "Open Customer Record"}
         </button>
 
-        {!isArchived ? (
+        {!isArchived && canEditOrArchiveCustomer(currentUser, customer) ? (
           <>
             <button
               type="button"
@@ -196,7 +203,7 @@ export function CustomerCard({
               {isArabic ? "أرشفة" : "Archive"}
             </button>
           </>
-        ) : (
+        ) : isArchived && canRestoreCustomer(currentUser?.role) ? (
           <button
             type="button"
             onClick={onRestore}
@@ -205,7 +212,7 @@ export function CustomerCard({
             <RotateCcw size={15} />
             {isArabic ? "استعادة" : "Restore"}
           </button>
-        )}
+        ) : null}
       </div>
     </article>
   );

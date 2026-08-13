@@ -19,6 +19,7 @@ import { TypographyPreferencesSelector } from "@/components/theme/TypographyPref
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useTranslation } from "@/hooks/useTranslation";
+import { canAdministrateTenant } from "@/lib/tenant-administrator";
 import {
   isInternationalSaudiMobile,
   normalizeNullableSaudiMobile,
@@ -75,9 +76,7 @@ export default function SettingsPage() {
     setForm(profileFromSettings(settings));
   }
 
-  const canManageCompany = Boolean(
-    user?.role === "administrator" || user?.role === "system_owner"
-  );
+  const canManageCompany = canAdministrateTenant(user?.role);
   const canEditCompany =
     canManageCompany &&
     settings.hasLoadedSettings &&

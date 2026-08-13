@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Units\Requests;
 
-use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Enums\UnitType;
 use App\Modules\Units\Models\Unit;
 use Illuminate\Foundation\Http\FormRequest;
@@ -49,12 +48,7 @@ final class UpdateUnitRequest extends FormRequest
             ],
 
             'status' => [
-                'sometimes',
-                'required',
-                Rule::in([
-                    UnitStatus::Available->value,
-                    UnitStatus::Sold->value,
-                ]),
+                'prohibited',
             ],
 
             'selling_price' => [
@@ -95,13 +89,6 @@ final class UpdateUnitRequest extends FormRequest
                 'nullable',
                 'string',
             ],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'status.in' => 'لا يمكن تعيين حالة الوحدة إلى محجوزة يدويًا.',
         ];
     }
 

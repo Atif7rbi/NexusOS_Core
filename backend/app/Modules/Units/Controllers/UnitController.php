@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Units\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use App\Modules\Units\Actions\ArchiveUnitAction;
 use App\Modules\Units\Actions\CreateUnitAction;
@@ -18,6 +19,7 @@ use App\Modules\Units\Exceptions\UnitNotArchivedException;
 use App\Modules\Units\Models\Unit;
 use App\Modules\Units\Requests\StoreUnitRequest;
 use App\Modules\Units\Requests\UpdateUnitRequest;
+use App\Modules\Units\Support\UnitAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,6 +29,7 @@ final class UnitController extends Controller
 {
     public function __construct(
         private readonly ResolveActiveMembership $resolveActiveMembership,
+        private readonly UnitAuthorization $authorization,
     ) {
     }
 
@@ -71,7 +74,7 @@ final class UnitController extends Controller
         ]);
 
         $query = Unit::query()
-            ->with('project:id,project_number,name,currency')
+            ->with('project:id,project_number,name,currency,project_manager_id')
             ->where('tenant_id', $membership->tenant_id)
             ->latest();
 
@@ -151,11 +154,18 @@ final class UnitController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
+        $data = $request->validated();
+        $project = $this->findProject(
+            (string) $membership->tenant_id,
+            $data['project_id'],
+        );
+
+        $this->authorization->assertCanCreate($request->user(), $project);
 
         $unit = $action->execute(
             tenantId: (string) $membership->tenant_id,
             actorId: $request->user()->id,
-            data: $request->validated(),
+            data: $data,
         );
 
         return response()->json([
@@ -175,6 +185,7 @@ final class UnitController extends Controller
         );
 
         $unitRecord = Unit::query()
+            ->with('project:id,project_number,name,currency,project_manager_id')
             ->where('tenant_id', $membership->tenant_id)
             ->whereKey($unit)
             ->firstOrFail();
@@ -194,13 +205,30 @@ final class UnitController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
+        $data = $request->validated();
+        $unitRecord = $this->findUnit(
+            (string) $membership->tenant_id,
+            $unit,
+        );
+        $targetProject = array_key_exists('project_id', $data)
+            ? $this->findProject(
+                (string) $membership->tenant_id,
+                $data['project_id'],
+            )
+            : null;
+
+        $this->authorization->assertCanUpdate(
+            $request->user(),
+            $unitRecord,
+            $targetProject,
+        );
 
         try {
             $unitRecord = $action->execute(
                 tenantId: (string) $membership->tenant_id,
                 unitId: $unit,
                 actorId: $request->user()->id,
-                data: $request->validated(),
+                data: $data,
             );
         } catch (ArchivedUnitCannotBeUpdatedException $exception) {
             $this->throwUnitValidationException(
@@ -223,6 +251,10 @@ final class UnitController extends Controller
     ): JsonResponse {
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
+        );
+        $this->authorization->assertCanArchiveOrRestore(
+            $request->user(),
+            $this->findUnit((string) $membership->tenant_id, $unit),
         );
 
         try {
@@ -252,6 +284,10 @@ final class UnitController extends Controller
     ): JsonResponse {
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
+        );
+        $this->authorization->assertCanArchiveOrRestore(
+            $request->user(),
+            $this->findUnit((string) $membership->tenant_id, $unit),
         );
 
         try {
@@ -283,5 +319,22 @@ final class UnitController extends Controller
         throw ValidationException::withMessages([
             'unit' => [$message],
         ]);
+    }
+
+    private function findProject(string $tenantId, string $projectId): Project
+    {
+        return Project::query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($projectId)
+            ->firstOrFail();
+    }
+
+    private function findUnit(string $tenantId, string $unitId): Unit
+    {
+        return Unit::query()
+            ->with('project')
+            ->where('tenant_id', $tenantId)
+            ->whereKey($unitId)
+            ->firstOrFail();
     }
 }

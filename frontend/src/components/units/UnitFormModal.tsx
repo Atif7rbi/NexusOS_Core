@@ -18,8 +18,6 @@ import type { Project } from "@/types/project";
 import type {
   Unit,
   UnitFormPayload,
-  ManuallyAssignableUnitStatus,
-  UnitStatus,
   UnitType,
 } from "@/types/unit";
 
@@ -36,7 +34,6 @@ type UnitFormState = {
   project_id: string;
   unit_number: string;
   unit_type: UnitType;
-  status: UnitStatus;
   selling_price: string;
   area: string;
   floor: string;
@@ -49,7 +46,6 @@ const emptyForm: UnitFormState = {
   project_id: "",
   unit_number: "",
   unit_type: "apartment",
-  status: "available",
   selling_price: "",
   area: "",
   floor: "",
@@ -76,7 +72,6 @@ function initialForm(unit: Unit | null): UnitFormState {
     project_id: unit.project_id,
     unit_number: unit.unit_number,
     unit_type: unit.unit_type,
-    status: unit.status,
     selling_price: unit.selling_price,
     area: unit.area ?? "",
     floor: unit.floor?.toString() ?? "",
@@ -114,7 +109,6 @@ export function UnitFormModal({
         chooseProject: "اختر المشروع",
         number: "رقم الوحدة",
         type: "نوع الوحدة",
-        status: "الحالة",
         price: "سعر البيع",
         area: "المساحة",
         floor: "الطابق",
@@ -127,9 +121,6 @@ export function UnitFormModal({
         close: "إغلاق",
         required: "المشروع ورقم الوحدة وسعر البيع مطلوبة.",
         failed: "تعذر حفظ الوحدة.",
-        available: "متاحة",
-        reserved: "محجوزة",
-        sold: "مباعة",
         apartment: "شقة",
         villa: "فيلا",
         office: "مكتب",
@@ -145,7 +136,6 @@ export function UnitFormModal({
         chooseProject: "Select a project",
         number: "Unit number",
         type: "Unit type",
-        status: "Status",
         price: "Selling price",
         area: "Area",
         floor: "Floor",
@@ -158,9 +148,6 @@ export function UnitFormModal({
         close: "Close",
         required: "Project, unit number, and selling price are required.",
         failed: "Unable to save unit.",
-        available: "Available",
-        reserved: "Reserved",
-        sold: "Sold",
         apartment: "Apartment",
         villa: "Villa",
         office: "Office",
@@ -212,9 +199,6 @@ export function UnitFormModal({
         project_id: form.project_id,
         unit_number: form.unit_number.trim(),
         unit_type: form.unit_type,
-        ...(unit?.status === "reserved"
-          ? {}
-          : { status: form.status as ManuallyAssignableUnitStatus }),
         selling_price: Number(form.selling_price),
         area: form.area === "" ? null : Number(form.area),
         floor: form.floor === "" ? null : Number(form.floor),
@@ -308,34 +292,6 @@ export function UnitFormModal({
               label: typeLabels[type],
             }))}
           />
-          {unit?.status === "reserved" ? (
-            <Input
-              label={labels.status}
-              name="status"
-              value={labels.reserved}
-              hint={
-                isArabic
-                  ? "هذه الحالة تُدار تلقائيًا بواسطة الحجز النشط."
-                  : "This status is managed automatically by the active reservation."
-              }
-              disabled
-              readOnly
-            />
-          ) : (
-            <Select
-              label={labels.status}
-              name="status"
-              value={form.status}
-              error={fieldErrors.status?.[0]}
-              onChange={(event) =>
-                updateField("status", event.target.value as UnitStatus)
-              }
-              options={[
-                { value: "available", label: labels.available },
-                { value: "sold", label: labels.sold },
-              ]}
-            />
-          )}
           <Input
             label={labels.price}
             name="selling_price"

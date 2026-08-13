@@ -36,7 +36,7 @@ final class CreateUnitAction
             );
 
             $data['tenant_id'] = $tenantId;
-            $data['status'] ??= UnitStatus::Available->value;
+            $data['status'] = UnitStatus::Available->value;
             $data['created_by'] = $actorId;
             $data['updated_by'] = $actorId;
 

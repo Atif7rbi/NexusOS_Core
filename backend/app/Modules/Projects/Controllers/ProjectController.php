@@ -25,6 +25,7 @@ use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Requests\StoreProjectRequest;
 use App\Modules\Projects\Requests\UpdateProjectRequest;
+use App\Modules\Projects\Support\ProjectAuthorization;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ final class ProjectController extends Controller
 {
     public function __construct(
         private readonly ResolveActiveMembership $resolveActiveMembership,
+        private readonly ProjectAuthorization $authorization,
     ) {
     }
 
@@ -104,11 +106,20 @@ final class ProjectController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
         );
+        $data = $request->validated();
+
+        $this->authorization->assertCanCreate(
+            $request->user(),
+            (string) $membership->tenant_id,
+            isset($data['project_manager_id'])
+                ? (int) $data['project_manager_id']
+                : null,
+        );
 
         $project = $action->execute(
             tenantId: (string) $membership->tenant_id,
             actorId: $request->user()->id,
-            data: $request->validated(),
+            data: $data,
         )->load('projectManager:id,name,email');
 
         return response()->json([
@@ -147,13 +158,28 @@ final class ProjectController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
         );
+        $data = $request->validated();
+        $projectRecord = $this->findProject(
+            (string) $membership->tenant_id,
+            $project,
+        );
+
+        $this->authorization->assertCanUpdate(
+            $request->user(),
+            (string) $membership->tenant_id,
+            $projectRecord,
+            array_key_exists('project_manager_id', $data),
+            isset($data['project_manager_id'])
+                ? (int) $data['project_manager_id']
+                : null,
+        );
 
         try {
             $project = $action->execute(
                 tenantId: (string) $membership->tenant_id,
                 projectId: $project,
                 actorId: $request->user()->id,
-                data: $request->validated(),
+                data: $data,
             )->load('projectManager:id,name,email');
         } catch (
             ArchivedProjectCannotBeUpdatedException
@@ -178,6 +204,9 @@ final class ProjectController extends Controller
         ArchiveProjectAction $action,
     ): JsonResponse {
         $membership = $this->resolveActiveMembership->handle(
+            $request->user(),
+        );
+        $this->authorization->assertCanArchiveOrRestore(
             $request->user(),
         );
 
@@ -212,6 +241,9 @@ final class ProjectController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
         );
+        $this->authorization->assertCanArchiveOrRestore(
+            $request->user(),
+        );
 
         try {
             $projectRecord = $action->execute(
@@ -240,6 +272,10 @@ final class ProjectController extends Controller
     ): JsonResponse {
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
+        );
+        $this->authorization->assertCanRunOperationalLifecycle(
+            $request->user(),
+            $this->findProject((string) $membership->tenant_id, $project),
         );
 
         try {
@@ -272,6 +308,10 @@ final class ProjectController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
         );
+        $this->authorization->assertCanRunOperationalLifecycle(
+            $request->user(),
+            $this->findProject((string) $membership->tenant_id, $project),
+        );
 
         try {
             $projectRecord = $action->execute(
@@ -302,6 +342,10 @@ final class ProjectController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
         );
+        $this->authorization->assertCanRunOperationalLifecycle(
+            $request->user(),
+            $this->findProject((string) $membership->tenant_id, $project),
+        );
 
         try {
             $projectRecord = $action->execute(
@@ -329,6 +373,7 @@ final class ProjectController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user(),
         );
+        $this->authorization->assertCanCancel($request->user());
 
         try {
             $projectRecord = $action->execute(
@@ -372,5 +417,13 @@ final class ProjectController extends Controller
                 'project' => $project,
             ],
         ]);
+    }
+
+    private function findProject(string $tenantId, string $projectId): Project
+    {
+        return Project::query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($projectId)
+            ->firstOrFail();
     }
 }

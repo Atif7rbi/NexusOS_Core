@@ -6,25 +6,19 @@ namespace App\Modules\Collections\Support;
 
 use App\Models\User;
 use App\Modules\Collections\Http\Exceptions\RoleNotAuthorizedException;
+use App\Modules\Contracts\Models\Contract;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 
 final class CollectionScheduleAuthorization
 {
     /** @var array<int, string> */
-    private const DRAFT_ROLES = [
-        User::ROLE_ADMINISTRATOR,
-        User::ROLE_SALES,
-        User::ROLE_ACCOUNTANT,
-    ];
-
-    /** @var array<int, string> */
     private const FINANCIAL_COMMAND_ROLES = [
-        User::ROLE_ADMINISTRATOR,
         User::ROLE_ACCOUNTANT,
     ];
 
-    public function assertCanSaveDraft(User $user): void
+    public function assertCanSaveDraft(User $user, Contract $contract): void
     {
-        if (! $this->canSaveDraft($user)) {
+        if (! $this->canSaveDraft($user, $contract)) {
             throw new RoleNotAuthorizedException;
         }
     }
@@ -43,18 +37,25 @@ final class CollectionScheduleAuthorization
         }
     }
 
-    public function canSaveDraft(User $user): bool
+    public function canSaveDraft(User $user, Contract $contract): bool
     {
-        return in_array($user->role, self::DRAFT_ROLES, true);
+        if (TenantAdministratorAuthority::allows($user) || $user->role === User::ROLE_ACCOUNTANT) {
+            return true;
+        }
+
+        return $user->role === User::ROLE_SALES
+            && (int) $contract->reservation?->created_by === (int) $user->id;
     }
 
     public function canFinalize(User $user): bool
     {
-        return in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
+        return TenantAdministratorAuthority::allows($user)
+            || in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
     }
 
     public function canAmend(User $user): bool
     {
-        return in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
+        return TenantAdministratorAuthority::allows($user)
+            || in_array($user->role, self::FINANCIAL_COMMAND_ROLES, true);
     }
 }

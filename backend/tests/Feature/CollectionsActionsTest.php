@@ -327,10 +327,7 @@ final class CollectionsActionsTest extends ApiTestCase
         $context = $this->createCollectionContractContext();
         $this->saveAndFinalize($context);
 
-        $otherContractId = (string) $this->postJson('/api/contracts', [
-            'reservation_id' => $this->createCollectionReservation(),
-            'total_amount' => '1000.00',
-        ])->assertCreated()->json('data.contract.id');
+        $otherContractId = $this->createCollectionContract();
 
         (new SaveDraftCollectionScheduleAction)->execute(
             $context['tenant_id'],

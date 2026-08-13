@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import UnitsPage from "@/app/units/page";
@@ -11,6 +16,10 @@ const services = vi.hoisted(() => ({
   }),
 }));
 
+const auth = vi.hoisted(() => ({
+  user: { id: 1, role: "administrator" },
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: services.routerReplace }),
   useSearchParams: () =>
@@ -18,7 +27,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/providers/AuthProvider", () => ({
-  useAuth: () => ({ token: "token" }),
+  useAuth: () => ({
+    token: "token",
+    user: auth.user,
+  }),
 }));
 
 vi.mock("@/hooks/useResourceInvalidation", () => ({
@@ -84,6 +96,7 @@ describe("UnitsPage quick create", () => {
     services.fetchProjects.mockResolvedValue({
       data: { data: [] },
     });
+    auth.user = { id: 1, role: "administrator" };
   });
 
   it("opens from create=1 and preserves other query params on close", async () => {
@@ -102,5 +115,17 @@ describe("UnitsPage quick create", () => {
     fireEvent.click(screen.getByText("close-unit-create"));
 
     expect(window.location.search).toBe("?project=project-1");
+  });
+
+  it("does not expose the create flow to read-only roles", async () => {
+    auth.user = { id: 2, role: "accountant" };
+    window.history.replaceState(null, "", "/units/?create=1");
+
+    render(<UnitsPage />);
+
+    await waitFor(() => {
+      expect(window.location.search).toBe("");
+    });
+    expect(screen.queryByText("unit-create-modal")).toBeNull();
   });
 });

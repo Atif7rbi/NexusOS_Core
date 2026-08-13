@@ -112,6 +112,24 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('data.lead.assigned_to.id', $sales->id);
     }
 
+    public function test_system_owner_has_administrator_crm_authority(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $owner = $this->createLeadUser(
+            $tenant,
+            User::ROLE_SYSTEM_OWNER,
+        )['user'];
+        $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        Sanctum::actingAs($owner);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $sales->id],
+        ))
+            ->assertCreated()
+            ->assertJsonPath('data.lead.assigned_to.id', $sales->id);
+    }
+
     public function test_sales_and_employee_cannot_supply_assigned_to_on_create(): void
     {
         foreach ([User::ROLE_SALES, User::ROLE_EMPLOYEE] as $role) {
@@ -206,6 +224,27 @@ final class LeadsApiTest extends ApiTestCase
         ))
             ->assertUnprocessable()
             ->assertJsonPath('error.code', 'lead_assignee_not_active');
+    }
+
+    public function test_system_owner_cannot_be_selected_as_a_lead_assignee(): void
+    {
+        $tenant = $this->createLeadTenant();
+        $administrator = $this->createLeadUser(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        )['user'];
+        $owner = $this->createLeadUser(
+            $tenant,
+            User::ROLE_SYSTEM_OWNER,
+        )['user'];
+        Sanctum::actingAs($administrator);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $owner->id],
+        ))
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'lead_assignee_role_not_eligible');
     }
 
     public function test_duplicate_protocol_discloses_only_visible_matches_and_requires_acknowledgement(): void

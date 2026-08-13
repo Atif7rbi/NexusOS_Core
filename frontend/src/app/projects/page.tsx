@@ -25,6 +25,13 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
 import { useResourceInvalidation } from "@/hooks/useResourceInvalidation";
+import {
+  canArchiveOrRestoreProject,
+  canCreateProject,
+  canManageProjectManager,
+  canRunProjectLifecycleAction,
+  canWriteProject,
+} from "@/lib/project-authorization";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createProject,
@@ -55,8 +62,13 @@ export default function ProjectsPage() {
 
 function ProjectsPageContent() {
   const { isArabic } = useTranslation();
-  const { token } = useAuth();
-  const quickCreate = useQuickCreateQuery();
+  const { token, user } = useAuth();
+  const {
+    isRequested: isQuickCreateRequested,
+    clear: clearQuickCreate,
+  } = useQuickCreateQuery();
+  const canCreate = canCreateProject(user?.role);
+  const canManageManager = canManageProjectManager(user?.role);
 
   const [projects, setProjects] = useState<Project[]>(
     []
@@ -256,7 +268,7 @@ function ProjectsPageContent() {
     ]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !canManageManager) {
       return;
     }
 
@@ -285,7 +297,7 @@ function ProjectsPageContent() {
     return () => {
       isCancelled = true;
     };
-  }, [token]);
+  }, [token, canManageManager]);
 
   useEffect(() => {
     if (!token) {
@@ -345,14 +357,16 @@ function ProjectsPageContent() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      if (quickCreate.isRequested) {
+      if (isQuickCreateRequested && canCreate) {
         setFormProject(null);
         setFormOpen(true);
+      } else if (isQuickCreateRequested) {
+        clearQuickCreate();
       }
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [quickCreate.isRequested]);
+  }, [canCreate, clearQuickCreate, isQuickCreateRequested]);
 
   const openCreateModal = (): void => {
     setFormProject(null);
@@ -395,7 +409,7 @@ function ProjectsPageContent() {
 
       setFormOpen(false);
       setFormProject(null);
-      quickCreate.clear();
+        clearQuickCreate();
     } finally {
       setSubmitting(false);
     }
@@ -452,7 +466,7 @@ function ProjectsPageContent() {
               </div>
             </div>
 
-            <Button
+            {canCreate ? <Button
               type="button"
               onClick={openCreateModal}
               variant="primary"
@@ -460,7 +474,7 @@ function ProjectsPageContent() {
               className="min-w-44"
             >
               {labels.newProject}
-            </Button>
+            </Button> : null}
           </div>
 
           <div className="mt-6 grid gap-3 md:grid-cols-[1fr_220px_auto]">
@@ -575,7 +589,7 @@ function ProjectsPageContent() {
                   {labels.emptyDescription}
                 </p>
 
-                <Button
+                {canCreate ? <Button
                   type="button"
                   onClick={openCreateModal}
                   variant="primary"
@@ -583,7 +597,7 @@ function ProjectsPageContent() {
                   className="mt-5"
                 >
                   {labels.newProject}
-                </Button>
+                </Button> : null}
               </div>
             </div>
           ) : (
@@ -637,11 +651,11 @@ function ProjectsPageContent() {
                             ]
                           }
                           onEdit={
-                            !isProjectEditable(project)
+                            !isProjectEditable(project) || !canWriteProject(user, project)
                               ? undefined
                               : () => openEditModal(project)
                           }
-                          onArchiveAction={() => {
+                          onArchiveAction={!canArchiveOrRestoreProject(user?.role) ? undefined : () => {
                             setProjectForArchiveAction(project);
                             setArchiveAction(
                               project.archived_at
@@ -653,6 +667,14 @@ function ProjectsPageContent() {
                             setProjectForArchiveAction(project);
                             setArchiveAction(action);
                           }}
+                          allowedLifecycleActions={([
+                            "activate",
+                            "revert-to-draft",
+                            "complete",
+                            "cancel",
+                          ] as ProjectLifecycleAction[]).filter((action) =>
+                            canRunProjectLifecycleAction(user, project, action)
+                          )}
                         />
                       )
                     )}
@@ -673,11 +695,11 @@ function ProjectsPageContent() {
                       statusLabels[project.status]
                     }
                     onEdit={
-                      !isProjectEditable(project)
+                      !isProjectEditable(project) || !canWriteProject(user, project)
                         ? undefined
                         : () => openEditModal(project)
                     }
-                    onArchiveAction={() => {
+                    onArchiveAction={!canArchiveOrRestoreProject(user?.role) ? undefined : () => {
                       setProjectForArchiveAction(project);
                       setArchiveAction(
                         project.archived_at
@@ -689,6 +711,14 @@ function ProjectsPageContent() {
                       setProjectForArchiveAction(project);
                       setArchiveAction(action);
                     }}
+                    allowedLifecycleActions={([
+                      "activate",
+                      "revert-to-draft",
+                      "complete",
+                      "cancel",
+                    ] as ProjectLifecycleAction[]).filter((action) =>
+                      canRunProjectLifecycleAction(user, project, action)
+                    )}
                   />
                 ))}
               </div>
@@ -745,12 +775,14 @@ function ProjectsPageContent() {
           isOpen
           project={formProject}
           projectManagers={projectManagers}
+          currentUser={user}
+          canManageProjectManager={canManageManager}
           isSubmitting={isSubmitting}
           onClose={() => {
             if (!isSubmitting) {
               setFormOpen(false);
               setFormProject(null);
-              quickCreate.clear();
+          clearQuickCreate();
             }
           }}
           onSubmit={handleFormSubmit}
@@ -783,8 +815,9 @@ type ProjectRowProps = {
   typeLabel: string;
   statusLabel: string;
   onEdit?: () => void;
-  onArchiveAction: () => void;
+  onArchiveAction?: () => void;
   onLifecycleAction: (action: ProjectLifecycleAction) => void;
+  allowedLifecycleActions: ProjectLifecycleAction[];
 };
 
 function ProjectRow({
@@ -795,6 +828,7 @@ function ProjectRow({
   onEdit,
   onArchiveAction,
   onLifecycleAction,
+  allowedLifecycleActions,
 }: ProjectRowProps) {
   return (
     <tr className="transition-colors hover:bg-[var(--surface-soft)]">
@@ -879,14 +913,14 @@ function ProjectRow({
 
       <td className="px-5 py-4">
         <div className="flex justify-end gap-2">
-          {!project.archived_at && project.status === "draft" ? (
+          {!project.archived_at && project.status === "draft" && allowedLifecycleActions.includes("activate") ? (
             <LifecycleButton label="▶" title="Activate" onClick={() => onLifecycleAction("activate")} />
           ) : null}
           {!project.archived_at && project.status === "active" ? (
             <>
-              <LifecycleButton label="◀" title="Revert to draft" onClick={() => onLifecycleAction("revert-to-draft")} />
-              <LifecycleButton label="✓" title="Complete" onClick={() => onLifecycleAction("complete")} />
-              <LifecycleButton label="×" title="Cancel" onClick={() => onLifecycleAction("cancel")} />
+              {allowedLifecycleActions.includes("revert-to-draft") ? <LifecycleButton label="◀" title="Revert to draft" onClick={() => onLifecycleAction("revert-to-draft")} /> : null}
+              {allowedLifecycleActions.includes("complete") ? <LifecycleButton label="✓" title="Complete" onClick={() => onLifecycleAction("complete")} /> : null}
+              {allowedLifecycleActions.includes("cancel") ? <LifecycleButton label="×" title="Cancel" onClick={() => onLifecycleAction("cancel")} /> : null}
             </>
           ) : null}
           {onEdit ? (
@@ -900,7 +934,7 @@ function ProjectRow({
             </button>
           ) : null}
 
-          <button
+          {onArchiveAction ? <button
             type="button"
             onClick={onArchiveAction}
             title={
@@ -915,7 +949,7 @@ function ProjectRow({
             ) : (
               <Archive size={16} />
             )}
-          </button>
+          </button> : null}
         </div>
       </td>
     </tr>
@@ -928,8 +962,9 @@ type ProjectMobileCardProps = {
   typeLabel: string;
   statusLabel: string;
   onEdit?: () => void;
-  onArchiveAction: () => void;
+  onArchiveAction?: () => void;
   onLifecycleAction: (action: ProjectLifecycleAction) => void;
+  allowedLifecycleActions: ProjectLifecycleAction[];
 };
 
 function ProjectMobileCard({
@@ -940,6 +975,7 @@ function ProjectMobileCard({
   onEdit,
   onArchiveAction,
   onLifecycleAction,
+  allowedLifecycleActions,
 }: ProjectMobileCardProps) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
@@ -990,11 +1026,11 @@ function ProjectMobileCard({
       </div>
 
       <div className="mt-4 flex justify-end gap-2 border-t border-[var(--border)] pt-4">
-        {!project.archived_at && project.status === "draft" ? <LifecycleButton label={isArabic ? "تفعيل" : "Activate"} title="Activate" onClick={() => onLifecycleAction("activate")} /> : null}
+        {!project.archived_at && project.status === "draft" && allowedLifecycleActions.includes("activate") ? <LifecycleButton label={isArabic ? "تفعيل" : "Activate"} title="Activate" onClick={() => onLifecycleAction("activate")} /> : null}
         {!project.archived_at && project.status === "active" ? <>
-          <LifecycleButton label={isArabic ? "مسودة" : "Draft"} title="Revert to draft" onClick={() => onLifecycleAction("revert-to-draft")} />
-          <LifecycleButton label={isArabic ? "إكمال" : "Complete"} title="Complete" onClick={() => onLifecycleAction("complete")} />
-          <LifecycleButton label={isArabic ? "إلغاء" : "Cancel"} title="Cancel" onClick={() => onLifecycleAction("cancel")} />
+          {allowedLifecycleActions.includes("revert-to-draft") ? <LifecycleButton label={isArabic ? "مسودة" : "Draft"} title="Revert to draft" onClick={() => onLifecycleAction("revert-to-draft")} /> : null}
+          {allowedLifecycleActions.includes("complete") ? <LifecycleButton label={isArabic ? "إكمال" : "Complete"} title="Complete" onClick={() => onLifecycleAction("complete")} /> : null}
+          {allowedLifecycleActions.includes("cancel") ? <LifecycleButton label={isArabic ? "إلغاء" : "Cancel"} title="Cancel" onClick={() => onLifecycleAction("cancel")} /> : null}
         </> : null}
         {onEdit ? (
           <button
@@ -1007,7 +1043,7 @@ function ProjectMobileCard({
           </button>
         ) : null}
 
-        <button
+        {onArchiveAction ? <button
           type="button"
           onClick={onArchiveAction}
           className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-xs font-bold text-[var(--text-secondary)]"
@@ -1024,7 +1060,7 @@ function ProjectMobileCard({
             : project.archived_at
               ? "Restore"
               : "Archive"}
-        </button>
+        </button> : null}
       </div>
     </article>
   );

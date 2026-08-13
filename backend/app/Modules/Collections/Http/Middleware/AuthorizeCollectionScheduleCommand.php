@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Collections\Http\Exceptions\RoleNotAuthorizedException;
 use App\Modules\Collections\Support\CollectionScheduleAuthorization;
 use App\Modules\Collections\Support\CollectionScheduleExceptionResponder;
+use App\Modules\Contracts\Models\Contract;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,10 +28,16 @@ final class AuthorizeCollectionScheduleCommand
             throw new \LogicException('Authenticated user was not resolved.');
         }
 
+        $contract = $request->attributes->get('collection_schedule_contract');
+
+        if (! $contract instanceof Contract) {
+            throw new \LogicException('Collection Schedule Contract was not resolved.');
+        }
+
         try {
             switch ($command) {
                 case 'save_draft':
-                    $this->authorization->assertCanSaveDraft($user);
+                    $this->authorization->assertCanSaveDraft($user, $contract);
                     break;
 
                 case 'finalize':

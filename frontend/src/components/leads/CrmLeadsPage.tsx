@@ -32,6 +32,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { CrudPageLayout } from "@/components/ui/crud/CrudPageLayout";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isApiRequestError } from "@/lib/api-error";
+import { canAdministrateTenant } from "@/lib/tenant-administrator";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   addLeadNote,
@@ -92,7 +93,7 @@ export function CrmLeadsPage() {
   const searchParams = useSearchParams();
   const { token, user } = useAuth();
   const { t } = useTranslation();
-  const isAdministrator = user?.role === "administrator";
+  const isAdministrator = canAdministrateTenant(user?.role);
   const selectedLeadId = searchParams.get("lead");
   const viewMode = searchParams.get("view") === "pipeline" ? "pipeline" : "list";
   const archivedMode = isAdministrator && searchParams.get("archived") === "true";

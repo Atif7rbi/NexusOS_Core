@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Modules\Contracts\Models\Contract;
+use App\Models\User;
+use App\Modules\Customers\Models\Customer;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Modules\Projects\Enums\ProjectStatus;
@@ -35,7 +37,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contract_can_be_created_as_draft_from_an_active_reservation_with_negotiated_amount(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -63,7 +65,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contract_total_amount_is_not_copied_from_unit_selling_price(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -76,7 +78,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_a_reservation_can_only_produce_one_contract(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -93,7 +95,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contract_cannot_be_created_from_a_non_active_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
         $this->patchJson("/api/reservations/{$reservationId}/cancel")->assertOk();
@@ -106,7 +108,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_a_replacement_contract_can_be_created_after_the_draft_contract_was_cancelled(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -128,7 +130,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_two_draft_contracts_cannot_coexist_for_the_same_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -145,7 +147,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contract_creation_is_blocked_while_an_active_contract_exists_for_the_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
         $contractId = $this->postJson('/api/contracts', [
@@ -162,7 +164,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contract_creation_is_blocked_while_a_completed_contract_exists_for_the_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
         $contractId = $this->postJson('/api/contracts', [
@@ -180,8 +182,8 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contracts_are_tenant_scoped_on_creation_and_access(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($tenantAUser);
         $reservationId = $this->createReservation();
         $contractId = $this->postJson('/api/contracts', [
@@ -205,7 +207,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_draft_contract_total_amount_can_be_updated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
 
@@ -221,7 +223,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_active_contract_cannot_be_updated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
@@ -232,7 +234,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_completed_contract_cannot_be_updated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
@@ -244,7 +246,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_cancelled_contract_cannot_be_updated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $this->patchJson("/api/contracts/{$contractId}/cancel")->assertOk();
@@ -257,7 +259,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_draft_contract_with_active_reservation_and_reserved_unit_activates_successfully(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $reservation = Contract::query()->findOrFail($contractId)->reservation;
@@ -275,7 +277,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_activation_fails_when_reservation_is_not_active(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $reservationId = Contract::query()->findOrFail($contractId)->reservation_id;
@@ -292,7 +294,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_activation_fails_when_unit_is_not_reserved(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $unitId = Contract::query()->findOrFail($contractId)->reservation->unit_id;
@@ -307,7 +309,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_only_draft_contracts_can_be_activated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
@@ -320,7 +322,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_active_contract_can_be_completed_and_reservation_and_unit_are_unaffected(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $reservation = Contract::query()->findOrFail($contractId)->reservation;
@@ -338,7 +340,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_draft_contract_cannot_be_completed(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
 
@@ -348,7 +350,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_completed_and_cancelled_contracts_cannot_be_completed_again(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $completedId = $this->createContract();
@@ -367,7 +369,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_draft_contract_cancellation_leaves_reservation_active_and_unit_reserved(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $reservation = Contract::query()->findOrFail($contractId)->reservation;
@@ -383,7 +385,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_active_contract_cancellation_keeps_reservation_converted_and_releases_unit(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $reservation = Contract::query()->findOrFail($contractId)->reservation;
@@ -400,7 +402,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_completed_contract_cannot_be_cancelled(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $this->patchJson("/api/contracts/{$contractId}/activate")->assertOk();
@@ -412,7 +414,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_active_cancellation_rejects_reservation_not_in_converted_state_and_rolls_back(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $reservation = Contract::query()->findOrFail($contractId)->reservation;
@@ -432,7 +434,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_active_cancellation_rejects_unit_not_in_sold_state_and_rolls_back(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $unitId = Contract::query()->findOrFail($contractId)->reservation->unit_id;
@@ -450,7 +452,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_cancelled_contract_cannot_be_cancelled_again(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $contractId = $this->createContract();
         $this->patchJson("/api/contracts/{$contractId}/cancel")->assertOk();
@@ -463,7 +465,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contracts_can_be_listed_filtered_and_summarized(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $draftId = $this->createContract();
@@ -483,7 +485,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_contract_show_exposes_unit_and_customer_nested_under_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
         $reservation = Reservation::query()->findOrFail($reservationId);
@@ -513,7 +515,7 @@ final class ContractsApiTest extends ApiTestCase
 
     public function test_validation_rejects_zero_or_negative_total_amount(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -540,44 +542,84 @@ final class ContractsApiTest extends ApiTestCase
 
     private function createReservation(): string
     {
-        return (string) $this->postJson('/api/reservations', [
+        $user = auth()->user();
+
+        return (string) Reservation::query()->create([
+            'tenant_id' => $this->tenantIdFor($user),
             'unit_id' => $this->createAvailableUnit(),
             'customer_id' => $this->createCustomer(),
-        ])->assertCreated()->json('data.reservation.id');
+            'status' => 'active',
+            'reserved_at' => now(),
+            'expires_at' => now()->addHours(48),
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ])->id;
     }
 
     private function createAvailableUnit(bool $activeProject = true): string
     {
         $this->unitCount++;
         $projectId = $this->createProject($activeProject);
-        return (string) $this->postJson('/api/units', [
+        $user = auth()->user();
+
+        return (string) Unit::query()->create([
+            'tenant_id' => $this->tenantIdFor($user),
             'project_id' => $projectId,
             'unit_number' => "C-{$this->unitCount}",
             'unit_type' => 'apartment',
             'selling_price' => 500000,
-        ])->assertCreated()->json('data.unit.id');
+            'status' => 'reserved',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ])->id;
     }
 
     private function createCustomer(): string
     {
         $this->customerCount++;
-        return (string) $this->postJson('/api/customers', [
+        $user = auth()->user();
+
+        return (string) Customer::query()->create([
+            'tenant_id' => $this->tenantIdFor($user),
             'type' => 'individual', 'category' => 'buyer',
+            'status' => 'customer',
             'name' => "عميل العقد {$this->customerCount}",
             'phone' => '051000'.str_pad((string) $this->customerCount, 4, '0', STR_PAD_LEFT),
-        ])->assertCreated()->json('data.customer.id');
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ])->id;
     }
 
     private function createProject(bool $active): string
     {
         $this->projectCount++;
-        $projectId = (string) $this->postJson('/api/projects', [
-            'name' => "مشروع العقد {$this->projectCount}", 'project_type' => 'residential', 'city' => 'الرياض',
-        ])->assertCreated()->json('data.project.id');
-        if ($active) {
-            Project::query()->whereKey($projectId)->update(['status' => ProjectStatus::Active->value]);
-        }
+        $user = auth()->user();
+        $tenantId = $this->tenantIdFor($user);
+        $year = now('Asia/Riyadh')->year;
+        $sequence = (int) Project::query()
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number') + 1;
 
-        return $projectId;
+        return (string) Project::query()->create([
+            'tenant_id' => $tenantId,
+            'project_number' => sprintf('CON-%d-%03d', $year, $sequence),
+            'project_number_year' => $year,
+            'project_sequence_number' => $sequence,
+            'name' => "مشروع العقد {$this->projectCount}", 'project_type' => 'residential', 'city' => 'الرياض',
+            'status' => $active ? ProjectStatus::Active->value : ProjectStatus::Draft->value,
+            'country_code' => 'SA',
+            'currency' => 'SAR',
+            'data_origin' => 'user',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ])->id;
+    }
+
+    private function tenantIdFor(\App\Models\User $user): string
+    {
+        return (string) TenantUser::query()
+            ->where('user_id', $user->id)
+            ->where('status', TenantUser::STATUS_ACTIVE)
+            ->valueOrFail('tenant_id');
     }
 }
