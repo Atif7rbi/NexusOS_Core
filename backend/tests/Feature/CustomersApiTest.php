@@ -54,7 +54,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_authenticated_user_can_create_individual_customer(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         Sanctum::actingAs($user);
@@ -129,7 +129,7 @@ final class CustomersApiTest extends ApiTestCase
     }
     public function test_phone_normalization_and_raw_http_middleware_boundary(): void
     {
-        $user = $this->createActiveUser(); Sanctum::actingAs($user);
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]); Sanctum::actingAs($user);
         $this->postJson('/api/customers', ['type'=>'individual','category'=>'buyer','name'=>'مطبع','phone'=>"\t٠٥٠١٢٣٤٥٦٧ "])
             ->assertCreated()->assertJsonPath('data.customer.phone','0501234567');
         foreach (["\0".'0501234567', "0501234567\0", "0501234567\u{00A0}", '+966501234567'] as $phone) {
@@ -143,7 +143,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_authenticated_user_can_create_company_customer(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         Sanctum::actingAs($user);
@@ -195,7 +195,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_customer_creation_rejects_invalid_business_values(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         Sanctum::actingAs($user);
 
@@ -220,7 +220,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_individual_cannot_have_commercial_registration_number(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         Sanctum::actingAs($user);
 
@@ -239,7 +239,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_company_cannot_have_national_id(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         Sanctum::actingAs($user);
 
@@ -258,7 +258,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_unique_identifiers_are_enforced_inside_same_tenant(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         Sanctum::actingAs($user);
 
@@ -306,8 +306,8 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_same_identifiers_are_allowed_between_different_tenants(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         Sanctum::actingAs($tenantAUser);
 
@@ -356,7 +356,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_authenticated_user_can_list_and_show_own_customers(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $first = $this->createCustomer($tenantId, $user, [
@@ -405,7 +405,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_customer_index_supports_search_and_filters(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $target = $this->createCustomer($tenantId, $user, [
@@ -454,7 +454,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_authenticated_user_can_update_customer(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $customer = $this->createCustomer(
@@ -508,7 +508,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_changing_customer_type_clears_incompatible_identity_field(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $individual = $this->createCustomer(
@@ -575,7 +575,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_authenticated_user_can_archive_customer(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $customer = $this->createCustomer(
@@ -628,7 +628,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_archived_customer_cannot_be_updated_or_archived_again(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $customer = $this->createCustomer(
@@ -668,7 +668,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_authenticated_user_can_restore_archived_customer_to_inactive(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $customer = $this->createCustomer(
@@ -724,7 +724,7 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_non_archived_customer_cannot_be_restored(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user);
 
         $customer = $this->createCustomer(
@@ -821,8 +821,8 @@ final class CustomersApiTest extends ApiTestCase
 
     public function test_customer_index_does_not_leak_other_tenant_records(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         $tenantACustomer = $this->createCustomer(
             $this->tenantIdFor($tenantAUser),
@@ -908,8 +908,8 @@ final class CustomersApiTest extends ApiTestCase
     private function crossTenantScenario(
         array $customerAttributes = [],
     ): array {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         if (
             ($customerAttributes['status'] ?? null)

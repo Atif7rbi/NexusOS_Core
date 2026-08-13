@@ -9,6 +9,10 @@ export type ContractUnit = {
   project_id: string;
   unit_number: string;
   status: string;
+  project?: {
+    id: string;
+    project_manager_id: number | null;
+  } | null;
 };
 
 export type ContractCustomer = {
@@ -20,6 +24,7 @@ export type ContractCustomer = {
 export type ContractReservation = {
   id: string;
   status: string;
+  created_by: number | string | null;
   unit: ContractUnit | null;
   customer: ContractCustomer | null;
 };

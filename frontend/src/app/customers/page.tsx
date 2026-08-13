@@ -24,6 +24,7 @@ import { CustomerDetailsView } from "@/components/customers/CustomerDetailsView"
 import { CustomerFormModal } from "@/components/customers/CustomerFormModal";
 import { Button } from "@/components/ui/Button";
 import { ApiRequestError } from "@/lib/api-error";
+import { canCreateCustomer } from "@/lib/commercial-authorization";
 import { buildContextualReservationUrl } from "@/lib/reservation-create-context";
 import { useCustomersQueryState } from "@/hooks/useCustomersQueryState";
 import { useQuickCreateQuery } from "@/hooks/useQuickCreateQuery";
@@ -59,9 +60,10 @@ export default function CustomersPage() {
 
 function CustomersPageContent() {
   const { isArabic } = useTranslation();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const query = useCustomersQueryState();
   const quickCreate = useQuickCreateQuery();
+  const { isRequested: quickCreateRequested, clear: clearQuickCreate } = quickCreate;
 
   const [customers, setCustomers] = useState<
     Customer[]
@@ -427,16 +429,23 @@ function CustomersPageContent() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      if (quickCreate.isRequested) {
+      if (quickCreateRequested && !canCreateCustomer(user?.role)) {
+        clearQuickCreate();
+        return;
+      }
+      if (quickCreateRequested) {
         setFormCustomer(null);
         setFormOpen(true);
       }
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [quickCreate.isRequested]);
+  }, [clearQuickCreate, quickCreateRequested, user?.role]);
 
   const openCreateModal = (): void => {
+    if (!canCreateCustomer(user?.role)) {
+      return;
+    }
     setFormCustomer(null);
     setFormOpen(true);
   };
@@ -547,6 +556,7 @@ function CustomersPageContent() {
       <AppShell>
         <CustomerDetailsView
           customer={customerRecord}
+          currentUser={user}
           businessContext={customerBusinessContext}
           isArabic={isArabic}
           isLoading={isCustomerRecordLoading}
@@ -607,7 +617,7 @@ function CustomersPageContent() {
               </div>
             </div>
 
-            <Button
+            {canCreateCustomer(user?.role) ? <Button
               type="button"
               onClick={openCreateModal}
               variant="primary"
@@ -615,7 +625,7 @@ function CustomersPageContent() {
               className="min-w-44"
             >
               {labels.newCustomer}
-            </Button>
+            </Button> : null}
           </div>
         </section>
 
@@ -829,7 +839,7 @@ function CustomersPageContent() {
                     : labels.firstCustomer}
                 </p>
 
-                {!hasActiveFilters ? (
+                {!hasActiveFilters && canCreateCustomer(user?.role) ? (
                   <Button
                     type="button"
                     onClick={openCreateModal}
@@ -849,6 +859,7 @@ function CustomersPageContent() {
                   <CustomerCard
                     key={customer.id}
                     customer={customer}
+                    currentUser={user}
                     isArabic={isArabic}
                     onOpen={() =>
                       query.openCustomer(customer.id)

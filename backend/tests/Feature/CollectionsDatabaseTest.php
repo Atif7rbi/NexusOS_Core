@@ -6,8 +6,13 @@ namespace Tests\Feature;
 
 use App\Models\Tenant;
 use App\Models\TenantUser;
+use App\Models\User;
+use App\Modules\Contracts\Models\Contract;
+use App\Modules\Customers\Models\Customer;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Reservations\Models\Reservation;
+use App\Modules\Units\Models\Unit;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -44,7 +49,7 @@ final class CollectionsDatabaseTest extends ApiTestCase
 
     public function test_new_contract_copies_the_current_tenant_currency(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         $tenantId = $this->tenantIdFor($user->id);
 
         Tenant::query()->whereKey($tenantId)->update(['currency' => 'USD']);
@@ -303,7 +308,7 @@ final class CollectionsDatabaseTest extends ApiTestCase
      */
     private function createContractContext(): array
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
 
         Sanctum::actingAs($user);
 
@@ -374,18 +379,35 @@ final class CollectionsDatabaseTest extends ApiTestCase
 
     private function createContract(): string
     {
-        return (string) $this->postJson('/api/contracts', [
+        $userId = (int) auth()->id();
+        $contract = new Contract([
+            'tenant_id' => $this->tenantIdFor($userId),
             'reservation_id' => $this->createReservation(),
+            'status' => 'draft',
             'total_amount' => '450000.00',
-        ])->assertCreated()->json('data.contract.id');
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ]);
+        $contract->currency = Tenant::query()->findOrFail($contract->tenant_id)->currency;
+        $contract->save();
+
+        return (string) $contract->id;
     }
 
     private function createReservation(): string
     {
-        return (string) $this->postJson('/api/reservations', [
+        $userId = (int) auth()->id();
+
+        return (string) Reservation::query()->create([
+            'tenant_id' => $this->tenantIdFor($userId),
             'unit_id' => $this->createAvailableUnit(),
             'customer_id' => $this->createCustomer(),
-        ])->assertCreated()->json('data.reservation.id');
+            'status' => 'active',
+            'reserved_at' => now(),
+            'expires_at' => now()->addHours(48),
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ])->id;
     }
 
     private function createAvailableUnit(): string
@@ -393,41 +415,64 @@ final class CollectionsDatabaseTest extends ApiTestCase
         $this->unitCount++;
         $projectId = $this->createProject();
 
-        return (string) $this->postJson('/api/units', [
+        $userId = (int) auth()->id();
+
+        return (string) Unit::query()->create([
+            'tenant_id' => $this->tenantIdFor($userId),
             'project_id' => $projectId,
             'unit_number' => "COL-{$this->unitCount}",
             'unit_type' => 'apartment',
+            'status' => 'reserved',
             'selling_price' => 500000,
-        ])->assertCreated()->json('data.unit.id');
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ])->id;
     }
 
     private function createCustomer(): string
     {
         $this->customerCount++;
 
-        return (string) $this->postJson('/api/customers', [
+        $userId = (int) auth()->id();
+
+        return (string) Customer::query()->create([
+            'tenant_id' => $this->tenantIdFor($userId),
             'type' => 'individual',
             'category' => 'buyer',
+            'status' => 'customer',
             'name' => "عميل التحصيل {$this->customerCount}",
             'phone' => '056000'.str_pad((string) $this->customerCount, 4, '0', STR_PAD_LEFT),
-        ])->assertCreated()->json('data.customer.id');
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ])->id;
     }
 
     private function createProject(): string
     {
         $this->projectCount++;
 
-        $projectId = (string) $this->postJson('/api/projects', [
+        $userId = (int) auth()->id();
+        $tenantId = $this->tenantIdFor($userId);
+        $year = now('Asia/Riyadh')->year;
+        $sequence = (int) Project::query()
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number') + 1;
+
+        return (string) Project::query()->create([
+            'tenant_id' => $tenantId,
+            'project_number' => sprintf('COL-%d-%03d', $year, $sequence),
+            'project_number_year' => $year,
+            'project_sequence_number' => $sequence,
             'name' => "مشروع التحصيل {$this->projectCount}",
             'project_type' => 'residential',
             'city' => 'الرياض',
-        ])->assertCreated()->json('data.project.id');
-
-        Project::query()->whereKey($projectId)->update([
+            'country_code' => 'SA',
+            'currency' => Tenant::query()->findOrFail($tenantId)->currency,
+            'data_origin' => 'user',
             'status' => ProjectStatus::Active->value,
-        ]);
-
-        return $projectId;
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ])->id;
     }
 
     private function tenantIdFor(int $userId): string

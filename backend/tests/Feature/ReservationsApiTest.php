@@ -47,7 +47,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_active_project_available_unit_and_customer_can_be_reserved_with_default_expiry(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $customerId = $this->createCustomer();
@@ -79,7 +79,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_reservation_validates_expiry_and_only_allows_mutable_fields_to_be_updated(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -109,7 +109,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_ineligible_project_unit_and_customer_cannot_be_reserved(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $customerId = $this->createCustomer();
 
@@ -130,7 +130,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_only_one_active_reservation_can_exist_for_a_unit_and_database_constraint_is_enforced(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $first = $this->postJson('/api/reservations', ['unit_id' => $unitId, 'customer_id' => $this->createCustomer()])
@@ -153,7 +153,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_database_rejects_an_expiry_at_or_before_the_reservation_time(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $customerId = $this->createCustomer();
@@ -171,7 +171,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_active_reservation_can_be_cancelled_but_cannot_be_cancelled_or_updated_again(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $reservationId = $this->createReservation();
 
@@ -189,7 +189,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_expiration_job_expires_the_reservation_and_releases_the_unit_for_a_new_reservation(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
         $unitId = $this->createAvailableUnit();
         $reservationId = $this->postJson('/api/reservations', [
@@ -213,8 +213,8 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_reservations_are_tenant_scoped_and_can_be_listed_filtered_and_summarized(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($tenantAUser);
         $reservationId = $this->createReservation();
 
@@ -237,8 +237,8 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_available_units_returns_only_units_eligible_for_reservation(): void
     {
-        $tenantAUser = $this->createActiveUser();
-        $tenantBUser = $this->createActiveUser();
+        $tenantAUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantBUser = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($tenantAUser);
 
         $eligibleUnit = $this->createAvailableUnit();
@@ -284,7 +284,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_creating_reservation_marks_unit_as_reserved(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $unitId = $this->createAvailableUnit();
@@ -302,7 +302,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_cancelling_reservation_releases_unit_back_to_available(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $reservationId = $this->createReservation();
@@ -322,7 +322,7 @@ final class ReservationsApiTest extends ApiTestCase
 
     public function test_expiring_reservation_releases_unit_back_to_available(): void
     {
-        $user = $this->createActiveUser();
+        $user = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
         Sanctum::actingAs($user);
 
         $unitId = $this->createAvailableUnit();

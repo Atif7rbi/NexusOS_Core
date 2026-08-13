@@ -47,6 +47,10 @@ import {
   useResourceInvalidation,
 } from "@/hooks/useResourceInvalidation";
 import { formatInteger } from "@/lib/number-format";
+import {
+  canCreateContract,
+  canEditOrCancelReservation,
+} from "@/lib/commercial-authorization";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createContract,
@@ -78,7 +82,7 @@ const emptySummary: ContractSummary = {
 };
 
 export default function ContractsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [summary, setSummary] = useState<ContractSummary>(emptySummary);
   const [page, setPage] = useState(1);
@@ -166,7 +170,7 @@ export default function ContractsPage() {
   };
 
   const openCreateForm = async (): Promise<void> => {
-    if (!token) {
+    if (!token || !canCreateContract(user?.role)) {
       return;
     }
 
@@ -205,7 +209,7 @@ export default function ContractsPage() {
         ...remainingResponses.flatMap(
           (response) => response.data.reservations.data
         ),
-      ]);
+      ].filter((reservation) => canEditOrCancelReservation(user, reservation)));
     } catch (caughtError) {
       setReservationLoadError(
         caughtError instanceof Error
@@ -331,7 +335,7 @@ export default function ContractsPage() {
           icon={FileSignature}
           title="العقود"
           description="إنشاء العقود ومتابعة حالتها وإجراءات دورة حياتها"
-          action={
+          action={canCreateContract(user?.role) ? (
             <Button
               type="button"
               onClick={() => void openCreateForm()}
@@ -341,7 +345,7 @@ export default function ContractsPage() {
             >
               إنشاء عقد
             </Button>
-          }
+          ) : undefined}
         />
 
         {successMessage ? (
@@ -497,6 +501,7 @@ export default function ContractsPage() {
           ) : (
             <ContractsTable
               contracts={contracts}
+              currentUser={user}
               onDetails={openDetails}
               onEdit={setEditContract}
               onLifecycle={openLifecycleDialog}

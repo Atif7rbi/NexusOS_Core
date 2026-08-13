@@ -17,7 +17,9 @@ use App\Modules\Reservations\Requests\CancelReservationRequest;
 use App\Modules\Reservations\Requests\StoreReservationRequest;
 use App\Modules\Reservations\Requests\UpdateReservationRequest;
 use App\Modules\Reservations\Resources\ReservationResource;
+use App\Modules\Reservations\Support\ReservationAuthorization;
 use App\Modules\Shared\Services\ResolveActiveMembership;
+use App\Modules\Units\Models\Unit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,7 +27,10 @@ use Illuminate\Validation\ValidationException;
 
 final class ReservationController extends Controller
 {
-    public function __construct(private readonly ResolveActiveMembership $resolveActiveMembership) {}
+    public function __construct(
+        private readonly ResolveActiveMembership $resolveActiveMembership,
+        private readonly ReservationAuthorization $authorization,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -41,7 +46,7 @@ final class ReservationController extends Controller
 
         $query = Reservation::query()->with([
             'unit:id,project_id,unit_number,status,archived_at',
-            'unit.project:id,project_number,name,status',
+            'unit.project:id,project_number,name,status,project_manager_id',
             'customer:id,name,status,archived_at',
         ])->where('tenant_id', $membership->tenant_id)->latest();
 
@@ -102,6 +107,12 @@ final class ReservationController extends Controller
     public function store(StoreReservationRequest $request, CreateReservationAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $unit = Unit::query()
+            ->with('project:id,project_manager_id')
+            ->where('tenant_id', $membership->tenant_id)
+            ->whereKey($request->validated('unit_id'))
+            ->firstOrFail();
+        $this->authorization->assertCanCreate($request->user(), $unit);
         try {
             $reservation = $action->execute((string) $membership->tenant_id, $request->user()->id, $request->validated());
         } catch (ReservationUnitUnavailableException $exception) {
@@ -126,6 +137,10 @@ final class ReservationController extends Controller
     public function update(UpdateReservationRequest $request, string $reservation, UpdateReservationAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->authorization->assertCanUpdateOrCancel(
+            $request->user(),
+            $this->findReservation((string) $membership->tenant_id, $reservation),
+        );
         try { $record = $action->execute((string) $membership->tenant_id, $reservation, $request->user()->id, $request->validated()); }
         catch (ReservationNotActiveException $exception) { $this->throwValidationException('reservation', $exception->getMessage()); }
         return response()->json([
@@ -137,6 +152,10 @@ final class ReservationController extends Controller
     public function cancel(CancelReservationRequest $request, string $reservation, CancelReservationAction $action): JsonResponse
     {
         $membership = $this->resolveActiveMembership->handle($request->user());
+        $this->authorization->assertCanUpdateOrCancel(
+            $request->user(),
+            $this->findReservation((string) $membership->tenant_id, $reservation),
+        );
         try { $record = $action->execute((string) $membership->tenant_id, $reservation, $request->user()->id, $request->validated('cancellation_reason')); }
         catch (ReservationNotActiveException $exception) { $this->throwValidationException('reservation', $exception->getMessage()); }
         return response()->json([
@@ -148,5 +167,14 @@ final class ReservationController extends Controller
     private function throwValidationException(string $field, string $message): never
     {
         throw ValidationException::withMessages([$field => [$message]]);
+    }
+
+    private function findReservation(string $tenantId, string $reservation): Reservation
+    {
+        return Reservation::query()
+            ->with('unit.project:id,project_manager_id')
+            ->where('tenant_id', $tenantId)
+            ->whereKey($reservation)
+            ->firstOrFail();
     }
 }

@@ -19,6 +19,7 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Requests\StoreCustomerRequest;
 use App\Modules\Customers\Requests\UpdateCustomerRequest;
 use App\Modules\Customers\Support\CustomerBusinessContextQuery;
+use App\Modules\Customers\Support\CustomerAuthorization;
 use App\Modules\Shared\Services\ResolveActiveMembership;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,7 @@ final class CustomerController extends Controller
 {
     public function __construct(
         private readonly ResolveActiveMembership $resolveActiveMembership,
+        private readonly CustomerAuthorization $authorization,
     ) {
     }
 
@@ -38,7 +40,6 @@ final class CustomerController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
-
         $validated = $request->validate([
             'search' => [
                 'sometimes',
@@ -176,6 +177,7 @@ final class CustomerController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
+        $this->authorization->assertCanCreate($request->user());
 
         $customer = $action->execute(
             tenantId: (string) $membership->tenant_id,
@@ -199,7 +201,6 @@ final class CustomerController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
-
         $customerRecord = Customer::query()
             ->where(
                 'tenant_id',
@@ -226,6 +227,10 @@ final class CustomerController extends Controller
     ): JsonResponse {
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
+        );
+        $this->authorization->assertCanUpdateOrArchive(
+            $request->user(),
+            $this->findCustomer((string) $membership->tenant_id, $customer),
         );
 
         try {
@@ -259,6 +264,10 @@ final class CustomerController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
+        $this->authorization->assertCanUpdateOrArchive(
+            $request->user(),
+            $this->findCustomer((string) $membership->tenant_id, $customer),
+        );
 
         try {
             $customerRecord = $action->execute(
@@ -290,6 +299,8 @@ final class CustomerController extends Controller
         $membership = $this->resolveActiveMembership->handle(
             $request->user()
         );
+        $this->findCustomer((string) $membership->tenant_id, $customer);
+        $this->authorization->assertCanRestore($request->user());
 
         try {
             $customerRecord = $action->execute(
@@ -324,5 +335,13 @@ final class CustomerController extends Controller
                 $message,
             ],
         ]);
+    }
+
+    private function findCustomer(string $tenantId, string $customer): Customer
+    {
+        return Customer::query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($customer)
+            ->firstOrFail();
     }
 }

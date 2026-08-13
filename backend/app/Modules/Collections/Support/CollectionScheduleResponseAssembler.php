@@ -103,7 +103,7 @@ final class CollectionScheduleResponseAssembler
             ],
             'schedule' => $schedule,
             'allowed_actions' => [
-                'can_save_draft' => $this->authorization->canSaveDraft($user)
+                'can_save_draft' => $this->authorization->canSaveDraft($user, $contract)
                     && $this->policyAllows(function () use ($contract, $state): void {
                         $this->draftPolicy->assert($contract, $state);
                     }),

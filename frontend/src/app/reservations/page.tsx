@@ -44,6 +44,10 @@ import {
 import { formatDateTime } from "@/lib/date-format";
 import { formatInteger } from "@/lib/number-format";
 import {
+  canCreateReservation,
+  canEditOrCancelReservation,
+} from "@/lib/commercial-authorization";
+import {
   clearReservationCreateQuery,
   parseReservationCreateQuery,
   returnToCustomerRecord,
@@ -97,7 +101,7 @@ const statusClasses: Record<ReservationStatus, string> = {
 };
 
 export default function ReservationsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [summary, setSummary] = useState<ReservationSummary>(emptySummary);
@@ -173,7 +177,7 @@ export default function ReservationsPage() {
   }, [loadReservations]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !canCreateReservation(user?.role)) {
       return;
     }
 
@@ -194,7 +198,7 @@ export default function ReservationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, user?.role]);
 
   useResourceInvalidation("reservations", () => loadReservations());
 
@@ -218,7 +222,14 @@ export default function ReservationsPage() {
     async (
       context: ReservationCreateContext | null = null
     ): Promise<void> => {
-      if (!token) {
+      if (!token || !canCreateReservation(user?.role)) {
+        if (context) {
+          window.history.replaceState(
+            null,
+            "",
+            clearReservationCreateQuery(window.location.search)
+          );
+        }
         return;
       }
 
@@ -291,7 +302,7 @@ export default function ReservationsPage() {
         setLoadingInitialOptions(false);
       }
     },
-    [token]
+    [token, user?.role]
   );
 
   useEffect(() => {
@@ -465,7 +476,7 @@ export default function ReservationsPage() {
           icon={CalendarCheck2}
           title="الحجوزات"
           description="متابعة حجوزات الوحدات وحالتها"
-          action={
+          action={canCreateReservation(user?.role) ? (
             <Button
               type="button"
               onClick={() => void openCreateForm()}
@@ -475,7 +486,7 @@ export default function ReservationsPage() {
             >
               إضافة حجز
             </Button>
-          }
+          ) : undefined}
         />
 
         {successMessage ? (
@@ -601,7 +612,7 @@ export default function ReservationsPage() {
                       >
                         <Eye size={17} />
                       </button>
-                      {reservation.status === "active" ? (
+                      {canEditOrCancelReservation(user, reservation) ? (
                         <>
                           <button
                             type="button"

@@ -49,6 +49,7 @@ describe("CustomerDetailsView", () => {
     render(
       <CustomerDetailsView
         customer={customer}
+        currentUser={{ id: 1, role: "administrator" } as never}
         businessContext={businessContext}
         isArabic
         isLoading={false}
@@ -121,6 +122,7 @@ describe("CustomerDetailsView", () => {
         onBack={onBack}
         onRetry={vi.fn()}
         onEdit={onEdit}
+        currentUser={{ id: 1, role: "administrator" } as never}
       />
     );
 
