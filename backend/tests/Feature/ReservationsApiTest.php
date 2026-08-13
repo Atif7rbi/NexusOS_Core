@@ -257,8 +257,7 @@ final class ReservationsApiTest extends ApiTestCase
         $this->createAvailableUnit(false);
 
         $archivedUnit = $this->createAvailableUnit();
-        $this->patchJson("/api/units/{$archivedUnit}/archive")
-            ->assertOk();
+        $this->archiveUnitFixture($archivedUnit);
 
         Sanctum::actingAs($tenantBUser);
         $this->createAvailableUnit();
@@ -387,6 +386,17 @@ final class ReservationsApiTest extends ApiTestCase
             'name' => "عميل الحجز {$this->customerCount}",
             'phone' => '050000'.str_pad((string) $this->customerCount, 4, '0', STR_PAD_LEFT),
         ])->assertCreated()->json('data.customer.id');
+    }
+
+    private function archiveUnitFixture(string $unitId): void
+    {
+        Unit::query()
+            ->whereKey($unitId)
+            ->update([
+                'archived_at' => now(),
+                'archived_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+            ]);
     }
 
     private function createProject(bool $active): string
