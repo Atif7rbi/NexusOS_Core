@@ -11,6 +11,7 @@ import {
   initialDashboardResource,
   loadDashboardResource,
 } from "@/hooks/dashboard-resource";
+import { canAccessCrm } from "@/lib/crm-authorization";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchCollectionsIndex } from "@/services/collections";
 import { fetchContracts } from "@/services/contracts";
@@ -27,16 +28,10 @@ import type {
   DashboardResource,
 } from "@/types/dashboard";
 
-const CRM_ROLES = new Set([
-  "administrator",
-  "sales",
-  "employee",
-]);
-
 export function useDashboard(): DashboardData {
   const { token, user } = useAuth();
   const requestSequence = useRef(0);
-  const hasCrmAccess = CRM_ROLES.has(user?.role ?? "");
+  const hasCrmAccess = canAccessCrm(user?.role);
 
   const [projects, setProjects] =
     useState<DashboardResource<DashboardProjects>>(

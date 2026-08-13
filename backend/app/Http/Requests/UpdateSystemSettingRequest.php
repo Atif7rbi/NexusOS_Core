@@ -1,6 +1,9 @@
 <?php
 
 namespace App\Http\Requests;
+
+use App\Models\User;
+use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use App\Modules\Shared\Phone\InvalidSaudiMobileNumberException;
 use App\Modules\Shared\Phone\Rules\SaudiMobileRule;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
@@ -17,7 +20,10 @@ class UpdateSystemSettingRequest extends FormRequest
     }
     public function authorize(): bool
     {
-        return $this->user()?->canManageUsers() ?? false;
+        $user = $this->user();
+
+        return $user instanceof User
+            && TenantAdministratorAuthority::allows($user);
     }
 
     /**

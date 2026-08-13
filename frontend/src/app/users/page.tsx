@@ -123,10 +123,9 @@ export default function UsersPage() {
               "تم تحديث المستخدم بنجاح.",
             deleteSuccess:
               "تمت إزالة عضوية المستخدم.",
-            readOnlyTitle:
-              "صلاحية عرض فقط",
-            readOnlyDescription:
-              "يمكنك مشاهدة المستخدمين وأدوارهم وحالاتهم، لكن ليس لديك صلاحية الإضافة أو التعديل أو الحذف.",
+            accessDeniedTitle: "إدارة المستخدمين غير متاحة",
+            accessDeniedDescription:
+              "يلزم حساب مالك النظام أو مسؤول الشركة للوصول إلى إدارة المستخدمين.",
             ownAccountHint:
               "تعديل حسابك الشخصي سيكون من صفحة حسابي.",
           }
@@ -160,10 +159,9 @@ export default function UsersPage() {
               "User updated successfully.",
             deleteSuccess:
               "User membership removed.",
-            readOnlyTitle:
-              "View-only access",
-            readOnlyDescription:
-              "You can view users, roles and statuses, but you cannot add, edit or remove users.",
+            accessDeniedTitle: "User management unavailable",
+            accessDeniedDescription:
+              "A system owner or administrator account is required to access user management.",
             ownAccountHint:
               "Your personal account will be managed from My Account.",
           },
@@ -219,7 +217,10 @@ export default function UsersPage() {
 
   const loadUsers =
     useCallback(async (): Promise<void> => {
-      if (!token) {
+      if (!token || !canManageUsers) {
+        setUsers([]);
+        setSummary(emptySummary);
+        setIsLoading(false);
         return;
       }
 
@@ -246,7 +247,7 @@ export default function UsersPage() {
       } finally {
         setIsLoading(false);
       }
-    }, [token, labels.loadError]);
+    }, [canManageUsers, token, labels.loadError]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -342,7 +343,7 @@ export default function UsersPage() {
       | CreateTenantUserPayload
       | UpdateTenantUserPayload
   ): Promise<void> => {
-    if (!token) {
+    if (!token || !canManageUsers) {
       return;
     }
 
@@ -379,7 +380,7 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!token || !userToDelete) {
+    if (!token || !canManageUsers || !userToDelete) {
       return;
     }
 
@@ -422,6 +423,22 @@ export default function UsersPage() {
     ).format(new Date(value));
   };
 
+  if (!canManageUsers) {
+    return (
+      <AppShell>
+        <section
+          role="alert"
+          className="mx-auto max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center"
+        >
+          <h1 className="type-page-title">{labels.accessDeniedTitle}</h1>
+          <p className="mt-2 type-secondary text-[var(--text-secondary)]">
+            {labels.accessDeniedDescription}
+          </p>
+        </section>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -456,18 +473,6 @@ export default function UsersPage() {
           isArabic={isArabic}
           isLoading={isLoading}
         />
-
-        {!canManageUsers ? (
-          <div className="rounded-2xl border border-[var(--info)]/25 bg-[var(--info-soft)] px-5 py-4">
-            <p className="text-sm font-bold text-[var(--info)]">
-              {labels.readOnlyTitle}
-            </p>
-
-            <p className="mt-1 text-sm leading-7 text-[var(--text-secondary)]">
-              {labels.readOnlyDescription}
-            </p>
-          </div>
-        ) : null}
 
         {successMessage ? (
           <div className="rounded-xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-4 py-3 text-sm font-semibold text-[var(--success)]">

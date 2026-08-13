@@ -26,6 +26,7 @@ class TenantUserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->ensureAdministrator($request);
         $membership = $this->currentMembership($request);
 
         $query = TenantUser::query()
@@ -173,6 +174,7 @@ class TenantUserController extends Controller
         $membership = $this->currentMembership($request);
 
         $this->ensureSameTenant($membership, $user);
+        $this->ensureAdministrator($request);
 
         return response()->json([
             'data' => [
@@ -189,11 +191,10 @@ class TenantUserController extends Controller
         UpdateTenantUserRequest $request,
         TenantUser $user
     ): JsonResponse {
-        $this->ensureAdministrator($request);
-
         $actorMembership = $this->currentMembership($request);
 
         $this->ensureSameTenant($actorMembership, $user);
+        $this->ensureAdministrator($request);
 
         $validated = $request->validated();
 
@@ -287,11 +288,10 @@ class TenantUserController extends Controller
         Request $request,
         TenantUser $user
     ): JsonResponse {
-        $this->ensureAdministrator($request);
-
         $actorMembership = $this->currentMembership($request);
 
         $this->ensureSameTenant($actorMembership, $user);
+        $this->ensureAdministrator($request);
 
         if ($user->user_id === $request->user()->id) {
             throw ValidationException::withMessages([

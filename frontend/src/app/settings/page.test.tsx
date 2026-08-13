@@ -103,6 +103,19 @@ describe("SettingsPage", () => {
     expect(services.applyCompanyProfile).toHaveBeenCalledWith(settingsState);
   });
 
+  it("gives the system owner the same company mutation controls", () => {
+    authState.user = { role: "system_owner" };
+    render(<SettingsPage />);
+
+    expect(
+      screen.getByRole("button", { name: "حفظ التغييرات" })
+    ).toBeTruthy();
+    expect(
+      (screen.getByLabelText("اسم الشركة بالعربية") as HTMLInputElement)
+        .closest("fieldset")?.disabled
+    ).toBe(false);
+  });
+
   it("keeps Demo company profile changes local instead of calling the API", async () => {
     settingsState.isDemoMode = true;
     render(<SettingsPage />);
@@ -131,15 +144,20 @@ describe("SettingsPage", () => {
     expect(services.updateCompanyProfile).not.toHaveBeenCalled();
   });
 
-  it("renders the company profile as read-only for non-administrators", () => {
-    authState.user = { role: "sales" };
-    render(<SettingsPage />);
+  it.each(["project_manager", "sales", "accountant", "employee"])(
+    "renders the company profile as read-only for %s",
+    (role) => {
+      authState.user = { role };
+      render(<SettingsPage />);
 
-    expect(screen.queryByRole("button", { name: "حفظ التغييرات" })).toBeNull();
-    expect(
-      (screen.getByLabelText("اسم الشركة بالعربية") as HTMLInputElement)
-        .closest("fieldset")?.disabled
-    ).toBe(true);
-    expect(screen.getByText(/يلزم حساب مسؤول لتعديلها/)).toBeTruthy();
-  });
+      expect(
+        screen.queryByRole("button", { name: "حفظ التغييرات" })
+      ).toBeNull();
+      expect(
+        (screen.getByLabelText("اسم الشركة بالعربية") as HTMLInputElement)
+          .closest("fieldset")?.disabled
+      ).toBe(true);
+      expect(screen.getByText(/يلزم حساب مسؤول لتعديلها/)).toBeTruthy();
+    }
+  );
 });

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import type { TranslationKey } from "@/i18n/types";
+import { crmAccessRoles } from "@/lib/crm-authorization";
 import type { UserRole } from "@/types/auth";
 
 export type NavigationItem = {
@@ -45,6 +46,7 @@ export const navigationGroups: NavigationGroup[] = [
         labelKey: "navigation.crm",
         href: "/crm/",
         icon: UsersRound,
+        allowedRoles: crmAccessRoles,
       },
       {
         labelKey: "navigation.customers",

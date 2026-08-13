@@ -49,22 +49,21 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('error.code', 'unauthenticated');
 
         $tenant = $this->createLeadTenant();
-        $accountant = $this->createLeadUser(
-            $tenant,
-            User::ROLE_ACCOUNTANT,
-        )['user'];
-        Sanctum::actingAs($accountant);
+        foreach ([User::ROLE_ACCOUNTANT, User::ROLE_EMPLOYEE] as $role) {
+            $actor = $this->createLeadUser($tenant, $role)['user'];
+            Sanctum::actingAs($actor);
 
-        $this->getJson('/api/leads')
-            ->assertForbidden()
-            ->assertJsonPath('error.code', 'lead_action_not_authorized');
+            $this->getJson('/api/leads')
+                ->assertForbidden()
+                ->assertJsonPath('error.code', 'lead_action_not_authorized');
+        }
     }
 
-    public function test_sales_and_employee_creation_normalizes_phone_and_auto_assigns_actor(): void
+    public function test_sales_and_project_manager_creation_normalizes_phone_and_auto_assigns_actor(): void
     {
         foreach ([
             User::ROLE_SALES => "\t٠٥٠١٢٣٤٥٦٧ ",
-            User::ROLE_EMPLOYEE => '۰۵۰۱۲۳۴۵۶۸',
+            User::ROLE_PROJECT_MANAGER => '۰۵۰۱۲۳۴۵۶۸',
         ] as $role => $phone) {
             $tenant = $this->createLeadTenant();
             $actor = $this->createLeadUser($tenant, $role)['user'];
@@ -98,6 +97,10 @@ final class LeadsApiTest extends ApiTestCase
             User::ROLE_ADMINISTRATOR,
         )['user'];
         $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $projectManager = $this->createLeadUser(
+            $tenant,
+            User::ROLE_PROJECT_MANAGER,
+        )['user'];
         Sanctum::actingAs($administrator);
 
         $this->postJson('/api/leads', $this->createPayload($this->nextLeadPhone()))
@@ -110,6 +113,13 @@ final class LeadsApiTest extends ApiTestCase
         ))
             ->assertCreated()
             ->assertJsonPath('data.lead.assigned_to.id', $sales->id);
+
+        $this->postJson('/api/leads', array_merge(
+            $this->createPayload($this->nextLeadPhone()),
+            ['assigned_to' => $projectManager->id],
+        ))
+            ->assertCreated()
+            ->assertJsonPath('data.lead.assigned_to.id', $projectManager->id);
     }
 
     public function test_system_owner_has_administrator_crm_authority(): void
@@ -130,9 +140,9 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('data.lead.assigned_to.id', $sales->id);
     }
 
-    public function test_sales_and_employee_cannot_supply_assigned_to_on_create(): void
+    public function test_sales_and_project_manager_cannot_supply_assigned_to_on_create(): void
     {
-        foreach ([User::ROLE_SALES, User::ROLE_EMPLOYEE] as $role) {
+        foreach ([User::ROLE_SALES, User::ROLE_PROJECT_MANAGER] as $role) {
             $tenant = $this->createLeadTenant();
             $actor = $this->createLeadUser($tenant, $role)['user'];
             Sanctum::actingAs($actor);
@@ -226,25 +236,27 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('error.code', 'lead_assignee_not_active');
     }
 
-    public function test_system_owner_cannot_be_selected_as_a_lead_assignee(): void
+    public function test_administrative_roles_cannot_be_selected_as_lead_assignees(): void
     {
         $tenant = $this->createLeadTenant();
         $administrator = $this->createLeadUser(
             $tenant,
             User::ROLE_ADMINISTRATOR,
         )['user'];
-        $owner = $this->createLeadUser(
-            $tenant,
-            User::ROLE_SYSTEM_OWNER,
-        )['user'];
         Sanctum::actingAs($administrator);
 
-        $this->postJson('/api/leads', array_merge(
-            $this->createPayload($this->nextLeadPhone()),
-            ['assigned_to' => $owner->id],
-        ))
-            ->assertUnprocessable()
-            ->assertJsonPath('error.code', 'lead_assignee_role_not_eligible');
+        foreach ([User::ROLE_SYSTEM_OWNER, User::ROLE_ADMINISTRATOR] as $role) {
+            $ineligible = $role === User::ROLE_ADMINISTRATOR
+                ? $administrator
+                : $this->createLeadUser($tenant, $role)['user'];
+
+            $this->postJson('/api/leads', array_merge(
+                $this->createPayload($this->nextLeadPhone()),
+                ['assigned_to' => $ineligible->id],
+            ))
+                ->assertUnprocessable()
+                ->assertJsonPath('error.code', 'lead_assignee_role_not_eligible');
+        }
     }
 
     public function test_duplicate_protocol_discloses_only_visible_matches_and_requires_acknowledgement(): void
@@ -420,19 +432,25 @@ final class LeadsApiTest extends ApiTestCase
         $this->assertSame((string) $archivedOwn->id, $archived);
     }
 
-    public function test_employee_uses_the_same_own_and_unassigned_open_visibility_contract_as_sales(): void
+    public function test_project_manager_uses_the_same_own_and_unassigned_open_visibility_contract_as_sales(): void
     {
         $tenant = $this->createLeadTenant();
         $administrator = $this->createLeadUser(
             $tenant,
             User::ROLE_ADMINISTRATOR,
         )['user'];
-        $employee = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE)['user'];
-        $otherEmployee = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE)['user'];
-        $own = $this->createLead($tenant, $employee);
+        $projectManager = $this->createLeadUser(
+            $tenant,
+            User::ROLE_PROJECT_MANAGER,
+        )['user'];
+        $otherProjectManager = $this->createLeadUser(
+            $tenant,
+            User::ROLE_PROJECT_MANAGER,
+        )['user'];
+        $own = $this->createLead($tenant, $projectManager);
         $unassigned = $this->createLead($tenant, $administrator, ['assigned_to' => null]);
-        $this->createLead($tenant, $otherEmployee);
-        Sanctum::actingAs($employee);
+        $this->createLead($tenant, $otherProjectManager);
+        Sanctum::actingAs($projectManager);
 
         $this->getJson('/api/leads')
             ->assertOk()
@@ -994,6 +1012,10 @@ final class LeadsApiTest extends ApiTestCase
             User::ROLE_ADMINISTRATOR,
         )['user'];
         $sales = $this->createLeadUser($tenant, User::ROLE_SALES)['user'];
+        $projectManager = $this->createLeadUser(
+            $tenant,
+            User::ROLE_PROJECT_MANAGER,
+        )['user'];
         $unassigned = $this->createLead($tenant, $administrator, ['assigned_to' => null]);
         Sanctum::actingAs($sales);
 
@@ -1009,9 +1031,9 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('error.code', 'lead_action_not_authorized');
 
         Sanctum::actingAs($administrator);
-        $this->patchJson("/api/leads/{$unassigned->id}/assign", ['assigned_to' => $administrator->id])
+        $this->patchJson("/api/leads/{$unassigned->id}/assign", ['assigned_to' => $projectManager->id])
             ->assertOk()
-            ->assertJsonPath('data.lead.assigned_to.id', $administrator->id)
+            ->assertJsonPath('data.lead.assigned_to.id', $projectManager->id)
             ->assertJsonPath('data.lead.updated_by', $administrator->id);
         $this->patchJson("/api/leads/{$unassigned->id}/assign", ['assigned_to' => null])
             ->assertOk()
@@ -1117,17 +1139,20 @@ final class LeadsApiTest extends ApiTestCase
             $tenant,
             User::ROLE_ADMINISTRATOR,
         )['user'];
-        $employeeContext = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE);
-        $this->createLead($tenant, $employeeContext['user']);
+        $projectManagerContext = $this->createLeadUser(
+            $tenant,
+            User::ROLE_PROJECT_MANAGER,
+        );
+        $this->createLead($tenant, $projectManagerContext['user']);
         Sanctum::actingAs($administrator);
 
-        $this->putJson("/api/users/{$employeeContext['membership']->id}", [
+        $this->putJson("/api/users/{$projectManagerContext['membership']->id}", [
             'status' => TenantUser::STATUS_PAUSED,
         ])
             ->assertConflict()
             ->assertJsonPath('error.code', 'user_has_open_assigned_leads');
 
-        $this->putJson("/api/users/{$employeeContext['membership']->id}", [
+        $this->putJson("/api/users/{$projectManagerContext['membership']->id}", [
             'status' => TenantUser::STATUS_SUSPENDED,
         ])->assertOk()
             ->assertJsonPath('data.user.status', TenantUser::STATUS_SUSPENDED);
@@ -1141,7 +1166,10 @@ final class LeadsApiTest extends ApiTestCase
                 $tenant,
                 User::ROLE_ADMINISTRATOR,
             )['user'];
-            $employeeContext = $this->createLeadUser($tenant, User::ROLE_EMPLOYEE);
+            $projectManagerContext = $this->createLeadUser(
+                $tenant,
+                User::ROLE_PROJECT_MANAGER,
+            );
 
             if ($case === 'other_tenant') {
                 $otherTenant = $this->createLeadTenant();
@@ -1151,22 +1179,22 @@ final class LeadsApiTest extends ApiTestCase
                 )['user'];
                 TenantUser::factory()
                     ->forTenant($otherTenant)
-                    ->forUser($employeeContext['user'])
+                    ->forUser($projectManagerContext['user'])
                     ->active()
                     ->create();
                 $this->createLead($otherTenant, $otherAdmin, [
-                    'assigned_to' => $employeeContext['user']->id,
+                    'assigned_to' => $projectManagerContext['user']->id,
                 ]);
             } elseif ($case === 'closed') {
-                $this->createLead($tenant, $employeeContext['user'], ['stage' => 'lost']);
+                $this->createLead($tenant, $projectManagerContext['user'], ['stage' => 'lost']);
             } else {
-                $this->createLead($tenant, $employeeContext['user'], [
+                $this->createLead($tenant, $projectManagerContext['user'], [
                     'archived_at' => now(),
                 ]);
             }
 
             Sanctum::actingAs($administrator);
-            $this->putJson("/api/users/{$employeeContext['membership']->id}", [
+            $this->putJson("/api/users/{$projectManagerContext['membership']->id}", [
                 'status' => TenantUser::STATUS_PAUSED,
             ])->assertOk()
                 ->assertJsonPath('data.user.status', TenantUser::STATUS_PAUSED);

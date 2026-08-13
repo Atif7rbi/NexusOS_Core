@@ -16,8 +16,8 @@ final class LeadAuthorization
     private const CRM_ROLES = [
         User::ROLE_SYSTEM_OWNER,
         User::ROLE_ADMINISTRATOR,
+        User::ROLE_PROJECT_MANAGER,
         User::ROLE_SALES,
-        User::ROLE_EMPLOYEE,
     ];
 
     public function assertActor(User $actor, string $tenantId, bool $lockMembership = false): void

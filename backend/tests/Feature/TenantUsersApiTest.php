@@ -228,7 +228,7 @@ class TenantUsersApiTest extends TestCase
         ]);
     }
 
-    public function test_non_administrator_can_list_users_read_only(): void
+    public function test_non_administrator_cannot_list_or_show_users(): void
     {
         [$administrator, $tenant] =
             $this->createCompanyAdministrator();
@@ -249,12 +249,14 @@ class TenantUsersApiTest extends TestCase
 
         Sanctum::actingAs($salesUser);
 
-        $this->getJson('/api/users')
-            ->assertOk()
-            ->assertJsonPath(
-                'data.summary.total',
-                2
-            );
+        $salesMembership = TenantUser::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('user_id', $salesUser->id)
+            ->firstOrFail();
+
+        $this->getJson('/api/users')->assertForbidden();
+        $this->getJson("/api/users/{$salesMembership->id}")
+            ->assertForbidden();
     }
 
     public function test_non_administrator_cannot_update_or_remove_users(): void

@@ -18,6 +18,11 @@ const services = vi.hoisted(() => ({
   archiveLead: vi.fn(),
   restoreLead: vi.fn(),
   addLeadNote: vi.fn(),
+  fetchTenantUsers: vi.fn(),
+}));
+
+const auth = vi.hoisted(() => ({
+  role: "administrator",
 }));
 
 vi.mock("next/navigation", () => ({
@@ -26,7 +31,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/providers/AuthProvider", () => ({
   useAuth: () => ({
     token: "token",
-    user: { id: 1, name: "Admin", role: "administrator" },
+    user: { id: 1, name: "Admin", role: auth.role },
   }),
 }));
 vi.mock("@/hooks/useTranslation", () => ({
@@ -42,7 +47,7 @@ vi.mock("@/services/projects", () => ({
   fetchProjects: vi.fn().mockResolvedValue({ data: { data: [] } }),
 }));
 vi.mock("@/services/users", () => ({
-  fetchTenantUsers: vi.fn().mockResolvedValue({ data: { users: { data: [] } } }),
+  fetchTenantUsers: services.fetchTenantUsers,
 }));
 vi.mock("@/services/leads", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/leads")>();
@@ -132,12 +137,16 @@ const indexResponse = {
 
 describe("CrmLeadsPage routing and workflows", () => {
   beforeEach(() => {
+    auth.role = "administrator";
     window.history.replaceState(null, "", "/crm/");
     services.fetchLeads.mockResolvedValue(indexResponse);
     services.fetchLead.mockResolvedValue(leadFixture());
     services.fetchLeadActivities.mockResolvedValue({ data: { activities: [], pagination: {} } });
     services.createLead.mockResolvedValue(leadFixture({ id: "created-lead" }));
     services.claimLead.mockResolvedValue(leadFixture());
+    services.fetchTenantUsers.mockResolvedValue({
+      data: { users: { data: [] } },
+    });
   });
 
   it("shows list view for /crm/ and updates filter query", async () => {
@@ -244,5 +253,13 @@ describe("CrmLeadsPage routing and workflows", () => {
   it("contains no dynamic-route or conversion UI contract", () => {
     render(<CrmLeadsPage />);
     expect(document.body.textContent?.toLowerCase()).not.toContain("convert");
+  });
+
+  it("does not request tenant user management data for a project manager", async () => {
+    auth.role = "project_manager";
+    render(<CrmLeadsPage />);
+
+    await waitFor(() => expect(services.fetchLeads).toHaveBeenCalled());
+    expect(services.fetchTenantUsers).not.toHaveBeenCalled();
   });
 });

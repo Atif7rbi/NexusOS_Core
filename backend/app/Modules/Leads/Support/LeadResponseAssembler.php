@@ -52,9 +52,8 @@ final class LeadResponseAssembler
                 'is_eligible' => $assignee->status === User::STATUS_ACTIVE
                     && $assigneeMembership?->status === TenantUser::STATUS_ACTIVE
                     && in_array($assignee->role, [
-                        User::ROLE_ADMINISTRATOR,
+                        User::ROLE_PROJECT_MANAGER,
                         User::ROLE_SALES,
-                        User::ROLE_EMPLOYEE,
                     ], true),
             ],
             'next_follow_up_at' => $lead->next_follow_up_at?->toISOString(),
