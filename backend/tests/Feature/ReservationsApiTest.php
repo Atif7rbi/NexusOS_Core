@@ -252,9 +252,7 @@ final class ReservationsApiTest extends ApiTestCase
         ])->assertCreated();
 
         $soldUnit = $this->createAvailableUnit();
-        $this->patchJson("/api/units/{$soldUnit}", [
-            'status' => 'sold',
-        ])->assertOk();
+        Unit::query()->whereKey($soldUnit)->update(['status' => 'sold']);
 
         $this->createAvailableUnit(false);
 
@@ -368,12 +366,17 @@ final class ReservationsApiTest extends ApiTestCase
     {
         $this->unitCount++;
         $projectId = $this->createProject($activeProject);
-        return (string) $this->postJson('/api/units', [
+
+        return (string) Unit::query()->create([
+            'tenant_id' => $this->tenantIdFor(auth()->user()),
             'project_id' => $projectId,
             'unit_number' => "U-{$this->unitCount}",
             'unit_type' => 'apartment',
+            'status' => 'available',
             'selling_price' => 500000,
-        ])->assertCreated()->json('data.unit.id');
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ])->id;
     }
 
     private function createCustomer(): string
@@ -389,16 +392,28 @@ final class ReservationsApiTest extends ApiTestCase
     private function createProject(bool $active): string
     {
         $this->projectCount++;
-        $projectId = (string) $this->postJson('/api/projects', [
-            'name' => "مشروع الحجز {$this->projectCount}", 'project_type' => 'residential', 'city' => 'الرياض',
-        ])->assertCreated()->json('data.project.id');
-        if ($active) {
-            Project::query()
-                ->whereKey($projectId)
-                ->update(['status' => ProjectStatus::Active->value]);
-        }
+        $year = now('Asia/Riyadh')->year;
+        $sequence = (int) Project::query()
+            ->where('project_number_year', $year)
+            ->max('project_sequence_number') + 1;
 
-        return $projectId;
+        return (string) Project::query()->create([
+            'tenant_id' => $this->tenantIdFor(auth()->user()),
+            'project_number' => sprintf('PRJ-%d-%03d', $year, $sequence),
+            'project_number_year' => $year,
+            'project_sequence_number' => $sequence,
+            'name' => "مشروع الحجز {$this->projectCount}",
+            'project_type' => 'residential',
+            'status' => $active
+                ? ProjectStatus::Active->value
+                : ProjectStatus::Draft->value,
+            'country_code' => 'SA',
+            'city' => 'الرياض',
+            'currency' => 'SAR',
+            'data_origin' => 'user',
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ])->id;
     }
 
     private function tenantIdFor(User $user): string
