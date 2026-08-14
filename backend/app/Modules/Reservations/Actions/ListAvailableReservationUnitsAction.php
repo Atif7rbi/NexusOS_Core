@@ -22,17 +22,16 @@ final class ListAvailableReservationUnitsAction
     ): Collection
     {
         return Unit::query()
-            ->with('project:id,name,status')
+            ->with('project:id,name,status,archived_at')
             ->where('tenant_id', $tenantId)
             ->where('project_id', $projectId)
             ->where('status', UnitStatus::Available->value)
             ->whereNull('archived_at')
             ->whereHas(
                 'project',
-                fn (Builder $query) => $query->where(
-                    'status',
-                    ProjectStatus::Active->value,
-                ),
+                fn (Builder $query) => $query
+                    ->where('status', ProjectStatus::Active->value)
+                    ->whereNull('archived_at'),
             )
             ->whereNotExists(function ($query): void {
                 $query

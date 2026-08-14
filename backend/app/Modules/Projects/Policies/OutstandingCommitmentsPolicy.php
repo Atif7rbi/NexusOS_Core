@@ -14,6 +14,7 @@ final class OutstandingCommitmentsPolicy
     public function assert(
         Project $project,
         bool $hasActiveReservation,
+        bool $hasLiveContract,
         bool $hasSoldUnit,
     ): void {
         if (
@@ -23,7 +24,7 @@ final class OutstandingCommitmentsPolicy
             throw new InvalidProjectStatusTransitionException();
         }
 
-        if ($hasActiveReservation || $hasSoldUnit) {
+        if ($hasActiveReservation || $hasLiveContract || $hasSoldUnit) {
             throw new ProjectHasOutstandingCommitmentsException();
         }
     }

@@ -12,6 +12,7 @@ use App\Modules\Reservations\Actions\UpdateReservationAction;
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Exceptions\ReservationNotActiveException;
 use App\Modules\Reservations\Exceptions\ReservationUnitUnavailableException;
+use App\Modules\Reservations\Exceptions\ReservationUnitStateException;
 use App\Modules\Reservations\Models\Reservation;
 use App\Modules\Reservations\Requests\CancelReservationRequest;
 use App\Modules\Reservations\Requests\StoreReservationRequest;
@@ -157,7 +158,7 @@ final class ReservationController extends Controller
             $this->findReservation((string) $membership->tenant_id, $reservation),
         );
         try { $record = $action->execute((string) $membership->tenant_id, $reservation, $request->user()->id, $request->validated('cancellation_reason')); }
-        catch (ReservationNotActiveException $exception) { $this->throwValidationException('reservation', $exception->getMessage()); }
+        catch (ReservationNotActiveException|ReservationUnitStateException $exception) { $this->throwValidationException('reservation', $exception->getMessage()); }
         return response()->json([
             'message' => 'تم إلغاء الحجز بنجاح.',
             'data' => ['reservation' => (new ReservationResource($record))->resolve()],

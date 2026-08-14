@@ -14,6 +14,7 @@ use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Enums\CustomerType;
 use App\Modules\Customers\Exceptions\ArchivedCustomerCannotBeUpdatedException;
 use App\Modules\Customers\Exceptions\CustomerAlreadyArchivedException;
+use App\Modules\Customers\Exceptions\CustomerHasLiveDependenciesException;
 use App\Modules\Customers\Exceptions\CustomerNotArchivedException;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Requests\StoreCustomerRequest;
@@ -276,7 +277,8 @@ final class CustomerController extends Controller
                 actorId: $request->user()->id,
             );
         } catch (
-            CustomerAlreadyArchivedException $exception
+            CustomerAlreadyArchivedException
+            | CustomerHasLiveDependenciesException $exception
         ) {
             $this->throwCustomerValidationException(
                 $exception->getMessage()

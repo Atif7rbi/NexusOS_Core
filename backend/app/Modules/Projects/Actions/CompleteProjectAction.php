@@ -7,12 +7,14 @@ namespace App\Modules\Projects\Actions;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Policies\OperationalCompletionPolicy;
+use App\Modules\Projects\Support\ProjectOperationalDependencies;
 use Illuminate\Support\Facades\DB;
 
 final class CompleteProjectAction
 {
     public function __construct(
         private readonly OperationalCompletionPolicy $completionPolicy,
+        private readonly ProjectOperationalDependencies $dependencies,
     ) {
     }
 
@@ -32,7 +34,17 @@ final class CompleteProjectAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $this->completionPolicy->assert($project);
+            $this->completionPolicy->assert(
+                $project,
+                $this->dependencies->hasActiveReservation(
+                    $tenantId,
+                    $projectId,
+                ),
+                $this->dependencies->hasLiveContract(
+                    $tenantId,
+                    $projectId,
+                ),
+            );
 
             $project->forceFill([
                 'status' => ProjectStatus::Completed,

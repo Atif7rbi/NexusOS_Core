@@ -7,6 +7,7 @@ namespace App\Modules\Reservations\Actions;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Projects\Enums\ProjectStatus;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Exceptions\ReservationUnitUnavailableException;
 use App\Modules\Reservations\Models\Reservation;
@@ -22,25 +23,32 @@ final class CreateReservationAction
     {
         return DB::transaction(function () use ($tenantId, $actorId, $data): Reservation {
             $unit = Unit::query()
-                ->with('project:id,status')
                 ->where('tenant_id', $tenantId)
                 ->whereKey($data['unit_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $project = Project::query()
+                ->where('tenant_id', $tenantId)
+                ->whereKey($unit->project_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
             $customer = Customer::query()
                 ->where('tenant_id', $tenantId)
                 ->whereKey($data['customer_id'])
+                ->lockForUpdate()
                 ->firstOrFail();
 
             if (
                 $unit->isArchived()
                 || $unit->status !== UnitStatus::Available
-                || $unit->project === null
-                || $unit->project->status !== ProjectStatus::Active
+                || $project->isArchived()
+                || $project->status !== ProjectStatus::Active
                 || $customer->status === CustomerStatus::Archived
                 || $customer->archived_at !== null
                 || Reservation::query()
+                    ->where('tenant_id', $tenantId)
                     ->where('unit_id', $unit->id)
                     ->where('status', ReservationStatus::Active->value)
                     ->exists()
@@ -70,6 +78,7 @@ final class CreateReservationAction
 
             $unit->update([
                 'status' => UnitStatus::Reserved,
+                'updated_by' => $actorId,
             ]);
 
             return $reservation;

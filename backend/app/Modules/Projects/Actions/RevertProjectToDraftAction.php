@@ -7,14 +7,14 @@ namespace App\Modules\Projects\Actions;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Policies\OperationalFootprintPolicy;
 use App\Modules\Projects\Models\Project;
-use App\Modules\Reservations\Enums\ReservationStatus;
-use App\Modules\Reservations\Models\Reservation;
+use App\Modules\Projects\Support\ProjectOperationalDependencies;
 use Illuminate\Support\Facades\DB;
 
 final class RevertProjectToDraftAction
 {
     public function __construct(
         private readonly OperationalFootprintPolicy $footprintPolicy,
+        private readonly ProjectOperationalDependencies $dependencies,
     ) {
     }
 
@@ -34,18 +34,16 @@ final class RevertProjectToDraftAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $hasActiveReservation = Reservation::query()
-                ->where('tenant_id', $tenantId)
-                ->where('status', ReservationStatus::Active->value)
-                ->whereHas(
-                    'unit',
-                    fn ($query) => $query->where('project_id', $project->id),
-                )
-                ->exists();
-
             $this->footprintPolicy->assert(
                 $project,
-                $hasActiveReservation,
+                $this->dependencies->hasActiveReservation(
+                    $tenantId,
+                    $projectId,
+                ),
+                $this->dependencies->hasLiveContract(
+                    $tenantId,
+                    $projectId,
+                ),
             );
 
             $project->forceFill([
