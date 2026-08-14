@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Leads\Support\EnsureTenantUserCanBePaused;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
+use App\Modules\Shared\Services\RevokeUserTokens;
 use App\Modules\Users\Requests\StoreTenantUserRequest;
 use App\Modules\Users\Requests\UpdateTenantUserRequest;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,7 @@ class TenantUserController extends Controller
     public function __construct(
         private readonly SaudiMobileNormalizer $phoneNormalizer,
         private readonly EnsureTenantUserCanBePaused $ensureCanBePaused,
+        private readonly RevokeUserTokens $revokeTokens,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -195,6 +197,7 @@ class TenantUserController extends Controller
 
         $this->ensureSameTenant($actorMembership, $user);
         $this->ensureAdministrator($request);
+        $this->ensureProtectedOwnerMutation($request->user(), $user);
 
         $validated = $request->validated();
 
@@ -218,6 +221,11 @@ class TenantUserController extends Controller
                     ->whereKey($user->id)
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                $this->ensureProtectedOwnerMutation(
+                    $request->user(),
+                    $membership,
+                );
 
                 if (
                     ($validated['status'] ?? null) === TenantUser::STATUS_PAUSED
@@ -250,6 +258,11 @@ class TenantUserController extends Controller
                         ->normalizeNullable($identityData['phone']);
                 }
 
+                $roleChanged = array_key_exists('role', $identityData)
+                    && $identityData['role'] !== $membership->user->role;
+                $passwordChanged = array_key_exists('password', $identityData)
+                    && $identityData['password'] !== null;
+
                 if ($identityData !== []) {
                     $membership->user->update($identityData);
                 }
@@ -263,10 +276,13 @@ class TenantUserController extends Controller
                                 ? User::STATUS_SUSPENDED
                                 : User::STATUS_ACTIVE,
                     ])->save();
+                }
 
-                    if ($validated['status'] !== TenantUser::STATUS_ACTIVE) {
-                        $membership->user->tokens()->delete();
-                    }
+                $accessRevoked = array_key_exists('status', $validated)
+                    && $validated['status'] !== TenantUser::STATUS_ACTIVE;
+
+                if ($roleChanged || $passwordChanged || $accessRevoked) {
+                    $this->revokeTokens->all($membership->user);
                 }
 
                 $membership->updated_by = $request->user()->id;
@@ -301,18 +317,31 @@ class TenantUserController extends Controller
             ]);
         }
 
+        $this->ensureProtectedOwnerMutation($request->user(), $user);
+
         DB::transaction(function () use ($request, $user): void {
-            $user->forceFill([
+            $membership = TenantUser::query()
+                ->with('user')
+                ->whereKey($user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->ensureProtectedOwnerMutation(
+                $request->user(),
+                $membership,
+            );
+
+            $membership->forceFill([
                 'status' => TenantUser::STATUS_REMOVED,
                 'removed_at' => now(),
                 'updated_by' => $request->user()->id,
             ])->save();
 
-            $user->user->forceFill([
+            $membership->user->forceFill([
                 'status' => User::STATUS_ARCHIVED,
             ])->save();
 
-            $user->user->tokens()->delete();
+            $this->revokeTokens->all($membership->user);
         });
 
         return response()->json([
@@ -358,6 +387,20 @@ class TenantUserController extends Controller
             $actorMembership->tenant_id
                 === $targetMembership->tenant_id,
             404
+        );
+    }
+
+    private function ensureProtectedOwnerMutation(
+        User $actor,
+        TenantUser $targetMembership,
+    ): void {
+        $targetMembership->loadMissing('user:id,role');
+
+        abort_if(
+            $targetMembership->user->isSystemOwner()
+                && $targetMembership->user_id !== $actor->id,
+            403,
+            'لا يمكن إدارة مالك النظام من خلال شاشة إدارة المستخدمين.'
         );
     }
 }

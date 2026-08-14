@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
@@ -56,8 +58,9 @@ class AuthenticationApiTest extends ApiTestCase
     public function test_logout_deletes_current_token_only(): void
     {
         [$user, $token] = $this->actingAsActiveUser([], 'device-1');
+        $otherToken = $this->createAccessToken($user, 'device-2');
 
-        $this->assertDatabaseCount('personal_access_tokens', 1);
+        $this->assertDatabaseCount('personal_access_tokens', 2);
 
         $this->withHeader(
             'Authorization',
@@ -66,7 +69,14 @@ class AuthenticationApiTest extends ApiTestCase
             ->postJson('/api/auth/logout')
             ->assertOk();
 
-        $this->assertDatabaseCount('personal_access_tokens', 0);
+        $this->assertDatabaseCount('personal_access_tokens', 1);
+
+        app('auth')->forgetGuards();
+
+        $this->withHeader('Authorization', 'Bearer '.$otherToken)
+            ->getJson('/api/auth/user')
+            ->assertOk()
+            ->assertJsonPath('data.user.id', $user->id);
     }
 
     public function test_login_rejects_invalid_credentials(): void
@@ -86,18 +96,26 @@ class AuthenticationApiTest extends ApiTestCase
 
     public function test_suspended_user_cannot_login(): void
     {
-        User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'admin@example.com',
             'password' => Hash::make('StrongPassword123!'),
             'status' => User::STATUS_SUSPENDED,
         ]);
 
+        $tenant = Tenant::factory()->create();
+
+        TenantUser::factory()
+            ->forTenant($tenant)
+            ->forUser($user)
+            ->active()
+            ->create();
+
         $this->postJson('/api/auth/login', [
             'email' => 'admin@example.com',
             'password' => 'StrongPassword123!',
         ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('email');
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'user_suspended');
     }
 
     public function test_guest_cannot_access_protected_routes(): void

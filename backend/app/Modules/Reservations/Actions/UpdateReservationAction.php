@@ -7,11 +7,16 @@ namespace App\Modules\Reservations\Actions;
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Exceptions\ReservationNotActiveException;
 use App\Modules\Reservations\Models\Reservation;
-use Carbon\Carbon;
+use App\Modules\Shared\Time\TenantClock;
 use Illuminate\Support\Facades\DB;
 
 final class UpdateReservationAction
 {
+    public function __construct(
+        private readonly TenantClock $clock,
+    ) {
+    }
+
     public function execute(string $tenantId, string $reservationId, int|string $actorId, array $data): Reservation
     {
         return DB::transaction(function () use ($tenantId, $reservationId, $actorId, $data): Reservation {
@@ -24,10 +29,10 @@ final class UpdateReservationAction
             }
 
             if (array_key_exists('expires_at', $data)) {
-                $data['expires_at'] = Carbon::parse(
-                    $data['expires_at'],
-                    config('app.timezone'),
-                )->utc();
+                $data['expires_at'] = $this->clock->parse(
+                    $tenantId,
+                    (string) $data['expires_at'],
+                );
             }
 
             $reservation->fill([

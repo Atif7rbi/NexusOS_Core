@@ -86,7 +86,7 @@ final class ReservationsApiTest extends ApiTestCase
         $this->postJson('/api/reservations', [
             'unit_id' => $this->createAvailableUnit(),
             'customer_id' => $this->createCustomer(),
-            'expires_at' => '2026-07-22 09:59:00',
+            'expires_at' => '2026-07-22 12:59:00',
         ])->assertUnprocessable()->assertJsonValidationErrors(['expires_at']);
 
         $this->patchJson("/api/reservations/{$reservationId}", [
@@ -97,7 +97,7 @@ final class ReservationsApiTest extends ApiTestCase
                 'data.reservation.expires_at',
                 Carbon::parse(
                     '2026-07-23 12:00:00',
-                    config('app.timezone'),
+                    'Asia/Riyadh',
                 )->utc()->toISOString()
             )
             ->assertJsonPath('data.reservation.notes', 'تم تمديد الحجز.');
@@ -195,7 +195,7 @@ final class ReservationsApiTest extends ApiTestCase
         $reservationId = $this->postJson('/api/reservations', [
             'unit_id' => $unitId,
             'customer_id' => $this->createCustomer(),
-            'expires_at' => '2026-07-22 10:01:00',
+            'expires_at' => '2026-07-22 13:01:00',
         ])->assertCreated()->json('data.reservation.id');
 
         (new ExpireReservations)->expireAt(
@@ -330,7 +330,7 @@ final class ReservationsApiTest extends ApiTestCase
         $reservationId = $this->postJson('/api/reservations', [
             'unit_id' => $unitId,
             'customer_id' => $this->createCustomer(),
-            'expires_at' => '2026-07-22 10:01:00',
+            'expires_at' => '2026-07-22 13:01:00',
         ])->assertCreated()
             ->json('data.reservation.id');
 

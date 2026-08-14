@@ -2,17 +2,18 @@
 
 namespace App\Modules\Projects\Actions;
 
-use App\Models\Tenant;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Shared\Contracts\BusinessNumberGeneratorInterface;
 use App\Modules\Shared\Enums\DataOrigin;
+use App\Modules\Shared\Time\TenantClock;
 use Illuminate\Support\Facades\DB;
 
 class CreateProjectAction
 {
     public function __construct(
         private readonly BusinessNumberGeneratorInterface $numberGenerator,
+        private readonly TenantClock $clock,
     ) {
     }
 
@@ -27,12 +28,7 @@ class CreateProjectAction
             $actorId,
             $data,
         ): Project {
-            $timezone = Tenant::query()
-                ->whereKey($tenantId)
-                ->value('timezone')
-                ?? config('app.timezone');
-
-            $year = now($timezone)->year;
+            $year = $this->clock->now($tenantId)->year;
 
             $number = $this->numberGenerator->generate(
                 prefix: 'PRJ',

@@ -12,13 +12,18 @@ use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Exceptions\ReservationUnitUnavailableException;
 use App\Modules\Reservations\Models\Reservation;
 use App\Modules\Reservations\Policies\ReservationPolicy;
+use App\Modules\Shared\Time\TenantClock;
 use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Models\Unit;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class CreateReservationAction
 {
+    public function __construct(
+        private readonly TenantClock $clock,
+    ) {
+    }
+
     public function execute(string $tenantId, int|string $actorId, array $data): Reservation
     {
         return DB::transaction(function () use ($tenantId, $actorId, $data): Reservation {
@@ -58,10 +63,10 @@ final class CreateReservationAction
 
             $reservedAt = now()->utc();
             $expiresAt = isset($data['expires_at'])
-                ? Carbon::parse(
-                    $data['expires_at'],
-                    config('app.timezone'),
-                )->utc()
+                ? $this->clock->parse(
+                    $tenantId,
+                    (string) $data['expires_at'],
+                )
                 : $reservedAt->copy()->add(ReservationPolicy::defaultDuration());
 
             $reservation = Reservation::query()->create([

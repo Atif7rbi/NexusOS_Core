@@ -7,6 +7,7 @@ namespace App\Modules\Projects\Policies;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Exceptions\ProjectNotOperationallyCompleteException;
 use App\Modules\Projects\Models\Project;
+use Carbon\CarbonInterface;
 
 final class OperationalCompletionPolicy
 {
@@ -14,18 +15,20 @@ final class OperationalCompletionPolicy
         Project $project,
         bool $hasActiveReservation,
         bool $hasLiveContract,
+        CarbonInterface $businessDate,
     ): void
     {
-        $startsAt = $project->actual_start_date;
-        $endsAt = $project->actual_end_date;
+        $startsOn = $project->actual_start_date?->toDateString();
+        $endsOn = $project->actual_end_date?->toDateString();
+        $businessDateValue = $businessDate->toDateString();
 
         if (
             $project->status !== ProjectStatus::Active
             || $project->isArchived()
-            || $startsAt === null
-            || $endsAt === null
-            || $endsAt->lt($startsAt)
-            || $endsAt->gt(today())
+            || $startsOn === null
+            || $endsOn === null
+            || $endsOn < $startsOn
+            || $endsOn > $businessDateValue
             || $hasActiveReservation
             || $hasLiveContract
         ) {
