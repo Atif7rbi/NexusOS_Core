@@ -95,7 +95,7 @@ final class Lead extends Model
             return $query;
         }
 
-        if (! in_array($user->role, [User::ROLE_SALES, User::ROLE_EMPLOYEE], true)) {
+        if (! in_array($user->role, [User::ROLE_PROJECT_MANAGER, User::ROLE_SALES], true)) {
             return $query->whereRaw('1 = 0');
         }
 

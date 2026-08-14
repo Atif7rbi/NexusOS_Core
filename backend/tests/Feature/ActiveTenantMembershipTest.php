@@ -23,7 +23,7 @@ final class ActiveTenantMembershipTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->getJson('/api/users')
+        $this->getJson('/api/projects')
             ->assertOk();
     }
 

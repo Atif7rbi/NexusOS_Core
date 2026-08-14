@@ -74,7 +74,7 @@ import type {
 import type { Project } from "@/types/project";
 import type { TenantUser } from "@/types/tenant-user";
 
-const crmRoles = ["administrator", "sales", "employee"];
+const leadAssigneeRoles = ["project_manager", "sales"];
 
 const followUpBuckets: FollowUpBucket[] = [
   "overdue",
@@ -267,7 +267,9 @@ export function CrmLeadsPage() {
     let active = true;
     void Promise.allSettled([
       fetchProjects(token, { page: 1, perPage: 100 }),
-      fetchTenantUsers(token, { page: 1, perPage: 100 }),
+      isAdministrator
+        ? fetchTenantUsers(token, { page: 1, perPage: 100 })
+        : Promise.resolve(null),
     ]).then(([projectResult, userResult]) => {
       if (!active) {
         return;
@@ -277,10 +279,11 @@ export function CrmLeadsPage() {
         projectResult.status === "fulfilled" ? projectResult.value.data.data : []
       );
       setAssignees(
-        userResult.status === "fulfilled"
+        userResult.status === "fulfilled" && userResult.value !== null
           ? userResult.value.data.users.data.filter(
               (membership) =>
-                membership.status === "active" && crmRoles.includes(membership.user.role)
+                membership.status === "active" &&
+                leadAssigneeRoles.includes(membership.user.role)
             )
           : []
       );
@@ -289,7 +292,7 @@ export function CrmLeadsPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [isAdministrator, token]);
 
   const loadActivities = useCallback(
     async (leadId: string, archived: boolean): Promise<void> => {

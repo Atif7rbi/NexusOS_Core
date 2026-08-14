@@ -22,7 +22,6 @@ use App\Modules\Leads\Enums\LeadStage;
 use App\Modules\Leads\Enums\LostReason;
 use App\Modules\Leads\Exceptions\LeadNotFoundException;
 use App\Modules\Leads\Models\Lead;
-use App\Modules\Leads\Exceptions\LeadActionNotAuthorizedException;
 use App\Modules\Leads\Requests\ArchiveLeadRequest;
 use App\Modules\Leads\Requests\AssignLeadRequest;
 use App\Modules\Leads\Requests\ClaimLeadRequest;
@@ -34,7 +33,6 @@ use App\Modules\Leads\Requests\ReopenLeadRequest;
 use App\Modules\Leads\Requests\RestoreLeadRequest;
 use App\Modules\Leads\Requests\StoreLeadRequest;
 use App\Modules\Leads\Requests\UpdateLeadRequest;
-use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
 use App\Modules\Leads\Support\LeadAuthorization;
 use App\Modules\Leads\Support\LeadResponseAssembler;
 use App\Modules\Leads\Support\LeadsIndexQuery;
@@ -274,17 +272,16 @@ final class LeadController extends Controller
         $membership = $this->membership($request);
         $actor      = $this->actor($request);
 
-        // Authorization: administrator, or sales/employee on own Lead
-        if (! TenantAdministratorAuthority::allows($actor)) {
-            $leadRecord = Lead::query()
-                ->where('tenant_id', (string) $membership->tenant_id)
-                ->whereKey($lead)
-                ->first();
+        $leadRecord = Lead::query()
+            ->forTenant((string) $membership->tenant_id)
+            ->whereKey($lead)
+            ->first();
 
-            if ($leadRecord === null || $leadRecord->assigned_to !== $actor->id) {
-                throw new LeadActionNotAuthorizedException;
-            }
+        if ($leadRecord === null) {
+            throw new LeadNotFoundException();
         }
+
+        $this->authorization->assertCanModify($leadRecord, $actor);
 
         $record = $action->execute(
             tenantId: (string) $membership->tenant_id,

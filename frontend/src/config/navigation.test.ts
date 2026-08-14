@@ -70,4 +70,19 @@ describe("pilot navigation visibility", () => {
     expect(hrefs).toContain("/collections/");
     expect(hrefs).toContain("/settings/");
   });
+
+  it("shows CRM only to the frozen CRM roles", () => {
+    ([
+      "system_owner",
+      "administrator",
+      "project_manager",
+      "sales",
+    ] as UserRole[]).forEach((role) => {
+      expect(hrefsForRole(role)).toContain("/crm/");
+    });
+
+    (["accountant", "employee"] as UserRole[]).forEach((role) => {
+      expect(hrefsForRole(role)).not.toContain("/crm/");
+    });
+  });
 });

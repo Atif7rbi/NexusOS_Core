@@ -15,9 +15,8 @@ final class LeadAssigneeResolver
      * @var list<string>
      */
     private const ELIGIBLE_ROLES = [
-        User::ROLE_ADMINISTRATOR,
+        User::ROLE_PROJECT_MANAGER,
         User::ROLE_SALES,
-        User::ROLE_EMPLOYEE,
     ];
 
     public function resolve(string $tenantId, int $userId): User

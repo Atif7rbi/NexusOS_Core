@@ -1,9 +1,41 @@
+"use client";
+
 import { Suspense } from "react";
 
 import { CrmLeadsPage } from "@/components/leads/CrmLeadsPage";
 import { AppShell } from "@/components/layout/AppShell";
+import { useTranslation } from "@/hooks/useTranslation";
+import { canAccessCrm } from "@/lib/crm-authorization";
+import { useAuth } from "@/providers/AuthProvider";
 
 export default function Page() {
+  const { user, isLoading } = useAuth();
+  const { isArabic } = useTranslation();
+
+  if (isLoading) {
+    return <CrmPageFallback />;
+  }
+
+  if (user && !canAccessCrm(user.role)) {
+    return (
+      <AppShell>
+        <section
+          role="alert"
+          className="mx-auto max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center"
+        >
+          <h1 className="type-page-title">
+            {isArabic ? "إدارة العملاء المحتملين" : "CRM Leads"}
+          </h1>
+          <p className="mt-2 type-secondary text-[var(--text-secondary)]">
+            {isArabic
+              ? "لا يملك هذا الحساب صلاحية الوصول إلى إدارة العملاء المحتملين."
+              : "This account does not have access to CRM leads."}
+          </p>
+        </section>
+      </AppShell>
+    );
+  }
+
   return (
     <Suspense fallback={<CrmPageFallback />}>
       <CrmLeadsPage />

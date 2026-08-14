@@ -190,4 +190,33 @@ describe("useDashboard", () => {
     expect(services.fetchLeads).not.toHaveBeenCalled();
     expect(result.current.contracts.data).toBe(7);
   });
+
+  it.each(["system_owner", "project_manager", "sales"])(
+    "loads CRM sections for %s",
+    async (role) => {
+      auth.role = role;
+      const { result } = renderHook(() => useDashboard());
+
+      await waitFor(() => {
+        expect(result.current.followUps.isLoading).toBe(false);
+      });
+
+      expect(result.current.hasCrmAccess).toBe(true);
+      expect(services.fetchLeads).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it("treats employee CRM access as unavailable without failing the dashboard", async () => {
+    auth.role = "employee";
+    const { result } = renderHook(() => useDashboard());
+
+    await waitFor(() => {
+      expect(result.current.projects.isLoading).toBe(false);
+    });
+
+    expect(result.current.hasCrmAccess).toBe(false);
+    expect(result.current.followUps.error).toBeNull();
+    expect(services.fetchLeads).not.toHaveBeenCalled();
+    expect(result.current.collections.data?.summary.scheduled_count).toBe(3);
+  });
 });
