@@ -16,6 +16,7 @@ use App\Modules\Leads\Support\LeadAuthorization;
 use App\Modules\Leads\Support\LeadDuplicateDetector;
 use App\Modules\Leads\Support\LeadInterestValidator;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
+use App\Modules\Shared\Time\TenantClock;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -27,6 +28,7 @@ final class CreateLeadAction
         private readonly LeadInterestValidator $interests,
         private readonly LeadDuplicateDetector $duplicates,
         private readonly SaudiMobileNormalizer $phoneNormalizer,
+        private readonly TenantClock $clock,
     ) {
     }
 
@@ -97,7 +99,10 @@ final class CreateLeadAction
                 'stage' => LeadStage::New,
                 'assigned_to' => $assignedTo,
                 'next_follow_up_at' => isset($data['next_follow_up_at'])
-                    ? CarbonImmutable::parse((string) $data['next_follow_up_at'])
+                    ? $this->clock->parse(
+                        $tenantId,
+                        (string) $data['next_follow_up_at'],
+                    )
                     : null,
                 'created_by' => $actor->id,
                 'updated_by' => $actor->id,

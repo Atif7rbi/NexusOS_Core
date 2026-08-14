@@ -8,6 +8,7 @@ use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Policies\OperationalCompletionPolicy;
 use App\Modules\Projects\Support\ProjectOperationalDependencies;
+use App\Modules\Shared\Time\TenantClock;
 use Illuminate\Support\Facades\DB;
 
 final class CompleteProjectAction
@@ -15,6 +16,7 @@ final class CompleteProjectAction
     public function __construct(
         private readonly OperationalCompletionPolicy $completionPolicy,
         private readonly ProjectOperationalDependencies $dependencies,
+        private readonly TenantClock $clock,
     ) {
     }
 
@@ -44,6 +46,7 @@ final class CompleteProjectAction
                     $tenantId,
                     $projectId,
                 ),
+                $this->clock->today($tenantId),
             );
 
             $project->forceFill([
