@@ -6,6 +6,7 @@ namespace App\Modules\Reservations\Actions;
 
 use App\Modules\Reservations\Enums\ReservationStatus;
 use App\Modules\Reservations\Exceptions\ReservationNotActiveException;
+use App\Modules\Reservations\Exceptions\ReservationUnitStateException;
 use App\Modules\Reservations\Models\Reservation;
 use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Models\Unit;
@@ -25,9 +26,14 @@ final class CancelReservationAction
             }
 
             $unit = Unit::query()
+                ->where('tenant_id', $tenantId)
                 ->whereKey($reservation->unit_id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($unit->status !== UnitStatus::Reserved) {
+                throw new ReservationUnitStateException();
+            }
 
             $reservation->forceFill([
                 'status' => ReservationStatus::Cancelled,
@@ -39,6 +45,7 @@ final class CancelReservationAction
 
             $unit->update([
                 'status' => UnitStatus::Available,
+                'updated_by' => $actorId,
             ]);
 
             return $reservation;

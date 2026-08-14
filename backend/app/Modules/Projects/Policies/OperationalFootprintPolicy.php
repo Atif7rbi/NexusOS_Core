@@ -11,7 +11,11 @@ use App\Modules\Projects\Models\Project;
 
 final class OperationalFootprintPolicy
 {
-    public function assert(Project $project, bool $hasActiveReservation): void
+    public function assert(
+        Project $project,
+        bool $hasActiveReservation,
+        bool $hasLiveContract,
+    ): void
     {
         if (
             $project->status !== ProjectStatus::Active
@@ -20,7 +24,7 @@ final class OperationalFootprintPolicy
             throw new InvalidProjectStatusTransitionException();
         }
 
-        if ($hasActiveReservation) {
+        if ($hasActiveReservation || $hasLiveContract) {
             throw new ProjectHasOperationalFootprintException();
         }
     }

@@ -6,12 +6,19 @@ namespace App\Modules\Projects\Actions;
 
 use App\Modules\Projects\Exceptions\ProjectAlreadyArchivedException;
 use App\Modules\Projects\Enums\ProjectStatus;
+use App\Modules\Projects\Exceptions\ProjectHasLiveDependenciesException;
 use App\Modules\Projects\Exceptions\InvalidProjectStatusTransitionException;
 use App\Modules\Projects\Models\Project;
+use App\Modules\Projects\Support\ProjectOperationalDependencies;
 use Illuminate\Support\Facades\DB;
 
 final class ArchiveProjectAction
 {
+    public function __construct(
+        private readonly ProjectOperationalDependencies $dependencies,
+    ) {
+    }
+
     public function execute(
         string $tenantId,
         string $projectId,
@@ -39,6 +46,19 @@ final class ArchiveProjectAction
                 ProjectStatus::Cancelled,
             ], true)) {
                 throw new InvalidProjectStatusTransitionException();
+            }
+
+            if (
+                $this->dependencies->hasActiveReservation(
+                    $tenantId,
+                    $projectId,
+                )
+                || $this->dependencies->hasLiveContract(
+                    $tenantId,
+                    $projectId,
+                )
+            ) {
+                throw new ProjectHasLiveDependenciesException();
             }
 
             $project->forceFill([

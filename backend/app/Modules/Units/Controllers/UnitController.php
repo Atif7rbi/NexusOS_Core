@@ -15,6 +15,7 @@ use App\Modules\Units\Enums\UnitStatus;
 use App\Modules\Units\Enums\UnitType;
 use App\Modules\Units\Exceptions\ArchivedUnitCannotBeUpdatedException;
 use App\Modules\Units\Exceptions\UnitAlreadyArchivedException;
+use App\Modules\Units\Exceptions\UnitHasLiveDependenciesException;
 use App\Modules\Units\Exceptions\UnitNotArchivedException;
 use App\Modules\Units\Models\Unit;
 use App\Modules\Units\Requests\StoreUnitRequest;
@@ -263,7 +264,10 @@ final class UnitController extends Controller
                 unitId: $unit,
                 actorId: $request->user()->id,
             );
-        } catch (UnitAlreadyArchivedException $exception) {
+        } catch (
+            UnitAlreadyArchivedException
+            | UnitHasLiveDependenciesException $exception
+        ) {
             $this->throwUnitValidationException(
                 $exception->getMessage()
             );

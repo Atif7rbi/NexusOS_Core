@@ -65,10 +65,12 @@ final class ActivateContractAction
 
             $reservation->forceFill([
                 'status' => ReservationStatus::Converted,
+                'updated_by' => $actorId,
             ])->save();
 
             $unit->update([
                 'status' => UnitStatus::Sold,
+                'updated_by' => $actorId,
             ]);
 
             return $contract;

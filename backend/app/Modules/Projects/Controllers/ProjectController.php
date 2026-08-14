@@ -17,6 +17,7 @@ use App\Modules\Projects\Exceptions\InvalidProjectStatusTransitionException;
 use App\Modules\Projects\Exceptions\ProjectAlreadyActiveException;
 use App\Modules\Projects\Exceptions\ProjectAlreadyArchivedException;
 use App\Modules\Projects\Exceptions\ProjectHasOperationalFootprintException;
+use App\Modules\Projects\Exceptions\ProjectHasLiveDependenciesException;
 use App\Modules\Projects\Exceptions\ProjectHasOutstandingCommitmentsException;
 use App\Modules\Projects\Exceptions\ProjectNotArchivedException;
 use App\Modules\Projects\Exceptions\ProjectNotOperationallyCompleteException;
@@ -218,7 +219,8 @@ final class ProjectController extends Controller
             );
         } catch (
             ProjectAlreadyArchivedException
-            | InvalidProjectStatusTransitionException $exception
+            | InvalidProjectStatusTransitionException
+            | ProjectHasLiveDependenciesException $exception
         ) {
             $this->throwProjectValidationException(
                 $exception->getMessage()

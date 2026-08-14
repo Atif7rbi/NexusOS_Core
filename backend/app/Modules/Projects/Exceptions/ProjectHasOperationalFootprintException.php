@@ -10,6 +10,8 @@ final class ProjectHasOperationalFootprintException extends DomainException
 {
     public function __construct()
     {
-        parent::__construct('لا يمكن إعادة المشروع إلى مسودة لوجود حجوزات نشطة.');
+        parent::__construct(
+            'لا يمكن إعادة المشروع إلى مسودة لوجود حجوزات أو عقود تشغيلية قائمة.'
+        );
     }
 }

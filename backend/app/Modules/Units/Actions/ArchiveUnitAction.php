@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Units\Actions;
 
+use App\Modules\Contracts\Enums\ContractStatus;
+use App\Modules\Contracts\Models\Contract;
+use App\Modules\Reservations\Enums\ReservationStatus;
+use App\Modules\Reservations\Models\Reservation;
 use App\Modules\Units\Exceptions\UnitAlreadyArchivedException;
+use App\Modules\Units\Exceptions\UnitHasLiveDependenciesException;
 use App\Modules\Units\Models\Unit;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +33,30 @@ final class ArchiveUnitAction
 
             if ($unit->isArchived()) {
                 throw new UnitAlreadyArchivedException();
+            }
+
+            $hasActiveReservation = Reservation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('unit_id', $unitId)
+                ->where('status', ReservationStatus::Active->value)
+                ->exists();
+
+            $hasLiveContract = Contract::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('status', [
+                    ContractStatus::Draft->value,
+                    ContractStatus::Active->value,
+                ])
+                ->whereHas(
+                    'reservation',
+                    fn ($query) => $query
+                        ->where('tenant_id', $tenantId)
+                        ->where('unit_id', $unitId),
+                )
+                ->exists();
+
+            if ($hasActiveReservation || $hasLiveContract) {
+                throw new UnitHasLiveDependenciesException();
             }
 
             $unit->forceFill([

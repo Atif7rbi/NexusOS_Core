@@ -7,16 +7,14 @@ namespace App\Modules\Projects\Actions;
 use App\Modules\Projects\Enums\ProjectStatus;
 use App\Modules\Projects\Models\Project;
 use App\Modules\Projects\Policies\OutstandingCommitmentsPolicy;
-use App\Modules\Reservations\Enums\ReservationStatus;
-use App\Modules\Reservations\Models\Reservation;
-use App\Modules\Units\Enums\UnitStatus;
-use App\Modules\Units\Models\Unit;
+use App\Modules\Projects\Support\ProjectOperationalDependencies;
 use Illuminate\Support\Facades\DB;
 
 final class CancelProjectAction
 {
     public function __construct(
         private readonly OutstandingCommitmentsPolicy $commitmentsPolicy,
+        private readonly ProjectOperationalDependencies $dependencies,
     ) {
     }
 
@@ -36,25 +34,20 @@ final class CancelProjectAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $hasActiveReservation = Reservation::query()
-                ->where('tenant_id', $tenantId)
-                ->where('status', ReservationStatus::Active->value)
-                ->whereHas(
-                    'unit',
-                    fn ($query) => $query->where('project_id', $project->id),
-                )
-                ->exists();
-
-            $hasSoldUnit = Unit::query()
-                ->where('tenant_id', $tenantId)
-                ->where('project_id', $project->id)
-                ->where('status', UnitStatus::Sold->value)
-                ->exists();
-
             $this->commitmentsPolicy->assert(
                 $project,
-                $hasActiveReservation,
-                $hasSoldUnit,
+                $this->dependencies->hasActiveReservation(
+                    $tenantId,
+                    $projectId,
+                ),
+                $this->dependencies->hasLiveContract(
+                    $tenantId,
+                    $projectId,
+                ),
+                $this->dependencies->hasSoldUnit(
+                    $tenantId,
+                    $projectId,
+                ),
             );
 
             $project->forceFill([
