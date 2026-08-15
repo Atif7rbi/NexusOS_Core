@@ -7,6 +7,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import UnitsPage from "@/app/units/page";
+import { ApiRequestError } from "@/lib/api-error";
 
 const services = vi.hoisted(() => ({
   fetchUnits: vi.fn(),
@@ -127,5 +128,25 @@ describe("UnitsPage quick create", () => {
       expect(window.location.search).toBe("");
     });
     expect(screen.queryByText("unit-create-modal")).toBeNull();
+  });
+
+  it("shows a normalized list fetch failure with retry", async () => {
+    services.fetchUnits.mockRejectedValueOnce(
+      new ApiRequestError(
+        "تعذر تحميل بيانات الوحدات حاليًا.",
+        {},
+        500,
+        "internal_error"
+      )
+    );
+
+    render(<UnitsPage />);
+
+    expect(
+      await screen.findByText("تعذر تحميل بيانات الوحدات حاليًا.")
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "إعادة المحاولة" })
+    ).toBeTruthy();
   });
 });

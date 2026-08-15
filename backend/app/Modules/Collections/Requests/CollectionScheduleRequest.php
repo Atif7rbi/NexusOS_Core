@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Collections\Requests;
 
+use App\Modules\Shared\Support\ApiErrorResponse;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -47,13 +48,9 @@ abstract class CollectionScheduleRequest extends FormRequest
 
     protected function fail(string $code, string $message): never
     {
-        throw new HttpResponseException(response()->json([
-            'message' => $message,
-            'error' => [
-                'code' => $code,
-                'message' => $message,
-            ],
-        ], 422));
+        throw new HttpResponseException(
+            app(ApiErrorResponse::class)->make(422, $code, $message)
+        );
     }
 
     private function messageFor(string $code): string

@@ -19,6 +19,10 @@ use Throwable;
 
 final class LifecycleAccessDenialResponder
 {
+    public function __construct(
+        private readonly ApiErrorResponse $errors,
+    ) {}
+
     public function respond(Throwable $exception): JsonResponse
     {
         [$code, $status, $title, $message] = match (true) {
@@ -61,15 +65,10 @@ final class LifecycleAccessDenialResponder
             ),
         };
 
-        return response()->json([
-            'message' => $message,
-            'error' => [
-                'code' => $code,
-                'status' => $status,
-                'title' => $title,
-                'message' => $message,
-            ],
-        ], 403);
+        return $this->errors->make(403, $code, $message, [
+            'status' => $status,
+            'title' => $title,
+        ]);
     }
 
     /** @return array{string, string, string, string} */
