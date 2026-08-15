@@ -4,6 +4,7 @@ import type {
   LoginPayload,
   LoginResponse,
 } from "@/types/auth";
+import { parseApiError } from "@/lib/api-error";
 
 const TOKEN_STORAGE_KEY = "ufq_pilot_access_token";
 
@@ -33,25 +34,6 @@ export function removeStoredToken(): void {
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
-async function parseValidationMessage(
-  response: Response
-): Promise<string> {
-  try {
-    const payload = (await response.json()) as {
-      message?: string;
-      errors?: Record<string, string[]>;
-    };
-
-    const firstError = payload.errors
-      ? Object.values(payload.errors)[0]?.[0]
-      : null;
-
-    return firstError ?? payload.message ?? "تعذر إكمال العملية.";
-  } catch {
-    return "تعذر الاتصال بالخادم.";
-  }
-}
-
 export async function login(
   payload: LoginPayload
 ): Promise<LoginResponse> {
@@ -68,7 +50,7 @@ export async function login(
   );
 
   if (!response.ok) {
-    throw new Error(await parseValidationMessage(response));
+    throw await parseApiError(response);
   }
 
   return (await response.json()) as LoginResponse;
@@ -88,7 +70,7 @@ export async function fetchCurrentUser(
   );
 
   if (!response.ok) {
-    throw new Error("Unauthenticated");
+    throw await parseApiError(response);
   }
 
   const payload =

@@ -6,6 +6,7 @@ import type {
   TenantUsersResponse,
   UpdateTenantUserPayload,
 } from "@/types/tenant-user";
+import { parseApiError } from "@/lib/api-error";
 
 function getApiBaseUrl(): string {
   const apiBaseUrl =
@@ -26,29 +27,6 @@ function getHeaders(token: string): HeadersInit {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   };
-}
-
-async function parseError(
-  response: Response
-): Promise<string> {
-  try {
-    const payload = (await response.json()) as {
-      message?: string;
-      errors?: Record<string, string[]>;
-    };
-
-    const firstValidationError = payload.errors
-      ? Object.values(payload.errors)[0]?.[0]
-      : null;
-
-    return (
-      firstValidationError ??
-      payload.message ??
-      "تعذر إكمال العملية."
-    );
-  } catch {
-    return "تعذر الاتصال بالخادم.";
-  }
 }
 
 export async function fetchTenantUsers(
@@ -84,7 +62,7 @@ export async function fetchTenantUsers(
   );
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw await parseApiError(response);
   }
 
   return (await response.json()) as TenantUsersResponse;
@@ -103,7 +81,7 @@ export async function fetchTenantUser(
   );
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw await parseApiError(response);
   }
 
   const result =
@@ -126,7 +104,7 @@ export async function createTenantUser(
   );
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw await parseApiError(response);
   }
 
   const result =
@@ -150,7 +128,7 @@ export async function updateTenantUser(
   );
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw await parseApiError(response);
   }
 
   const result =
@@ -172,6 +150,6 @@ export async function removeTenantUser(
   );
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw await parseApiError(response);
   }
 }

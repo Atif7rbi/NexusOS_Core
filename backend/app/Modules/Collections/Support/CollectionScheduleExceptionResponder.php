@@ -22,6 +22,7 @@ use App\Modules\Collections\Exceptions\ScheduleNotInDraftStateException;
 use App\Modules\Collections\Exceptions\ScheduleTotalMismatchException;
 use App\Modules\Collections\Http\Exceptions\CollectionScheduleIntegrityViolationException;
 use App\Modules\Collections\Http\Exceptions\RoleNotAuthorizedException;
+use App\Modules\Shared\Support\ApiErrorResponse;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,10 @@ use Throwable;
 
 final class CollectionScheduleExceptionResponder
 {
+    public function __construct(
+        private readonly ApiErrorResponse $errors,
+    ) {}
+
     public function from(Throwable $exception): ?JsonResponse
     {
         [$status, $code] = match (true) {
@@ -70,13 +75,7 @@ final class CollectionScheduleExceptionResponder
 
     public function error(int $status, string $code, string $message): JsonResponse
     {
-        return response()->json([
-            'message' => $message,
-            'error' => [
-                'code' => $code,
-                'message' => $message,
-            ],
-        ], $status);
+        return $this->errors->make($status, $code, $message);
     }
 
     private function isTransientPostgresFailure(QueryException $exception): bool

@@ -29,11 +29,16 @@ use App\Modules\Leads\Exceptions\LeadUnitProjectMismatchException;
 use App\Modules\Leads\Exceptions\LeadValidationException;
 use App\Modules\Leads\Exceptions\LeadWonCannotBeArchivedException;
 use App\Modules\Leads\Exceptions\UserHasOpenAssignedLeadsException;
+use App\Modules\Shared\Support\ApiErrorResponse;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
 final class LeadExceptionResponder
 {
+    public function __construct(
+        private readonly ApiErrorResponse $errors,
+    ) {}
+
     public function from(Throwable $exception): ?JsonResponse
     {
         [$status, $code] = match (true) {
@@ -69,10 +74,10 @@ final class LeadExceptionResponder
             return null;
         }
 
-        $error = ['code' => $code, 'message' => $exception->getMessage()];
+        $errorContext = [];
 
         if ($exception instanceof LeadConversionNewCustomerConflictException) {
-            $error['conflicting_customer'] = [
+            $errorContext['conflicting_customer'] = [
                 'id' => $exception->conflictingCustomerId,
                 'status' => $exception->conflictingCustomerStatus,
                 'name' => $exception->conflictingCustomerName,
@@ -80,7 +85,7 @@ final class LeadExceptionResponder
         }
 
         if ($exception instanceof LeadPhoneDuplicateDetectedException) {
-            $error['matches'] = $exception->matches
+            $errorContext['matches'] = $exception->matches
                 ->map(static fn ($lead): array => [
                     'id' => (string) $lead->id,
                     'name' => $lead->name,
@@ -94,12 +99,18 @@ final class LeadExceptionResponder
                 ])->values()->all();
         }
 
-        $response = ['message' => $exception->getMessage(), 'error' => $error];
+        $responseContext = [];
 
         if ($exception instanceof LeadValidationException && $exception->errors !== []) {
-            $response['errors'] = $exception->errors;
+            $responseContext['errors'] = $exception->errors;
         }
 
-        return response()->json($response, $status);
+        return $this->errors->make(
+            $status,
+            $code,
+            $exception->getMessage(),
+            $errorContext,
+            $responseContext,
+        );
     }
 }

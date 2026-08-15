@@ -6,12 +6,16 @@ use App\Modules\Collections\Http\Middleware\ResolveCollectionScheduleContract;
 use App\Modules\Collections\Support\CollectionScheduleExceptionResponder;
 use App\Modules\Leads\Exceptions\UserHasOpenAssignedLeadsException;
 use App\Modules\Leads\Support\LeadExceptionResponder;
+use App\Modules\Shared\Support\ApiErrorResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -31,20 +35,15 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (AuthenticationException $exception, Request $request) {
-            if (
-                ! $request->is('api/contracts/*/collection-schedule*')
-                && ! $request->is('api/leads*')
-            ) {
+            if (! $request->is('api/*')) {
                 return null;
             }
 
-            return response()->json([
-                'message' => 'Unauthenticated.',
-                'error' => [
-                    'code' => 'unauthenticated',
-                    'message' => 'Unauthenticated.',
-                ],
-            ], 401);
+            return app(ApiErrorResponse::class)->make(
+                401,
+                'unauthenticated',
+                'Unauthenticated.',
+            );
         });
 
         $exceptions->render(function (QueryException $exception, Request $request) {
@@ -64,5 +63,57 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return app(LeadExceptionResponder::class)->from($exception);
+        });
+
+        $exceptions->render(function (HttpExceptionInterface $exception, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            [$code, $message] = match ($exception->getStatusCode()) {
+                401 => ['unauthenticated', 'Unauthenticated.'],
+                403 => ['forbidden', 'ليس لديك صلاحية لتنفيذ هذا الإجراء.'],
+                404 => ['resource_not_found', 'المورد المطلوب غير متاح.'],
+                409 => ['state_conflict', 'لا يمكن تنفيذ العملية بسبب تعارض في الحالة الحالية.'],
+                default => [null, null],
+            };
+
+            if ($code === null || $message === null) {
+                return null;
+            }
+
+            return app(ApiErrorResponse::class)->make(
+                $exception->getStatusCode(),
+                $code,
+                $message,
+            );
+        });
+
+        $exceptions->render(function (ValidationException $exception, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => $exception->errors(),
+            ], $exception->status);
+        });
+
+        $exceptions->render(function (\Throwable $exception, Request $request) {
+            if (
+                ! $request->is('api/*')
+                || $exception instanceof HttpExceptionInterface
+                || $exception instanceof HttpResponseException
+                || $exception instanceof ValidationException
+            ) {
+                return null;
+            }
+
+            return app(ApiErrorResponse::class)->make(
+                500,
+                'internal_error',
+                'تعذر إكمال العملية.',
+            );
         });
     })->create();

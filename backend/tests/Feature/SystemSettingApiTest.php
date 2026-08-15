@@ -265,7 +265,11 @@ class SystemSettingApiTest extends ApiTestCase
             'company_name_ar' => 'لا يجب حفظها',
         ])
             ->assertForbidden()
-            ->assertJsonPath('error.code', 'company_profile_demo_read_only');
+            ->assertJsonPath('error.code', 'company_profile_demo_read_only')
+            ->assertJsonPath(
+                'error.message',
+                'لا يمكن تعديل بيانات الشركة المشتركة في وضع العرض التجريبي.',
+            );
     }
 
     public function test_demo_mode_returns_aswar_baseline_without_mutating_tenant_settings(): void

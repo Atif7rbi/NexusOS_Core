@@ -6,6 +6,7 @@ namespace App\Modules\Leads\Requests;
 
 use App\Modules\Shared\Phone\InvalidSaudiMobileNumberException;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
+use App\Modules\Shared\Support\ApiErrorResponse;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -49,24 +50,26 @@ abstract class LeadRequest extends FormRequest
     {
         $message = (string) collect($validator->errors()->all())->first();
 
-        throw new HttpResponseException(response()->json([
-            'message' => $message,
-            'error' => [
-                'code' => 'validation_error',
-                'message' => $message,
-            ],
-            'errors' => $validator->errors()->toArray(),
-        ], 422));
+        throw new HttpResponseException(
+            app(ApiErrorResponse::class)->make(
+                422,
+                'validation_error',
+                $message,
+                responseContext: [
+                    'errors' => $validator->errors()->toArray(),
+                ],
+            )
+        );
     }
 
     protected function failValidation(string $message): never
     {
-        throw new HttpResponseException(response()->json([
-            'message' => $message,
-            'error' => [
-                'code' => 'validation_error',
-                'message' => $message,
-            ],
-        ], 422));
+        throw new HttpResponseException(
+            app(ApiErrorResponse::class)->make(
+                422,
+                'validation_error',
+                $message,
+            )
+        );
     }
 }

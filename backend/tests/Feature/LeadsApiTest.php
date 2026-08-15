@@ -965,7 +965,15 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('error.code', 'lead_action_not_authorized');
         $this->patchJson("/api/leads/{$lost->id}", ['name' => 'Denied'])
             ->assertConflict()
-            ->assertJsonPath('error.code', 'lead_not_in_open_stage');
+            ->assertJsonPath('error.code', 'lead_not_in_open_stage')
+            ->assertJsonPath(
+                'message',
+                'The Lead must be in an open stage for this action.',
+            )
+            ->assertJsonPath(
+                'error.message',
+                'The Lead must be in an open stage for this action.',
+            );
 
         Sanctum::actingAs($administrator);
         $this->patchJson("/api/leads/{$archived->id}", ['name' => 'Denied'])

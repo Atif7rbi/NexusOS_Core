@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateSystemSettingRequest;
 use App\Models\SystemSetting;
 use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Shared\Services\ResolveActiveMembership;
+use App\Modules\Shared\Support\ApiErrorResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,7 @@ class SystemSettingController extends Controller
     public function __construct(
         private readonly SaudiMobileNormalizer $phoneNormalizer,
         private readonly ResolveActiveMembership $resolveActiveMembership,
+        private readonly ApiErrorResponse $errors,
     ) {}
 
     public function show(Request $request): JsonResponse
@@ -41,12 +43,11 @@ class SystemSettingController extends Controller
         UpdateSystemSettingRequest $request,
     ): JsonResponse {
         if (config('nexusos.demo_mode')) {
-            return response()->json([
-                'message' => 'لا يمكن تعديل بيانات الشركة المشتركة في وضع العرض التجريبي.',
-                'error' => [
-                    'code' => 'company_profile_demo_read_only',
-                ],
-            ], 403);
+            return $this->errors->make(
+                403,
+                'company_profile_demo_read_only',
+                'لا يمكن تعديل بيانات الشركة المشتركة في وضع العرض التجريبي.',
+            );
         }
 
         $settings = SystemSetting::forTenant(
