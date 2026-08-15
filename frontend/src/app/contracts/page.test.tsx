@@ -94,7 +94,12 @@ const navigation = vi.hoisted(() => ({
 }));
 
 vi.mock("@/providers/AuthProvider", () => ({
-  useAuth: () => ({ token: "token", user: auth.user }),
+  useAuth: () => ({
+    token: "token",
+    user: auth.user,
+    effectiveModules: ["contracts"],
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/components/layout/AppShell", () => ({

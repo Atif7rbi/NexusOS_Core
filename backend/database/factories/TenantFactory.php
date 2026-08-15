@@ -3,6 +3,10 @@
 namespace Database\Factories;
 
 use App\Models\Tenant;
+use App\Models\TenantLicense;
+use App\Modules\Entitlements\Services\ProvisionPilotEntitlements;
+use App\Modules\Entitlements\Support\CommercialModuleCatalog;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -12,6 +16,20 @@ use Illuminate\Support\Str;
 class TenantFactory extends Factory
 {
     protected $model = Tenant::class;
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Tenant $tenant): void {
+            app(ProvisionPilotEntitlements::class)->handle(
+                tenantReference: (string) $tenant->id,
+                planKey: CommercialModuleCatalog::PILOT_FULL_PLAN,
+                status: TenantLicense::STATUS_ACTIVE,
+                startsAt: CarbonImmutable::now('UTC')->subDay(),
+                endsAt: CarbonImmutable::now('UTC')->addYear(),
+                graceEndsAt: null,
+            );
+        });
+    }
 
     public function definition(): array
     {

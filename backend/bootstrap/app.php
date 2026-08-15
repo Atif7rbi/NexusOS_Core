@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureActiveTenantMembership;
+use App\Http\Middleware\EnsureModuleEntitled;
 use App\Modules\Collections\Http\Middleware\AuthorizeCollectionScheduleCommand;
 use App\Modules\Collections\Http\Middleware\ResolveCollectionScheduleContract;
 use App\Modules\Collections\Support\CollectionScheduleExceptionResponder;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: ['phone']);
         $middleware->alias([
             'tenant.active' => EnsureActiveTenantMembership::class,
+            'module.entitled' => EnsureModuleEntitled::class,
             'collections.contract' => ResolveCollectionScheduleContract::class,
             'collections.authorize' => AuthorizeCollectionScheduleCommand::class,
         ]);

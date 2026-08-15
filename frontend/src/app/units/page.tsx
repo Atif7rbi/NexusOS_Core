@@ -19,6 +19,7 @@ import {
 } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { UnitDetailsModal } from "@/components/units/UnitDetailsModal";
 import { UnitFormModal } from "@/components/units/UnitFormModal";
 import { Button } from "@/components/ui/Button";
@@ -95,9 +96,11 @@ const statusLabels: Record<UnitStatus, string> = {
 
 export default function UnitsPage() {
   return (
-    <Suspense fallback={null}>
-      <UnitsPageContent />
-    </Suspense>
+    <ModulePageGuard module="units">
+      <Suspense fallback={null}>
+        <UnitsPageContent />
+      </Suspense>
+    </ModulePageGuard>
   );
 }
 

@@ -36,6 +36,16 @@ class Tenant extends Model
         return $this->hasMany(TenantUser::class);
     }
 
+    public function licenses(): HasMany
+    {
+        return $this->hasMany(TenantLicense::class);
+    }
+
+    public function moduleOverrides(): HasMany
+    {
+        return $this->hasMany(TenantModule::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;

@@ -89,6 +89,15 @@ function dashboardData(hasCrmAccess = true): DashboardData {
       },
     }),
     hasCrmAccess,
+    availableModules: {
+      projects: true,
+      units: true,
+      customers: true,
+      crm: hasCrmAccess,
+      reservations: true,
+      contracts: true,
+      collections: true,
+    },
     refresh: vi.fn(),
   };
 }

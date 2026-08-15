@@ -13,6 +13,7 @@ vi.mock("@/providers/AuthProvider", () => ({
   useAuth: () => ({
     user: { role: auth.role },
     isLoading: auth.isLoading,
+    effectiveModules: ["crm"],
   }),
 }));
 vi.mock("@/hooks/useTranslation", () => ({

@@ -18,6 +18,7 @@ import {
 } from "react";
 
 import { ContractDetailsModal } from "@/components/contracts/ContractDetailsModal";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { ContractFormModal } from "@/components/contracts/ContractFormModal";
 import { ContractLifecycleDialog } from "@/components/contracts/ContractLifecycleDialog";
 import {
@@ -90,6 +91,14 @@ const emptySummary: ContractSummary = {
 };
 
 export default function ContractsPage() {
+  return (
+    <ModulePageGuard module="contracts">
+      <ContractsPageContent />
+    </ModulePageGuard>
+  );
+}
+
+function ContractsPageContent() {
   const { token, user } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [summary, setSummary] = useState<ContractSummary>(emptySummary);

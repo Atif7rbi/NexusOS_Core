@@ -17,6 +17,7 @@ import {
 } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { ReservationFormModal } from "@/components/reservations/ReservationFormModal";
 import { ReservationDetailsModal } from "@/components/reservations/ReservationDetailsModal";
 import { ReservationUpdateModal } from "@/components/reservations/ReservationUpdateModal";
@@ -43,6 +44,7 @@ import {
 } from "@/hooks/useResourceInvalidation";
 import { formatDateTime } from "@/lib/date-format";
 import { formatInteger } from "@/lib/number-format";
+import { hasModuleEntitlement } from "@/lib/entitlements";
 import {
   canCreateContractForReservation,
   canCreateReservation,
@@ -106,7 +108,15 @@ const statusClasses: Record<ReservationStatus, string> = {
 };
 
 export default function ReservationsPage() {
-  const { token, user } = useAuth();
+  return (
+    <ModulePageGuard module="reservations">
+      <ReservationsPageContent />
+    </ModulePageGuard>
+  );
+}
+
+function ReservationsPageContent() {
+  const { token, user, effectiveModules } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [summary, setSummary] = useState<ReservationSummary>(emptySummary);
@@ -401,6 +411,7 @@ export default function ReservationsPage() {
 
     setDetailReservation(reservation);
     setDetailContractCreateHref(
+      hasModuleEntitlement(effectiveModules, "contracts") &&
       canCreateContractForReservation(user, reservation)
         ? buildContextualContractUrl(
             reservation.id,
@@ -423,6 +434,7 @@ export default function ReservationsPage() {
       );
       setDetailReservation(loadedReservation);
       setDetailContractCreateHref(
+        hasModuleEntitlement(effectiveModules, "contracts") &&
         canCreateContractForReservation(user, loadedReservation)
           ? buildContextualContractUrl(
               loadedReservation.id,

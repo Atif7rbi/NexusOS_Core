@@ -5,6 +5,8 @@ import type {
   LoginResponse,
 } from "@/types/auth";
 import { parseApiError } from "@/lib/api-error";
+import { normalizeEffectiveModules } from "@/lib/entitlements";
+import type { CommercialModuleKey } from "@/types/entitlement";
 
 const TOKEN_STORAGE_KEY = "ufq_pilot_access_token";
 
@@ -58,7 +60,10 @@ export async function login(
 
 export async function fetchCurrentUser(
   token: string
-): Promise<AuthUser> {
+): Promise<{
+  user: AuthUser;
+  effectiveModules: CommercialModuleKey[];
+}> {
   const response = await fetch(
     `${getApiBaseUrl()}/auth/user`,
     {
@@ -76,7 +81,12 @@ export async function fetchCurrentUser(
   const payload =
     (await response.json()) as CurrentUserResponse;
 
-  return payload.data.user;
+  return {
+    user: payload.data.user,
+    effectiveModules: normalizeEffectiveModules(
+      payload.data.effective_modules
+    ),
+  };
 }
 
 export async function logout(token: string): Promise<void> {

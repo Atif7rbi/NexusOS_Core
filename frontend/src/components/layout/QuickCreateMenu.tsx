@@ -14,25 +14,30 @@ import {
 } from "react";
 
 import { useTranslation } from "@/hooks/useTranslation";
+import { hasModuleEntitlement } from "@/lib/entitlements";
+import { useAuth } from "@/providers/AuthProvider";
 
 export function QuickCreateMenu() {
   const { isArabic } = useTranslation();
+  const { effectiveModules } = useAuth();
   const [isOpen, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
 
-  const items = isArabic
+  const items = (isArabic
     ? [
-        { label: "مشروع جديد", href: "/projects/?create=1", icon: FolderPlus },
-        { label: "عميل جديد", href: "/customers/?create=1", icon: UserPlus },
-        { label: "إضافة وحدة", href: "/units/?create=1", icon: Building2 },
+        { label: "مشروع جديد", href: "/projects/?create=1", icon: FolderPlus, module: "projects" as const },
+        { label: "عميل جديد", href: "/customers/?create=1", icon: UserPlus, module: "customers" as const },
+        { label: "إضافة وحدة", href: "/units/?create=1", icon: Building2, module: "units" as const },
       ]
     : [
-        { label: "New project", href: "/projects/?create=1", icon: FolderPlus },
-        { label: "New customer", href: "/customers/?create=1", icon: UserPlus },
-        { label: "Add unit", href: "/units/?create=1", icon: Building2 },
-      ];
+        { label: "New project", href: "/projects/?create=1", icon: FolderPlus, module: "projects" as const },
+        { label: "New customer", href: "/customers/?create=1", icon: UserPlus, module: "customers" as const },
+        { label: "Add unit", href: "/units/?create=1", icon: Building2, module: "units" as const },
+      ]).filter((item) =>
+        hasModuleEntitlement(effectiveModules, item.module)
+      );
 
   useEffect(() => {
     if (!isOpen) {
@@ -111,6 +116,10 @@ export function QuickCreateMenu() {
     event.preventDefault();
     itemRefs.current[targetIndex]?.focus();
   };
+
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
     <div ref={containerRef} className="relative">
