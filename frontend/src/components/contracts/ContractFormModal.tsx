@@ -35,6 +35,7 @@ type ContractFormModalProps = {
   isOpen: boolean;
   contract?: Contract | null;
   reservations?: Reservation[];
+  lockedReservation?: Reservation | null;
   isLoadingReservations?: boolean;
   reservationLoadError?: string | null;
   isSubmitting: boolean;
@@ -75,6 +76,7 @@ export function ContractFormModal({
   isOpen,
   contract = null,
   reservations = [],
+  lockedReservation = null,
   isLoadingReservations = false,
   reservationLoadError = null,
   isSubmitting,
@@ -84,7 +86,7 @@ export function ContractFormModal({
 }: ContractFormModalProps) {
   const isEditing = contract !== null;
   const [reservationId, setReservationId] = useState(
-    contract?.reservation_id ?? ""
+    contract?.reservation_id ?? lockedReservation?.id ?? ""
   );
   const [totalAmount, setTotalAmount] = useState(
     contract?.total_amount ?? ""
@@ -258,7 +260,12 @@ export function ContractFormModal({
           <>
             <FormErrorBanner message={reservationLoadError} />
 
-            <div className="space-y-2">
+            {lockedReservation ? (
+              <LockedReservationContext
+                reservation={lockedReservation}
+              />
+            ) : (
+              <div className="space-y-2">
               <label
                 htmlFor="contract-reservation-search"
                 className="block text-sm font-semibold text-[var(--text-secondary)]"
@@ -293,18 +300,6 @@ export function ContractFormModal({
                   className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] ps-11 pe-4 text-sm text-[var(--text-primary)] outline-none shadow-[var(--shadow-sm)] focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
                 />
               </div>
-
-              <input
-                type="hidden"
-                name="reservation_id"
-                value={reservationId}
-              />
-
-              {fieldErrors.reservation_id?.[0] ? (
-                <p className="text-xs font-semibold text-[var(--danger)]">
-                  {fieldErrors.reservation_id[0]}
-                </p>
-              ) : null}
 
               <div
                 id="contract-reservation-suggestions"
@@ -373,7 +368,20 @@ export function ContractFormModal({
                   })
                 )}
               </div>
-            </div>
+              </div>
+            )}
+
+            <input
+              type="hidden"
+              name="reservation_id"
+              value={reservationId}
+            />
+
+            {fieldErrors.reservation_id?.[0] ? (
+              <p className="text-xs font-semibold text-[var(--danger)]">
+                {fieldErrors.reservation_id[0]}
+              </p>
+            ) : null}
           </>
         ) : null}
 
@@ -393,5 +401,44 @@ export function ContractFormModal({
         />
       </FormShell>
     </Modal>
+  );
+}
+
+function LockedReservationContext({
+  reservation,
+}: {
+  reservation: Reservation;
+}) {
+  const project = reservation.unit?.project;
+
+  return (
+    <section
+      aria-label="الحجز المحدد"
+      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-[var(--text-secondary)]">
+            الحجز المحدد
+          </p>
+          <p className="mt-1 truncate text-sm font-bold text-[var(--text-primary)]">
+            {reservation.customer?.name ?? "عميل غير متاح"}
+          </p>
+          <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+            {project
+              ? `${project.project_number} — ${project.name}`
+              : "مشروع غير متاح"}
+            {" · "}
+            الوحدة {reservation.unit?.unit_number ?? "—"}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-[var(--success-soft)] px-3 py-1 text-xs font-bold text-[var(--success)]">
+          محدد تلقائيًا
+        </span>
+      </div>
+      <p className="mt-3 font-mono text-[11px] text-[var(--text-muted)]">
+        مرجع الحجز: {shortReservationId(reservation.id)}
+      </p>
+    </section>
   );
 }

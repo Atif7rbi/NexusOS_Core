@@ -16,6 +16,13 @@ export function canCreateContract(role: UserRole | null | undefined): boolean {
   return canCreateReservation(role);
 }
 
+export function canCreateContractForReservation(
+  user: AuthUser | null | undefined,
+  reservation: Reservation
+): boolean {
+  return canEditOrCancelReservation(user, reservation);
+}
+
 export function canEditOrCancelReservation(user: AuthUser | null | undefined, reservation: Reservation): boolean {
   if (reservation.status !== "active" || !user) return false;
   return canAdministrateTenant(user.role) ||

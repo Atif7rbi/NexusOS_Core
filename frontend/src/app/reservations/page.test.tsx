@@ -14,7 +14,10 @@ import {
 
 import ReservationsPage from "@/app/reservations/page";
 import type { Customer } from "@/types/customer";
-import type { ReservationFormPayload } from "@/types/reservation";
+import type {
+  Reservation,
+  ReservationFormPayload,
+} from "@/types/reservation";
 
 const customerId = "01K00000000000000000000001";
 const unitId = "01K00000000000000000000003";
@@ -37,6 +40,79 @@ const customer: Customer = {
   archived_at: null,
   created_at: "2026-08-05T06:30:00.000Z",
   updated_at: "2026-08-05T06:30:00.000Z",
+};
+
+const activeReservation: Reservation = {
+  id: "01K00000000000000000000009",
+  tenant_id: "tenant-1",
+  unit_id: unitId,
+  customer_id: customerId,
+  status: "active",
+  reserved_at: "2026-08-05T06:30:00.000Z",
+  expires_at: "2026-08-10T10:00:00.000Z",
+  notes: null,
+  cancellation_reason: null,
+  cancelled_at: null,
+  cancelled_by: null,
+  created_by: 1,
+  updated_by: 1,
+  created_at: "2026-08-05T06:30:00.000Z",
+  updated_at: "2026-08-05T06:30:00.000Z",
+  customer,
+  unit: {
+    id: unitId,
+    tenant_id: "tenant-1",
+    project_id: "project-1",
+    unit_number: "A-101",
+    unit_type: "apartment",
+    status: "reserved",
+    selling_price: "650000.00",
+    area: null,
+    floor: null,
+    bedrooms: null,
+    bathrooms: null,
+    notes: null,
+    archived_at: null,
+    created_at: "",
+    updated_at: "",
+    project: {
+      id: "project-1",
+      project_number: "PRJ-2026-001",
+      name: "مشروع النخيل",
+      currency: "SAR",
+      project_manager_id: 2,
+    },
+  },
+};
+
+const activeProject = {
+  id: "project-1",
+  project_number: "PRJ-2026-001",
+  project_number_year: 2026,
+  project_sequence_number: 1,
+  name: "مشروع النخيل",
+  description: null,
+  project_type: "residential",
+  status: "active",
+  country_code: "SA",
+  city: "الرياض",
+  district: null,
+  address_line: null,
+  currency: "SAR",
+  estimated_budget: null,
+  planned_start_date: null,
+  planned_end_date: null,
+  actual_start_date: null,
+  actual_end_date: null,
+  project_manager_id: 2,
+  archived_at: null,
+  data_origin: "user",
+  external_reference: null,
+  legacy_reference: null,
+  created_by: 1,
+  updated_by: 1,
+  created_at: "",
+  updated_at: "",
 };
 
 const services = vi.hoisted(() => ({
@@ -290,6 +366,115 @@ describe("ReservationsPage contextual creation", () => {
     expect(services.fetchCustomers).toHaveBeenCalledWith(
       "token",
       { per_page: 100 }
+    );
+  });
+
+  it("exposes contextual contract creation from an authorized active reservation", async () => {
+    services.fetchProjects.mockResolvedValue({
+      data: {
+        data: [activeProject],
+      },
+    });
+    services.fetchReservations.mockImplementation(
+      (_token: string, params: { page?: number }) =>
+        Promise.resolve({
+          data: {
+            reservations: {
+              data: [activeReservation],
+              meta: {
+                current_page: params.page ?? 1,
+                last_page: 3,
+                per_page: 20,
+                total: 41,
+              },
+            },
+            summary: {
+              total: 41,
+              active: 41,
+              cancelled: 0,
+              expired: 0,
+            },
+          },
+        })
+    );
+    services.fetchReservation.mockResolvedValue(activeReservation);
+
+    render(<ReservationsPage />);
+
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "البحث برقم الوحدة أو اسم العميل"
+      ),
+      { target: { value: "محمد" } }
+    );
+
+    const projectOption = await screen.findByRole("option", {
+      name: /مشروع النخيل/,
+    });
+    fireEvent.change(projectOption.closest("select")!, {
+      target: { value: activeProject.id },
+    });
+    fireEvent.change(screen.getByDisplayValue("كل الحالات"), {
+      target: { value: "active" },
+    });
+
+    await waitFor(() => {
+      expect(services.fetchReservations).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({
+          page: 1,
+          search: "محمد",
+          status: "active",
+          project_id: activeProject.id,
+        })
+      );
+    });
+
+    const nextButton = screen.getByRole("button", {
+      name: "التالي",
+    });
+    await waitFor(() => {
+      expect(nextButton.hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(nextButton);
+    await waitFor(() => {
+      expect(services.fetchReservations).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ page: 2 })
+      );
+    });
+    await waitFor(() => {
+      expect(nextButton.hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(nextButton);
+    await waitFor(() => {
+      expect(services.fetchReservations).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ page: 3 })
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "عرض التفاصيل",
+      })
+    );
+
+    const link = await screen.findByRole("link", {
+      name: "إنشاء عقد",
+    });
+    const target = new URL(
+      link.getAttribute("href") ?? "",
+      "https://nexusos.test"
+    );
+
+    expect(target.pathname).toBe("/contracts/");
+    expect(target.searchParams.get("create")).toBe("1");
+    expect(target.searchParams.get("reservation")).toBe(
+      activeReservation.id
+    );
+    expect(target.searchParams.get("returnTo")).toBe(
+      "/reservations/?page=3&search=%D9%85%D8%AD%D9%85%D8%AF&status=active&project_id=project-1"
     );
   });
 });

@@ -28,6 +28,7 @@ import {
 import { ContractsTable } from "@/components/contracts/ContractsTable";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
+import { FormErrorBanner } from "@/components/ui/FormErrorBanner";
 import { SuccessBanner } from "@/components/ui/SuccessBanner";
 import {
   CrudPageHeader,
@@ -49,8 +50,15 @@ import {
 import { formatInteger } from "@/lib/number-format";
 import {
   canCreateContract,
+  canCreateContractForReservation,
   canEditOrCancelReservation,
 } from "@/lib/commercial-authorization";
+import {
+  clearContractCreateQuery,
+  parseContractCreateQuery,
+  returnToReservationList,
+  type ContractCreateContext,
+} from "@/lib/contract-create-context";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createContract,
@@ -96,6 +104,9 @@ export default function ContractsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [createContext, setCreateContext] =
+    useState<ContractCreateContext | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
   const [activeReservations, setActiveReservations] = useState<Reservation[]>(
     []
   );
@@ -174,6 +185,8 @@ export default function ContractsPage() {
       return;
     }
 
+    setCreateContext(null);
+    setContextError(null);
     setCreateOpen(true);
     setActiveReservations([]);
     setLoadingReservations(true);
@@ -221,6 +234,96 @@ export default function ContractsPage() {
     }
   };
 
+  const openContextualCreate = useCallback(
+    async (context: ContractCreateContext): Promise<void> => {
+      const failContext = (): void => {
+        setCreateOpen(false);
+        setCreateContext(null);
+        setActiveReservations([]);
+        setContextError(
+          "تعذر فتح إنشاء العقد من هذا الحجز. تحقق من أن الحجز نشط ومتاح لك."
+        );
+        window.history.replaceState(
+          null,
+          "",
+          clearContractCreateQuery(window.location.search)
+        );
+      };
+
+      if (!token || !canCreateContract(user?.role)) {
+        failContext();
+        return;
+      }
+
+      setCreateOpen(false);
+      setCreateContext(context);
+      setActiveReservations([]);
+      setLoadingReservations(true);
+      setReservationLoadError(null);
+      setContextError(null);
+
+      try {
+        const reservation = await fetchReservation(
+          token,
+          context.reservationId
+        );
+
+        if (
+          reservation.status !== "active" ||
+          !canCreateContractForReservation(user, reservation)
+        ) {
+          failContext();
+          return;
+        }
+
+        setActiveReservations([reservation]);
+        setCreateOpen(true);
+      } catch {
+        failContext();
+      } finally {
+        setLoadingReservations(false);
+      }
+    },
+    [token, user]
+  );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const parsed = parseContractCreateQuery(
+      window.location.search
+    );
+
+    if (parsed.normalizedUrl) {
+      window.history.replaceState(
+        null,
+        "",
+        parsed.normalizedUrl
+      );
+    }
+
+    if (!parsed.context) {
+      if (parsed.normalizedUrl) {
+        const timeoutId = window.setTimeout(() => {
+          setContextError(
+            "تعذر فتح إنشاء العقد من هذا الحجز. تحقق من الرابط وحاول مجددًا."
+          );
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
+      }
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void openContextualCreate(parsed.context as ContractCreateContext);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [openContextualCreate, token]);
+
   const submitCreate = async (
     payload: ContractFormPayload
   ): Promise<void> => {
@@ -230,8 +333,25 @@ export default function ContractsPage() {
 
     setSubmitting(true);
     try {
-      await createContract(token, payload);
+      await createContract(
+        token,
+        createContext
+          ? {
+              ...payload,
+              reservation_id: createContext.reservationId,
+            }
+          : payload
+      );
       setCreateOpen(false);
+      setActiveReservations([]);
+      if (createContext) {
+        window.history.replaceState(
+          null,
+          "",
+          clearContractCreateQuery(window.location.search)
+        );
+        setCreateContext(null);
+      }
       setSuccessMessage("تم إنشاء العقد بنجاح.");
       await loadContracts(1);
     } finally {
@@ -354,6 +474,8 @@ export default function ContractsPage() {
             onDismiss={() => setSuccessMessage(null)}
           />
         ) : null}
+
+        <FormErrorBanner message={contextError} />
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <SummaryCard
@@ -527,11 +649,19 @@ export default function ContractsPage() {
           key="create-contract"
           isOpen
           reservations={activeReservations}
+          lockedReservation={
+            createContext ? activeReservations[0] ?? null : null
+          }
           isLoadingReservations={isLoadingReservations}
           reservationLoadError={reservationLoadError}
           isSubmitting={isSubmitting}
           onClose={() => {
             if (!isSubmitting) {
+              if (createContext) {
+                returnToReservationList(createContext.returnTo);
+                return;
+              }
+
               setCreateOpen(false);
             }
           }}
