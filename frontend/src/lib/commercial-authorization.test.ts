@@ -4,6 +4,7 @@ import {
   canCancelContract,
   canCompleteContract,
   canCreateContract,
+  canCreateContractForReservation,
   canCreateCustomer,
   canCreateReservation,
   canEditOrActivateContract,
@@ -41,6 +42,15 @@ describe("commercial authorization UX mirrors", () => {
     expect(canCompleteContract(user("project_manager", 2), contract(1, 2, "active"))).toBe(false);
     expect(canCancelContract(user("sales", 1), contract(1, 2, "active"))).toBe(false);
     expect(canCancelContract(user("system_owner"), contract(1, 2, "active"))).toBe(true);
+  });
+
+  it("requires an active reservation within the current contract creation scope", () => {
+    expect(canCreateContractForReservation(user("project_manager", 2), reservation(1, 2))).toBe(true);
+    expect(canCreateContractForReservation(user("project_manager", 3), reservation(1, 2))).toBe(false);
+    expect(canCreateContractForReservation(user("sales", 1), reservation(1))).toBe(true);
+    expect(canCreateContractForReservation(user("sales", 2), reservation(1))).toBe(false);
+    expect(canCreateContractForReservation(user("accountant"), reservation())).toBe(false);
+    expect(canCreateContractForReservation(user("administrator"), { ...reservation(), status: "converted" })).toBe(false);
   });
 
   it("keeps customer create, write, and restore contracts distinct", () => {

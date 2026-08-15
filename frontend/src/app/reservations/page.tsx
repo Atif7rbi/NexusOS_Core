@@ -44,9 +44,14 @@ import {
 import { formatDateTime } from "@/lib/date-format";
 import { formatInteger } from "@/lib/number-format";
 import {
+  canCreateContractForReservation,
   canCreateReservation,
   canEditOrCancelReservation,
 } from "@/lib/commercial-authorization";
+import {
+  buildContextualContractUrl,
+  buildReservationListReturnTo,
+} from "@/lib/contract-create-context";
 import {
   clearReservationCreateQuery,
   parseReservationCreateQuery,
@@ -123,6 +128,8 @@ export default function ReservationsPage() {
   const [isLoadingAvailableUnits, setLoadingAvailableUnits] = useState(false);
   const [isSubmitting, setSubmitting] = useState(false);
   const [detailReservation, setDetailReservation] = useState<Reservation | null>(null);
+  const [detailContractCreateHref, setDetailContractCreateHref] =
+    useState<string | null>(null);
   const [isDetailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [editReservation, setEditReservation] = useState<Reservation | null>(null);
@@ -393,12 +400,43 @@ export default function ReservationsPage() {
     }
 
     setDetailReservation(reservation);
+    setDetailContractCreateHref(
+      canCreateContractForReservation(user, reservation)
+        ? buildContextualContractUrl(
+            reservation.id,
+            buildReservationListReturnTo({
+              page,
+              search,
+              statusFilter,
+              projectFilter,
+            })
+          )
+        : null
+    );
     setDetailLoading(true);
     setDetailError(null);
 
     try {
-      setDetailReservation(await fetchReservation(token, reservation.id));
+      const loadedReservation = await fetchReservation(
+        token,
+        reservation.id
+      );
+      setDetailReservation(loadedReservation);
+      setDetailContractCreateHref(
+        canCreateContractForReservation(user, loadedReservation)
+          ? buildContextualContractUrl(
+              loadedReservation.id,
+              buildReservationListReturnTo({
+                page,
+                search,
+                statusFilter,
+                projectFilter,
+              })
+            )
+          : null
+      );
     } catch (caughtError) {
+      setDetailContractCreateHref(null);
       setDetailError(
         caughtError instanceof Error
           ? caughtError.message
@@ -696,8 +734,10 @@ export default function ReservationsPage() {
         reservation={detailReservation}
         isLoading={isDetailLoading}
         error={detailError}
+        createContractHref={detailContractCreateHref}
         onClose={() => {
           setDetailReservation(null);
+          setDetailContractCreateHref(null);
           setDetailError(null);
         }}
       />

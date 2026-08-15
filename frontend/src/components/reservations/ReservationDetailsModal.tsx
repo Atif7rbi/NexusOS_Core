@@ -1,6 +1,9 @@
 "use client";
 
-import { CalendarCheck2 } from "lucide-react";
+import {
+  CalendarCheck2,
+  FileSignature,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import {
@@ -18,6 +21,7 @@ type ReservationDetailsModalProps = {
   reservation: Reservation | null;
   isLoading: boolean;
   error: string | null;
+  createContractHref?: string | null;
   onClose: () => void;
 };
 
@@ -32,6 +36,7 @@ export function ReservationDetailsModal({
   reservation,
   isLoading,
   error,
+  createContractHref = null,
   onClose,
 }: ReservationDetailsModalProps) {
   const isOpen = Boolean(reservation || isLoading || error);
@@ -136,6 +141,15 @@ export function ReservationDetailsModal({
       </div>
 
       <ModalFooter>
+        {reservation?.status === "active" && createContractHref ? (
+          <a
+            href={createContractHref}
+            className="motion-ui inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] border border-transparent bg-[var(--action-primary)] px-4 type-button font-bold text-[var(--action-primary-foreground)] shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
+          >
+            <FileSignature size={18} aria-hidden="true" />
+            إنشاء عقد
+          </a>
+        ) : null}
         <Button type="button" variant="secondary" onClick={onClose}>
           إغلاق
         </Button>
