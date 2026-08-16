@@ -60,8 +60,8 @@ final class EntitlementArchitectureTest extends ApiTestCase
         $this->assertCount(7, $resolver->handle((string) $tenant->id));
 
         $license->update([
-            'ends_at' => CarbonImmutable::now('UTC')->subDays(2),
-            'grace_ends_at' => CarbonImmutable::now('UTC')->subDay(),
+            'ends_at' => CarbonImmutable::now('UTC')->subDay(),
+            'grace_ends_at' => CarbonImmutable::now('UTC')->subHour(),
         ]);
         $this->assertSame([], $resolver->handle((string) $tenant->id));
 
