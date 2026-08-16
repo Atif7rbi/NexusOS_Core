@@ -11,8 +11,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('CREATE EXTENSION IF NOT EXISTS btree_gist');
-
         Schema::create('modules', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->string('key', 64)->unique();
@@ -104,22 +102,54 @@ return new class extends Migration
                 (status <> 'grace' AND grace_ends_at IS NULL)
             )
         ");
-        DB::statement("
-            ALTER TABLE tenant_licenses
-            ADD CONSTRAINT tenant_licenses_effective_period_exclusion
-            EXCLUDE USING gist (
-                tenant_id WITH =,
-                tstzrange(
-                    starts_at,
-                    CASE
-                        WHEN status = 'grace' THEN grace_ends_at
-                        ELSE ends_at
-                    END,
-                    '[]'
-                ) WITH &&
-            )
-            WHERE (status IN ('trial', 'active', 'grace'))
-        ");
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION enforce_tenant_license_effective_period_overlap()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            DECLARE
+                new_effective_end timestamptz;
+            BEGIN
+                PERFORM pg_advisory_xact_lock(hashtext(NEW.tenant_id::text));
+
+                IF NEW.status NOT IN ('trial', 'active', 'grace') THEN
+                    RETURN NEW;
+                END IF;
+
+                new_effective_end := CASE
+                    WHEN NEW.status = 'grace' THEN NEW.grace_ends_at
+                    ELSE NEW.ends_at
+                END;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM tenant_licenses AS existing
+                    WHERE existing.tenant_id = NEW.tenant_id
+                      AND existing.status IN ('trial', 'active', 'grace')
+                      AND existing.id IS DISTINCT FROM NEW.id
+                      AND existing.starts_at <= new_effective_end
+                      AND (
+                          CASE
+                              WHEN existing.status = 'grace' THEN existing.grace_ends_at
+                              ELSE existing.ends_at
+                          END
+                      ) >= NEW.starts_at
+                ) THEN
+                    RAISE EXCEPTION USING
+                        ERRCODE = '23P01',
+                        CONSTRAINT = 'tenant_licenses_effective_period_overlap',
+                        MESSAGE = 'Tenant License effective periods must not overlap.';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$;
+
+            CREATE TRIGGER tenant_licenses_effective_period_overlap_trigger
+            BEFORE INSERT OR UPDATE ON tenant_licenses
+            FOR EACH ROW
+            EXECUTE FUNCTION enforce_tenant_license_effective_period_overlap();
+            SQL);
 
         Schema::create('tenant_modules', function (Blueprint $table): void {
             $table->foreignUlid('tenant_id')
@@ -146,6 +176,13 @@ return new class extends Migration
 
     public function down(): void
     {
+        DB::unprepared(<<<'SQL'
+            DROP TRIGGER IF EXISTS tenant_licenses_effective_period_overlap_trigger
+            ON tenant_licenses;
+
+            DROP FUNCTION IF EXISTS enforce_tenant_license_effective_period_overlap();
+            SQL);
+
         Schema::dropIfExists('tenant_modules');
         Schema::dropIfExists('tenant_licenses');
         Schema::dropIfExists('plan_modules');

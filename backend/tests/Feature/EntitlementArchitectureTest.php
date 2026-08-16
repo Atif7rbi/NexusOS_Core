@@ -13,6 +13,7 @@ use App\Modules\Entitlements\Services\ValidatePlanModuleDependencies;
 use App\Modules\Entitlements\Support\CommercialModuleCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
 
@@ -162,6 +163,53 @@ final class EntitlementArchitectureTest extends ApiTestCase
             'ends_at' => CarbonImmutable::now('UTC')->addDay(),
             'grace_ends_at' => null,
         ]);
+    }
+
+    public function test_database_rejects_an_update_that_creates_an_entitled_period_overlap(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $existing = $tenant->licenses()->firstOrFail();
+        $historical = TenantLicense::query()->create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $existing->plan_id,
+            'status' => TenantLicense::STATUS_ACTIVE,
+            'starts_at' => $existing->starts_at->subYear(),
+            'ends_at' => $existing->starts_at->subSecond(),
+            'grace_ends_at' => null,
+        ]);
+
+        $this->expectException(QueryException::class);
+
+        $historical->update([
+            'ends_at' => $existing->starts_at,
+        ]);
+    }
+
+    public function test_overlap_trigger_uses_a_transaction_scoped_tenant_advisory_lock(): void
+    {
+        /** @var object{definition: string} $function */
+        $function = DB::selectOne(
+            "SELECT pg_get_functiondef(
+                'enforce_tenant_license_effective_period_overlap()'::regprocedure
+            ) AS definition",
+        );
+
+        $this->assertStringContainsString(
+            'pg_advisory_xact_lock',
+            $function->definition,
+        );
+        $this->assertStringContainsString(
+            'hashtext',
+            $function->definition,
+        );
+        $this->assertStringContainsString(
+            'tenant_id',
+            $function->definition,
+        );
+        $this->assertStringContainsString(
+            'existing.id IS DISTINCT FROM NEW.id',
+            $function->definition,
+        );
     }
 
     public function test_commercial_module_key_is_immutable(): void

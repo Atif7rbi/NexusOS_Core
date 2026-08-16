@@ -42,8 +42,10 @@ Entitlements v1 uses exactly five tables:
   override.
 
 Foreign keys use restrictive deletion. CHECK constraints protect status and
-period values. PostgreSQL excludes overlapping entitled periods for the same
-Tenant while retaining non-overlapping historical Licenses.
+period values. A PostgreSQL `BEFORE INSERT OR UPDATE` trigger takes a
+transaction-scoped advisory lock for the Tenant and rejects overlapping
+entitled periods while retaining non-overlapping historical Licenses. It uses
+only PostgreSQL core capabilities and has no extension dependency.
 
 ## License lifecycle and time semantics
 
