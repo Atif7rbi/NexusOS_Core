@@ -37,7 +37,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
     {
         $tenant = $this->tenantWithoutEntitlements();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant))
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant))
             ->assertSuccessful();
 
         $this->assertSame(7, Module::query()->count());
@@ -64,12 +64,12 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
             '--tenant' => (string) $tenant->id,
         ])->assertFailed();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--starts-at' => self::ENDS_AT,
             '--ends-at' => self::STARTS_AT,
         ]))->assertFailed();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--starts-at' => '2026-08-01 00:00:00',
         ]))->assertFailed();
     }
@@ -78,20 +78,20 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
     {
         $tenant = $this->tenantWithoutEntitlements();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--status' => TenantLicense::STATUS_GRACE,
         ]))->assertFailed();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--status' => TenantLicense::STATUS_GRACE,
             '--grace-ends-at' => '2026-07-01T00:00:00Z',
         ]))->assertFailed();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--grace-ends-at' => '2027-09-01T00:00:00Z',
         ]))->assertFailed();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--status' => TenantLicense::STATUS_GRACE,
             '--ends-at' => '2026-08-10T00:00:00Z',
             '--grace-ends-at' => '2026-09-01T00:00:00Z',
@@ -106,7 +106,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
     public function test_exact_rerun_is_idempotent_and_conflicting_license_fails(): void
     {
         $tenant = $this->tenantWithoutEntitlements();
-        $options = $this->options($tenant);
+        $options = $this->provisioningOptions($tenant);
 
         $this->artisan('nexusos:provision-entitlements', $options)
             ->assertSuccessful();
@@ -116,7 +116,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
 
         $this->assertSame(1, TenantLicense::query()->where('tenant_id', $tenant->id)->count());
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant, [
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant, [
             '--ends-at' => '2028-08-01T00:00:00Z',
         ]))
             ->assertFailed()
@@ -127,7 +127,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
     {
         $tenant = $this->tenantWithoutEntitlements();
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant))
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant))
             ->assertSuccessful();
 
         $historical = TenantLicense::query()
@@ -138,7 +138,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
             'ends_at' => CarbonImmutable::parse('2026-07-31T23:59:59Z'),
         ]);
 
-        $this->artisan('nexusos:provision-entitlements', $this->options($tenant))
+        $this->artisan('nexusos:provision-entitlements', $this->provisioningOptions($tenant))
             ->assertSuccessful();
 
         $this->assertDatabaseHas('tenant_licenses', [
@@ -193,7 +193,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
      * @param array<string, string> $overrides
      * @return array<string, string>
      */
-    private function options(Tenant $tenant, array $overrides = []): array
+    private function provisioningOptions(Tenant $tenant, array $overrides = []): array
     {
         return array_merge([
             '--tenant' => (string) $tenant->id,
