@@ -316,10 +316,10 @@ final class LeadsApiTest extends ApiTestCase
             ->assertJsonPath('data.pagination.total', 0);
         $this->getJson("/api/leads/{$lead->id}")
             ->assertNotFound()
-            ->assertJsonPath('error.code', 'lead_not_found');
+            ->assertJsonPath('error.code', 'resource_not_found');
         $this->patchJson("/api/leads/{$lead->id}", ['name' => 'Cross tenant'])
             ->assertNotFound()
-            ->assertJsonPath('error.code', 'lead_not_found');
+            ->assertJsonPath('error.code', 'resource_not_found');
     }
 
     public function test_final_visibility_rule_and_archived_mode_are_enforced(): void

@@ -409,7 +409,9 @@ final class CollectionsIndexApiTest extends ApiTestCase
         DB::disableQueryLog();
 
         $this->assertSame($singleItemQueryCount, $fullPageQueryCount);
-        $this->assertLessThanOrEqual(5, $fullPageQueryCount);
+        // Fixed request work: active membership (2), entitlement resolution (5),
+        // controller membership resolution (2), and index count/items/summary (3).
+        $this->assertLessThanOrEqual(12, $fullPageQueryCount);
     }
 
     /** @return array{string, int} */
