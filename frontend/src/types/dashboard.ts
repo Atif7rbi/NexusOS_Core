@@ -7,6 +7,7 @@ import type {
   LeadSummary,
 } from "@/types/lead";
 import type { Project } from "@/types/project";
+import type { CommercialModuleKey } from "@/types/entitlement";
 
 export type DashboardResource<T> = {
   data: T | null;
@@ -39,5 +40,6 @@ export type DashboardData = {
   followUps: DashboardResource<DashboardFollowUps>;
   collections: DashboardResource<DashboardCollections>;
   hasCrmAccess: boolean;
+  availableModules: Record<CommercialModuleKey, boolean>;
   refresh: () => Promise<void>;
 };

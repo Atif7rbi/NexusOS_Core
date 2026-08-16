@@ -1,3 +1,5 @@
+import type { CommercialModuleKey } from "@/types/entitlement";
+
 export type UserRole =
   | "system_owner"
   | "administrator"
@@ -34,11 +36,13 @@ export type LoginResponse = {
   data: {
     token: string;
     user: AuthUser;
+    effective_modules: CommercialModuleKey[];
   };
 };
 
 export type CurrentUserResponse = {
   data: {
     user: AuthUser;
+    effective_modules: CommercialModuleKey[];
   };
 };

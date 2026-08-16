@@ -339,7 +339,7 @@ final class LeadFollowUpsApiTest extends ApiTestCase
             $this->schedulePayload(),
         )
             ->assertNotFound()
-            ->assertJsonPath('error.code', 'lead_not_found');
+            ->assertJsonPath('error.code', 'resource_not_found');
     }
 
     /**

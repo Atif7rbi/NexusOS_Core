@@ -17,6 +17,7 @@ import {
 } from "react";
 
 import { CollectionsIndexTable } from "@/components/collections/CollectionsIndexTable";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { ContractDetailsModal } from "@/components/contracts/ContractDetailsModal";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -72,6 +73,14 @@ const scheduleStates: DerivedScheduleState[] = [
 ];
 
 export default function CollectionsPage() {
+  return (
+    <ModulePageGuard module="collections">
+      <CollectionsPageContent />
+    </ModulePageGuard>
+  );
+}
+
+function CollectionsPageContent() {
   const { token } = useAuth();
   const { t, isArabic } = useTranslation();
   const [query, setQuery] =

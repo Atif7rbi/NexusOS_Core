@@ -127,12 +127,21 @@ const services = vi.hoisted(() => ({
   fetchCustomer: vi.fn(),
 }));
 
+const auth = vi.hoisted(() => ({
+  effectiveModules: ["reservations", "contracts"] as string[],
+}));
+
 const navigation = vi.hoisted(() => ({
   returnToCustomerRecord: vi.fn(),
 }));
 
 vi.mock("@/providers/AuthProvider", () => ({
-  useAuth: () => ({ token: "token", user: { id: 1, role: "administrator" } }),
+  useAuth: () => ({
+    token: "token",
+    user: { id: 1, role: "administrator" },
+    effectiveModules: auth.effectiveModules,
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/components/layout/AppShell", () => ({
@@ -260,6 +269,7 @@ const customersResponse = {
 describe("ReservationsPage contextual creation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.effectiveModules = ["reservations", "contracts"];
     window.history.replaceState(
       null,
       "",
@@ -476,5 +486,44 @@ describe("ReservationsPage contextual creation", () => {
     expect(target.searchParams.get("returnTo")).toBe(
       "/reservations/?page=3&search=%D9%85%D8%AD%D9%85%D8%AF&status=active&project_id=project-1"
     );
+  });
+
+  it("does not expose contextual contract creation when Contracts is unavailable", async () => {
+    auth.effectiveModules = ["reservations"];
+    services.fetchReservations.mockResolvedValue({
+      data: {
+        reservations: {
+          data: [activeReservation],
+          meta: {
+            current_page: 1,
+            last_page: 1,
+            per_page: 20,
+            total: 1,
+          },
+        },
+        summary: {
+          total: 1,
+          active: 1,
+          cancelled: 0,
+          expired: 0,
+        },
+      },
+    });
+    services.fetchReservation.mockResolvedValue(activeReservation);
+
+    render(<ReservationsPage />);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "عرض التفاصيل",
+      })
+    );
+
+    await waitFor(() => {
+      expect(services.fetchReservation).toHaveBeenCalled();
+    });
+    expect(
+      screen.queryByRole("link", { name: "إنشاء عقد" })
+    ).toBeNull();
   });
 });

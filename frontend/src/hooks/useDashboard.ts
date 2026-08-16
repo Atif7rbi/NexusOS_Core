@@ -12,6 +12,7 @@ import {
   loadDashboardResource,
 } from "@/hooks/dashboard-resource";
 import { canAccessCrm } from "@/lib/crm-authorization";
+import { hasModuleEntitlement } from "@/lib/entitlements";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchCollectionsIndex } from "@/services/collections";
 import { fetchContracts } from "@/services/contracts";
@@ -29,9 +30,19 @@ import type {
 } from "@/types/dashboard";
 
 export function useDashboard(): DashboardData {
-  const { token, user } = useAuth();
+  const { token, user, effectiveModules } = useAuth();
   const requestSequence = useRef(0);
-  const hasCrmAccess = canAccessCrm(user?.role);
+  const availableModules = {
+    projects: hasModuleEntitlement(effectiveModules, "projects"),
+    units: hasModuleEntitlement(effectiveModules, "units"),
+    customers: hasModuleEntitlement(effectiveModules, "customers"),
+    crm: hasModuleEntitlement(effectiveModules, "crm"),
+    reservations: hasModuleEntitlement(effectiveModules, "reservations"),
+    contracts: hasModuleEntitlement(effectiveModules, "contracts"),
+    collections: hasModuleEntitlement(effectiveModules, "collections"),
+  };
+  const hasCrmAccess =
+    availableModules.crm && canAccessCrm(user?.role);
 
   const [projects, setProjects] =
     useState<DashboardResource<DashboardProjects>>(
@@ -62,8 +73,15 @@ export function useDashboard(): DashboardData {
     const requestId = ++requestSequence.current;
     const isCurrent = (): boolean =>
       requestSequence.current === requestId;
-    const tasks: Promise<void>[] = [
-      loadDashboardResource(
+    const tasks: Promise<void>[] = [];
+    const unavailable = {
+      data: null,
+      isLoading: false,
+      error: null,
+    };
+
+    if (availableModules.projects) {
+      tasks.push(loadDashboardResource(
         async () => {
           const response = await fetchProjects(token, {
             perPage: 5,
@@ -77,15 +95,25 @@ export function useDashboard(): DashboardData {
         },
         setProjects,
         isCurrent
-      ),
-      loadDashboardResource(
+      ));
+    } else {
+      setProjects(unavailable);
+    }
+
+    if (availableModules.customers) {
+      tasks.push(loadDashboardResource(
         async () =>
           (await fetchCustomers(token, { per_page: 1 }))
             .data.summary.total,
         setCustomers,
         isCurrent
-      ),
-      loadDashboardResource(
+      ));
+    } else {
+      setCustomers(unavailable);
+    }
+
+    if (availableModules.units) {
+      tasks.push(loadDashboardResource(
         async () =>
           (
             await fetchUnits(token, {
@@ -96,22 +124,37 @@ export function useDashboard(): DashboardData {
           ).data.units.total,
         setUnits,
         isCurrent
-      ),
-      loadDashboardResource(
+      ));
+    } else {
+      setUnits(unavailable);
+    }
+
+    if (availableModules.reservations) {
+      tasks.push(loadDashboardResource(
         async () =>
           (await fetchReservations(token, { per_page: 1 }))
             .data.summary.active,
         setReservations,
         isCurrent
-      ),
-      loadDashboardResource(
+      ));
+    } else {
+      setReservations(unavailable);
+    }
+
+    if (availableModules.contracts) {
+      tasks.push(loadDashboardResource(
         async () =>
           (await fetchContracts(token, { per_page: 1 }))
             .data.summary.total,
         setContracts,
         isCurrent
-      ),
-      loadDashboardResource(
+      ));
+    } else {
+      setContracts(unavailable);
+    }
+
+    if (availableModules.collections) {
+      tasks.push(loadDashboardResource(
         async () => {
           const response = await fetchCollectionsIndex(token, {
             per_page: 5,
@@ -126,8 +169,10 @@ export function useDashboard(): DashboardData {
         },
         setCollections,
         isCurrent
-      ),
-    ];
+      ));
+    } else {
+      setCollections(unavailable);
+    }
 
     if (hasCrmAccess) {
       tasks.push(
@@ -163,7 +208,16 @@ export function useDashboard(): DashboardData {
     }
 
     await Promise.all(tasks);
-  }, [hasCrmAccess, token]);
+  }, [
+    availableModules.collections,
+    availableModules.contracts,
+    availableModules.customers,
+    availableModules.projects,
+    availableModules.reservations,
+    availableModules.units,
+    hasCrmAccess,
+    token,
+  ]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -185,6 +239,7 @@ export function useDashboard(): DashboardData {
     followUps,
     collections,
     hasCrmAccess,
+    availableModules,
     refresh: loadDashboard,
   };
 }

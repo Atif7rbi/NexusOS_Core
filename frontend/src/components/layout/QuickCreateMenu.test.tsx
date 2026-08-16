@@ -4,15 +4,29 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuickCreateMenu } from "@/components/layout/QuickCreateMenu";
+
+const auth = vi.hoisted(() => ({
+  effectiveModules: ["projects", "customers", "units"] as string[],
+}));
 
 vi.mock("@/hooks/useTranslation", () => ({
   useTranslation: () => ({ isArabic: true }),
 }));
 
+vi.mock("@/providers/AuthProvider", () => ({
+  useAuth: () => ({
+    effectiveModules: auth.effectiveModules,
+  }),
+}));
+
 describe("QuickCreateMenu", () => {
+  beforeEach(() => {
+    auth.effectiveModules = ["projects", "customers", "units"];
+  });
+
   it("toggles an accessible menu with only the three approved routes", async () => {
     render(<QuickCreateMenu />);
 
@@ -128,5 +142,18 @@ describe("QuickCreateMenu", () => {
     fireEvent.pointerDown(document.body);
 
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("does not expose quick actions for unavailable modules", () => {
+    auth.effectiveModules = ["customers"];
+    render(<QuickCreateMenu />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "إنشاء سريع" })
+    );
+
+    expect(screen.getByRole("menuitem", { name: "عميل جديد" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "مشروع جديد" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "إضافة وحدة" })).toBeNull();
   });
 });

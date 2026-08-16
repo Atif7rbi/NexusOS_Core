@@ -5,9 +5,13 @@ import {
   navigationGroups,
 } from "@/config/navigation";
 import type { UserRole } from "@/types/auth";
+import { commercialModuleKeys } from "@/types/entitlement";
 
 function hrefsForRole(role: UserRole | null): string[] {
-  return getNavigationGroupsForRole(role).flatMap(
+  return getNavigationGroupsForRole(
+    role,
+    commercialModuleKeys
+  ).flatMap(
     (group) => group.items.map((item) => item.href)
   );
 }
@@ -84,5 +88,21 @@ describe("pilot navigation visibility", () => {
     (["accountant", "employee"] as UserRole[]).forEach((role) => {
       expect(hrefsForRole(role)).not.toContain("/crm/");
     });
+  });
+
+  it("hides unavailable commercial modules while preserving core navigation", () => {
+    const hrefs = getNavigationGroupsForRole(
+      "administrator",
+      ["projects"]
+    ).flatMap((group) =>
+      group.items.map((item) => item.href)
+    );
+
+    expect(hrefs).toContain("/");
+    expect(hrefs).toContain("/projects/");
+    expect(hrefs).toContain("/users/");
+    expect(hrefs).toContain("/settings/");
+    expect(hrefs).not.toContain("/crm/");
+    expect(hrefs).not.toContain("/collections/");
   });
 });

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Models\User;
+use App\Models\TenantUser;
+use App\Modules\Entitlements\Services\ResolveEffectiveTenantModules;
 use App\Modules\Shared\Exceptions\TenantAccessDeniedException;
 use App\Modules\Shared\Exceptions\TenantMembershipInvitedException;
 use App\Modules\Shared\Exceptions\TenantMembershipMissingException;
@@ -23,6 +25,7 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly ResolveActiveMembership $resolver,
+        private readonly ResolveEffectiveTenantModules $entitlements,
         private readonly LifecycleAccessDenialResponder $denials,
     ) {
     }
@@ -40,7 +43,7 @@ class AuthController extends Controller
         }
 
         try {
-            $this->resolver->handle($user);
+            $membership = $this->resolver->handle($user);
         } catch (
             TenantMembershipMissingException
             | TenantMembershipInvitedException
@@ -64,15 +67,27 @@ class AuthController extends Controller
             'data' => [
                 'token' => $token,
                 'user' => $user->fresh(),
+                'effective_modules' => $this->entitlements->handle(
+                    (string) $membership->tenant_id,
+                ),
             ],
         ]);
     }
 
     public function user(Request $request): JsonResponse
     {
+        $membership = $request->attributes->get('tenant_membership');
+
+        if (! $membership instanceof TenantUser) {
+            throw new \LogicException('Active Tenant membership was not resolved.');
+        }
+
         return response()->json([
             'data' => [
                 'user' => $request->user(),
+                'effective_modules' => $this->entitlements->handle(
+                    (string) $membership->tenant_id,
+                ),
             ],
         ]);
     }

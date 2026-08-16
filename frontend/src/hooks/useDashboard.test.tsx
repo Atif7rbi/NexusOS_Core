@@ -14,6 +14,15 @@ import { useDashboard } from "@/hooks/useDashboard";
 
 const auth = vi.hoisted(() => ({
   role: "administrator" as string,
+  effectiveModules: [
+    "projects",
+    "units",
+    "customers",
+    "crm",
+    "reservations",
+    "contracts",
+    "collections",
+  ] as string[],
 }));
 
 const services = vi.hoisted(() => ({
@@ -30,6 +39,7 @@ vi.mock("@/providers/AuthProvider", () => ({
   useAuth: () => ({
     token: "token",
     user: { role: auth.role },
+    effectiveModules: auth.effectiveModules,
   }),
 }));
 
@@ -107,6 +117,15 @@ describe("useDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.role = "administrator";
+    auth.effectiveModules = [
+      "projects",
+      "units",
+      "customers",
+      "crm",
+      "reservations",
+      "contracts",
+      "collections",
+    ];
     configureSuccessResponses();
   });
 
@@ -218,5 +237,25 @@ describe("useDashboard", () => {
     expect(result.current.followUps.error).toBeNull();
     expect(services.fetchLeads).not.toHaveBeenCalled();
     expect(result.current.collections.data?.summary.scheduled_count).toBe(3);
+  });
+
+  it("skips every API request whose source module is unavailable", async () => {
+    auth.effectiveModules = ["projects", "customers"];
+
+    const { result } = renderHook(() => useDashboard());
+
+    await waitFor(() => {
+      expect(result.current.projects.isLoading).toBe(false);
+      expect(result.current.units.isLoading).toBe(false);
+    });
+
+    expect(services.fetchProjects).toHaveBeenCalledTimes(1);
+    expect(services.fetchCustomers).toHaveBeenCalledTimes(1);
+    expect(services.fetchUnits).not.toHaveBeenCalled();
+    expect(services.fetchReservations).not.toHaveBeenCalled();
+    expect(services.fetchContracts).not.toHaveBeenCalled();
+    expect(services.fetchCollectionsIndex).not.toHaveBeenCalled();
+    expect(services.fetchLeads).not.toHaveBeenCalled();
+    expect(result.current.availableModules.units).toBe(false);
   });
 });

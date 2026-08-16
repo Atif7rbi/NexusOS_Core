@@ -18,12 +18,14 @@ import {
   useState,
 } from "react";
 import { AppShell } from "@/components/layout/AppShell";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { CustomerArchiveDialog } from "@/components/customers/CustomerArchiveDialog";
 import { CustomerCard } from "@/components/customers/CustomerCard";
 import { CustomerDetailsView } from "@/components/customers/CustomerDetailsView";
 import { CustomerFormModal } from "@/components/customers/CustomerFormModal";
 import { Button } from "@/components/ui/Button";
 import { ApiRequestError } from "@/lib/api-error";
+import { hasModuleEntitlement } from "@/lib/entitlements";
 import { canCreateCustomer } from "@/lib/commercial-authorization";
 import { buildContextualReservationUrl } from "@/lib/reservation-create-context";
 import { useCustomersQueryState } from "@/hooks/useCustomersQueryState";
@@ -52,15 +54,17 @@ type CustomerAction = "archive" | "restore";
 
 export default function CustomersPage() {
   return (
-    <Suspense fallback={null}>
-      <CustomersPageContent />
-    </Suspense>
+    <ModulePageGuard module="customers">
+      <Suspense fallback={null}>
+        <CustomersPageContent />
+      </Suspense>
+    </ModulePageGuard>
   );
 }
 
 function CustomersPageContent() {
   const { isArabic } = useTranslation();
-  const { token, user } = useAuth();
+  const { token, user, effectiveModules } = useAuth();
   const query = useCustomersQueryState();
   const quickCreate = useQuickCreateQuery();
   const { isRequested: quickCreateRequested, clear: clearQuickCreate } = quickCreate;
@@ -545,6 +549,7 @@ function CustomersPageContent() {
   if (query.customerId) {
     const createReservationHref =
       customerRecord &&
+      hasModuleEntitlement(effectiveModules, "reservations") &&
       typeof window !== "undefined"
         ? buildContextualReservationUrl(
             customerRecord.id,

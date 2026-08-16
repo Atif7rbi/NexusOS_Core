@@ -19,6 +19,7 @@ import {
 } from "react";
 
 import { ArchiveProjectDialog } from "@/components/projects/DeleteProjectDialog";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { ProjectFormModal } from "@/components/projects/ProjectFormModal";
 import { Button } from "@/components/ui/Button";
 import { AppShell } from "@/components/layout/AppShell";
@@ -54,9 +55,11 @@ import type {
 
 export default function ProjectsPage() {
   return (
-    <Suspense fallback={null}>
-      <ProjectsPageContent />
-    </Suspense>
+    <ModulePageGuard module="projects">
+      <Suspense fallback={null}>
+        <ProjectsPageContent />
+      </Suspense>
+    </ModulePageGuard>
   );
 }
 

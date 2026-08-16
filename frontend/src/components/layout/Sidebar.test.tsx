@@ -40,6 +40,15 @@ vi.mock("@/hooks/useTranslation", () => ({
 vi.mock("@/providers/AuthProvider", () => ({
   useAuth: () => ({
     user: { role: "administrator" },
+    effectiveModules: [
+      "projects",
+      "units",
+      "customers",
+      "crm",
+      "reservations",
+      "contracts",
+      "collections",
+    ],
   }),
 }));
 

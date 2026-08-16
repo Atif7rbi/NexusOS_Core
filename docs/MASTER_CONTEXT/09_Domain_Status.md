@@ -62,17 +62,17 @@ Historical documentation is retained for reference only.
 
 # Domain Overview
 
-> تم تحديث هذا الجدول بتاريخ 28 يوليو 2026 ليعكس الحالة الفعلية على `main` (commit `5cb2cdd` وما قبله). التعريفات والسياسات أعلاه لم تتغيّر.
+> تم تحديث صفوف Entitlements بتاريخ 15 أغسطس 2026 لتعكس معمارية CP18–CP20 المجمدة والتنفيذ الجاري على فرع المراجعة. الانتقال إلى `Frozen` ينتظر PostgreSQL runtime validation والاعتماد النهائي.
 
 | Domain | Status | Notes |
 |---------|--------|-------|
 | Identity | Completed | Stateless authentication, System Owner role, tenant membership. |
 | RBAC | In Progress | Basic role/membership checks exist (Tenant, System Owner); no full permission matrix yet. |
 | Tenant | Completed | Tenants and tenant-user membership tables and enforcement in place. |
-| Tenant License | Planned | Subscription and licensing lifecycle. |
-| Plan | Planned | Subscription plans and commercial offerings. |
-| Module | Planned | System module catalog and availability. |
-| Tenant Module | Planned | Tenant-specific module activation. |
+| Tenant License | In Progress | Entitlements v1 architecture and implementation complete; PostgreSQL runtime validation pending before freeze. |
+| Plan | In Progress | `pilot_full` composition and dependency validation implemented; runtime validation pending. |
+| Module | In Progress | Seven-key commercial Module catalog and fail-closed resolver implemented; runtime validation pending. |
+| Tenant Module | In Progress | Explicit `enabled`/`disabled` Tenant overrides implemented with frozen precedence; runtime validation pending. |
 | User | Completed | Tenant user CRUD (`api/users`) implemented and tested. |
 | Project | Frozen | Full lifecycle (draft/active/completed/cancelled/archived), tenant-scoped, tested. |
 | Customer | Completed | Tenant-scoped API, archive/restore, tested (`v1 frozen` per module docs). |

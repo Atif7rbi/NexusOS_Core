@@ -32,6 +32,8 @@ vi.mock("@/providers/AuthProvider", () => ({
   useAuth: () => ({
     token: "token",
     user: auth.user,
+    effectiveModules: ["projects"],
+    isLoading: false,
   }),
 }));
 

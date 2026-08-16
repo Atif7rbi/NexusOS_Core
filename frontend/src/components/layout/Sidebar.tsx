@@ -72,9 +72,12 @@ function SidebarContent({
   const pathname = usePathname();
   const { isArabic, t } = useTranslation();
   const { isDark } = useTheme();
-  const { user } = useAuth();
+  const { user, effectiveModules } = useAuth();
   const visibleNavigationGroups =
-    getNavigationGroupsForRole(user?.role ?? null);
+    getNavigationGroupsForRole(
+      user?.role ?? null,
+      effectiveModules
+    );
 
   const {
     isSidebarCollapsed,

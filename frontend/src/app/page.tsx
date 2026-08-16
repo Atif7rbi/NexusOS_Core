@@ -132,25 +132,27 @@ export default function HomePage() {
           },
         ]
       : []),
-    {
-      label: copy.activeReservations,
-      value: metricValue(
-        dashboard.reservations,
-        dashboard.reservations.data ?? undefined
-      ),
-      description: metricDescription(dashboard.reservations, {
-        ready: copy.currentReservations,
-        loading: copy.loading,
-        error: copy.error,
-      }),
-      icon: Building2,
-      tone: "green" as const,
-      href: "/reservations/",
-    },
+    ...(dashboard.availableModules.reservations
+      ? [{
+          label: copy.activeReservations,
+          value: metricValue(
+            dashboard.reservations,
+            dashboard.reservations.data ?? undefined
+          ),
+          description: metricDescription(dashboard.reservations, {
+            ready: copy.currentReservations,
+            loading: copy.loading,
+            error: copy.error,
+          }),
+          icon: Building2,
+          tone: "green" as const,
+          href: "/reservations/",
+        }]
+      : []),
   ];
 
   const businessStats = [
-    {
+    ...(dashboard.availableModules.contracts ? [{
       label: copy.totalContracts,
       value: metricValue(
         dashboard.contracts,
@@ -164,8 +166,8 @@ export default function HomePage() {
       icon: FileSignature,
       tone: "violet" as const,
       href: "/contracts/",
-    },
-    {
+    }] : []),
+    ...(dashboard.availableModules.projects ? [{
       label: copy.activeProjects,
       value: metricValue(
         dashboard.projects,
@@ -179,8 +181,8 @@ export default function HomePage() {
       icon: FolderKanban,
       tone: "gold" as const,
       href: "/projects/",
-    },
-    {
+    }] : []),
+    ...(dashboard.availableModules.customers ? [{
       label: copy.totalCustomers,
       value: metricValue(
         dashboard.customers,
@@ -194,8 +196,8 @@ export default function HomePage() {
       icon: Users,
       tone: "blue" as const,
       href: "/customers/",
-    },
-    {
+    }] : []),
+    ...(dashboard.availableModules.units ? [{
       label: copy.availableUnits,
       value: metricValue(
         dashboard.units,
@@ -209,13 +211,14 @@ export default function HomePage() {
       icon: Building2,
       tone: "green" as const,
       href: "/units/",
-    },
+    }] : []),
   ];
 
   return (
     <AppShell>
       <div className="mx-auto max-w-[1600px] space-y-6">
-        <DashboardCollapsibleSection
+        {attentionStats.length > 0 ? (
+          <DashboardCollapsibleSection
           title={copy.attention}
           description={copy.attentionDescription}
           contentClassName="mt-4"
@@ -233,15 +236,19 @@ export default function HomePage() {
               <StatCard key={stat.label} {...stat} />
             ))}
           </div>
-        </DashboardCollapsibleSection>
+          </DashboardCollapsibleSection>
+        ) : null}
 
         {dashboard.hasCrmAccess ? (
           <FollowUpsPanel resource={dashboard.followUps} />
         ) : null}
 
-        <CollectionSummary resource={dashboard.collections} />
+        {dashboard.availableModules.collections ? (
+          <CollectionSummary resource={dashboard.collections} />
+        ) : null}
 
-        <section>
+        {businessStats.length > 0 ? (
+          <section>
           <h2 className="text-xl font-bold text-[var(--text-primary)]">
             {copy.business}
           </h2>
@@ -253,13 +260,16 @@ export default function HomePage() {
               <StatCard key={stat.label} {...stat} />
             ))}
           </div>
-        </section>
+          </section>
+        ) : null}
 
-        <ProjectsOverview
-          projects={dashboard.projects.data?.items ?? []}
-          isLoading={dashboard.projects.isLoading}
-          error={dashboard.projects.error}
-        />
+        {dashboard.availableModules.projects ? (
+          <ProjectsOverview
+            projects={dashboard.projects.data?.items ?? []}
+            isLoading={dashboard.projects.isLoading}
+            error={dashboard.projects.error}
+          />
+        ) : null}
       </div>
     </AppShell>
   );

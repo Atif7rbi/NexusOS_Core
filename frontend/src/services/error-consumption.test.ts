@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { login } from "@/services/auth";
+import { fetchProjects } from "@/services/projects";
 import { fetchTenantUsers } from "@/services/users";
 
 describe("API service error consumption", () => {
@@ -60,6 +61,30 @@ describe("API service error consumption", () => {
       fieldErrors: { role: ["الدور غير صالح."] },
       status: 422,
       code: "validation_failed",
+    });
+  });
+
+  it("preserves the canonical module entitlement denial", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            message: "هذه الوحدة غير متاحة ضمن باقة المنشأة الحالية.",
+            error: {
+              code: "module_not_entitled",
+              message: "هذه الوحدة غير متاحة ضمن باقة المنشأة الحالية.",
+            },
+          }),
+          { status: 403 }
+        )
+      )
+    );
+
+    await expect(fetchProjects("token")).rejects.toMatchObject({
+      message: "هذه الوحدة غير متاحة ضمن باقة المنشأة الحالية.",
+      status: 403,
+      code: "module_not_entitled",
     });
   });
 });

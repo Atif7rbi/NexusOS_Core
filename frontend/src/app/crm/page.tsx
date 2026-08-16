@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 
 import { CrmLeadsPage } from "@/components/leads/CrmLeadsPage";
+import { ModulePageGuard } from "@/components/entitlements/ModulePageGuard";
 import { AppShell } from "@/components/layout/AppShell";
 import { useTranslation } from "@/hooks/useTranslation";
 import { canAccessCrm } from "@/lib/crm-authorization";
@@ -37,9 +38,11 @@ export default function Page() {
   }
 
   return (
-    <Suspense fallback={<CrmPageFallback />}>
-      <CrmLeadsPage />
-    </Suspense>
+    <ModulePageGuard module="crm">
+      <Suspense fallback={<CrmPageFallback />}>
+        <CrmLeadsPage />
+      </Suspense>
+    </ModulePageGuard>
   );
 }
 
