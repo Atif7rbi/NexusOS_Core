@@ -148,7 +148,7 @@ return new class extends Migration
             CREATE TRIGGER tenant_licenses_effective_period_overlap_trigger
             BEFORE INSERT OR UPDATE ON tenant_licenses
             FOR EACH ROW
-            EXECUTE FUNCTION enforce_tenant_license_effective_period_overlap();
+            EXECUTE PROCEDURE enforce_tenant_license_effective_period_overlap();
             SQL);
 
         Schema::create('tenant_modules', function (Blueprint $table): void {
