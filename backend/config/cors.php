@@ -7,7 +7,7 @@ $allowedOrigins = array_values(array_filter(
         static fn (string $origin): string => trim($origin),
         explode(',', (string) env('CORS_ALLOWED_ORIGINS', '')),
     ),
-    static fn (string $origin): bool => $origin !== '',
+    static fn (string $origin): bool => $origin !== '' && $origin !== '*',
 ));
 
 return [
