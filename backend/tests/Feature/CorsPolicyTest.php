@@ -44,12 +44,26 @@ final class CorsPolicyTest extends TestCase
         $this->assertNotSame('*', $allowOrigin);
     }
 
-    public function test_production_configuration_contains_no_wildcard_origin(): void
+    public function test_config_rejects_wildcard_even_if_environment_contains_it(): void
     {
-        config()->set('cors.allowed_origins', [
-            'https://ufq.sewarsky.online',
-        ]);
+        $original = getenv('CORS_ALLOWED_ORIGINS');
 
-        $this->assertNotContains('*', config('cors.allowed_origins'));
+        try {
+            putenv('CORS_ALLOWED_ORIGINS=https://ufq.sewarsky.online,*');
+
+            /** @var array<string, mixed> $cors */
+            $cors = require config_path('cors.php');
+
+            $this->assertSame(
+                ['https://ufq.sewarsky.online'],
+                $cors['allowed_origins'],
+            );
+        } finally {
+            if ($original === false) {
+                putenv('CORS_ALLOWED_ORIGINS');
+            } else {
+                putenv('CORS_ALLOWED_ORIGINS='.$original);
+            }
+        }
     }
 }
