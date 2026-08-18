@@ -22,7 +22,15 @@ final class Plan extends Model
         'name_ar',
         'name_en',
         'status',
+        'users_limit',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'users_limit' => 'integer',
+        ];
+    }
 
     public function modules(): BelongsToMany
     {

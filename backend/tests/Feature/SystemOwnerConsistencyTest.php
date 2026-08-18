@@ -13,8 +13,12 @@ final class SystemOwnerConsistencyTest extends ApiTestCase
 {
     public function test_normal_users_api_cannot_create_or_assign_system_owner_role(): void
     {
-        [$owner, $tenant] = $this->ownerContext();
-        Sanctum::actingAs($owner);
+        $tenant = Tenant::factory()->create();
+        [$administrator] = $this->tenantMember(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        );
+        Sanctum::actingAs($administrator);
 
         $this->postJson('/api/users', [
             'name' => 'مالك إضافي',
@@ -36,56 +40,73 @@ final class SystemOwnerConsistencyTest extends ApiTestCase
             ->assertJsonValidationErrors('role');
     }
 
-    public function test_administrator_cannot_mutate_demote_deactivate_or_remove_system_owner(): void
+    public function test_system_owner_is_platform_identity_without_tenant_membership(): void
     {
-        [$owner, $tenant] = $this->ownerContext();
+        $tenant = Tenant::factory()->create();
+        $owner = User::factory()->create([
+            'role' => User::ROLE_SYSTEM_OWNER,
+            'status' => User::STATUS_ACTIVE,
+        ]);
+
         [$administrator] = $this->tenantMember(
             $tenant,
             User::ROLE_ADMINISTRATOR,
         );
-        $ownerMembership = TenantUser::query()
-            ->where('user_id', $owner->id)
-            ->firstOrFail();
 
         Sanctum::actingAs($administrator);
 
-        foreach ([
-            ['name' => 'اسم غير مسموح'],
-            ['role' => User::ROLE_EMPLOYEE],
-            ['status' => TenantUser::STATUS_PAUSED],
-            ['status' => TenantUser::STATUS_SUSPENDED],
-        ] as $payload) {
-            $this->putJson(
-                "/api/users/{$ownerMembership->id}",
-                $payload,
-            )->assertForbidden();
-        }
+        $this->getJson('/api/users')
+            ->assertOk()
+            ->assertJsonPath('data.summary.total', 1);
 
-        $this->deleteJson("/api/users/{$ownerMembership->id}")
-            ->assertForbidden();
-
-        $this->assertDatabaseHas('users', [
-            'id' => $owner->id,
-            'role' => User::ROLE_SYSTEM_OWNER,
-            'status' => User::STATUS_ACTIVE,
-        ]);
-        $this->assertDatabaseHas('tenant_users', [
-            'id' => $ownerMembership->id,
-            'status' => TenantUser::STATUS_ACTIVE,
+        $this->assertDatabaseMissing('tenant_users', [
+            'user_id' => $owner->id,
         ]);
     }
 
-    public function test_user_cannot_change_own_role_status_or_remove_own_membership(): void
+    public function test_legacy_system_owner_membership_is_not_exposed_or_counted(): void
     {
-        [$owner] = $this->ownerContext();
-        $membership = TenantUser::query()
-            ->where('user_id', $owner->id)
-            ->firstOrFail();
+        $tenant = Tenant::factory()->create();
+        $owner = User::factory()->create([
+            'role' => User::ROLE_SYSTEM_OWNER,
+            'status' => User::STATUS_ACTIVE,
+        ]);
+        TenantUser::factory()
+            ->forTenant($tenant)
+            ->forUser($owner)
+            ->active()
+            ->create();
 
-        Sanctum::actingAs($owner);
+        [$administrator] = $this->tenantMember(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        );
+
+        Sanctum::actingAs($administrator);
+
+        $response = $this->getJson('/api/users')
+            ->assertOk()
+            ->assertJsonPath('data.summary.total', 1);
+
+        $emails = collect($response->json('data.users.data'))
+            ->pluck('user.email')
+            ->all();
+
+        $this->assertNotContains($owner->email, $emails);
+    }
+
+    public function test_tenant_user_cannot_change_own_role_status_or_remove_own_membership(): void
+    {
+        $tenant = Tenant::factory()->create();
+        [$administrator, $membership] = $this->tenantMember(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        );
+
+        Sanctum::actingAs($administrator);
 
         $this->putJson("/api/users/{$membership->id}", [
-            'role' => User::ROLE_ADMINISTRATOR,
+            'role' => User::ROLE_EMPLOYEE,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('user');
 
@@ -99,10 +120,14 @@ final class SystemOwnerConsistencyTest extends ApiTestCase
             ->assertJsonValidationErrors('user');
     }
 
-    public function test_system_owner_can_manage_regular_users_and_administrators(): void
+    public function test_administrator_can_manage_regular_users_and_other_administrators(): void
     {
-        [$owner, $tenant] = $this->ownerContext();
-        [$administrator, $administratorMembership] = $this->tenantMember(
+        $tenant = Tenant::factory()->create();
+        [$administrator] = $this->tenantMember(
+            $tenant,
+            User::ROLE_ADMINISTRATOR,
+        );
+        [$otherAdministrator, $otherAdministratorMembership] = $this->tenantMember(
             $tenant,
             User::ROLE_ADMINISTRATOR,
         );
@@ -111,9 +136,9 @@ final class SystemOwnerConsistencyTest extends ApiTestCase
             User::ROLE_EMPLOYEE,
         );
 
-        Sanctum::actingAs($owner);
+        Sanctum::actingAs($administrator);
 
-        $this->putJson("/api/users/{$administratorMembership->id}", [
+        $this->putJson("/api/users/{$otherAdministratorMembership->id}", [
             'name' => 'مدير محدث',
         ])->assertOk();
 
@@ -122,25 +147,13 @@ final class SystemOwnerConsistencyTest extends ApiTestCase
         ])->assertOk();
 
         $this->assertDatabaseHas('users', [
-            'id' => $administrator->id,
+            'id' => $otherAdministrator->id,
             'name' => 'مدير محدث',
         ]);
         $this->assertDatabaseHas('users', [
             'id' => $employee->id,
             'role' => User::ROLE_SALES,
         ]);
-    }
-
-    /** @return array{User, Tenant} */
-    private function ownerContext(): array
-    {
-        $tenant = Tenant::factory()->create();
-        [$owner] = $this->tenantMember(
-            $tenant,
-            User::ROLE_SYSTEM_OWNER,
-        );
-
-        return [$owner, $tenant];
     }
 
     /** @return array{User, TenantUser} */

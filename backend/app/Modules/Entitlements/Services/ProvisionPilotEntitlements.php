@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 
 final class ProvisionPilotEntitlements
 {
+    private const PILOT_FULL_USERS_LIMIT = 5;
+
     public function __construct(
         private readonly CommercialModuleCatalog $catalog,
         private readonly ValidatePlanModuleDependencies $dependencies,
@@ -163,6 +165,7 @@ final class ProvisionPilotEntitlements
                 'name_ar' => 'الباقة التجريبية الكاملة',
                 'name_en' => 'Pilot Full',
                 'status' => Plan::STATUS_ACTIVE,
+                'users_limit' => self::PILOT_FULL_USERS_LIMIT,
             ]);
             $plan->modules()->attach(array_map(
                 static fn (Module $module): string => (string) $module->id,
@@ -176,6 +179,7 @@ final class ProvisionPilotEntitlements
             $plan->name_ar !== 'الباقة التجريبية الكاملة'
             || $plan->name_en !== 'Pilot Full'
             || $plan->status !== Plan::STATUS_ACTIVE
+            || $plan->users_limit !== self::PILOT_FULL_USERS_LIMIT
         ) {
             throw new DomainException(
                 'The existing [pilot_full] plan conflicts with the approved definition.',
@@ -251,6 +255,12 @@ final class ProvisionPilotEntitlements
         if ($effectiveModules !== $expected) {
             throw new DomainException(
                 'Provisioning verification failed: effective modules do not match [pilot_full].',
+            );
+        }
+
+        if ($plan->users_limit !== self::PILOT_FULL_USERS_LIMIT) {
+            throw new DomainException(
+                'Provisioning verification failed: [pilot_full] user-seat policy does not match the approved definition.',
             );
         }
 
