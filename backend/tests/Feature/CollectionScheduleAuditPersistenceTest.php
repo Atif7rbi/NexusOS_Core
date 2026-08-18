@@ -49,16 +49,10 @@ final class CollectionScheduleAuditPersistenceTest extends ApiTestCase
 
         $auditId = DB::table('collection_schedule_audits')->value('id');
 
-        try {
-            DB::table('collection_schedule_audits')
-                ->where('id', $auditId)
-                ->update(['event' => 'tampered']);
-            $this->fail('Audit update should have been rejected.');
-        } catch (QueryException) {
-            $this->assertDatabaseHas('collection_schedule_audits', [
-                'id' => $auditId,
-                'event' => 'collection_draft_schedule_saved',
-            ]);
-        }
+        $this->expectException(QueryException::class);
+
+        DB::table('collection_schedule_audits')
+            ->where('id', $auditId)
+            ->update(['event' => 'tampered']);
     }
 }
