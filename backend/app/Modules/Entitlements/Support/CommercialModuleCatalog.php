@@ -22,6 +22,8 @@ final class CommercialModuleCatalog
 
     public const PILOT_FULL_PLAN = 'pilot_full';
 
+    public const DEMO_FULL_PLAN = 'demo_full';
+
     /**
      * @return array<string, array{name_ar: string, name_en: string, dependencies: list<string>}>
      */
