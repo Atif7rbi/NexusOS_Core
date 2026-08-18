@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Contracts\Actions;
 
+use App\Modules\Collections\Contracts\CollectionAuditRecorderInterface;
 use App\Modules\Collections\Enums\CollectionStatus;
 use App\Modules\Collections\Models\Collection;
 use App\Modules\Collections\Support\DerivedScheduleStateResolver;
@@ -27,11 +28,6 @@ use Illuminate\Support\Facades\DB;
  * row for that Contract. Already-cancelled rows and historical/replaced
  * versions are left untouched. An absent or already-cancelled schedule
  * is a no-op.
- *
- * The system-triggered cancellation reason below exists only to satisfy
- * the `collections_lifecycle_fields_check` DB constraint (a cancelled row
- * requires a non-blank cancellation_reason). It is not user-supplied,
- * since this cascade is not a user-invoked Collection action.
  */
 final class CancelContractAction
 {
@@ -39,6 +35,7 @@ final class CancelContractAction
 
     public function __construct(
         private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
+        private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
     ) {
     }
 
@@ -83,19 +80,35 @@ final class CancelContractAction
                     throw new ContractUnitStateException();
                 }
 
-                // Reservation remains 'converted'; only the unit is released.
                 $unit->update([
                     'status' => UnitStatus::Available,
                 ]);
             }
 
-            $this->cancelActiveCollectionSchedule($tenantId, $contract, $actorId);
+            $cancelledCollectionCount = $this->cancelActiveCollectionSchedule(
+                $tenantId,
+                $contract,
+                $actorId,
+            );
 
             $contract->forceFill([
                 'status' => ContractStatus::Cancelled,
                 'cancelled_at' => now(),
                 'updated_by' => $actorId,
             ])->save();
+
+            if ($cancelledCollectionCount > 0) {
+                $this->auditRecorder()->record(
+                    $tenantId,
+                    (string) $contract->id,
+                    'collection_schedule_cancelled_by_contract',
+                    $actorId,
+                    [
+                        'collection_count' => $cancelledCollectionCount,
+                        'reason' => self::SYSTEM_CANCELLATION_REASON,
+                    ],
+                );
+            }
 
             return $contract;
         });
@@ -105,7 +118,7 @@ final class CancelContractAction
         string $tenantId,
         Contract $contract,
         int|string $actorId,
-    ): void {
+    ): int {
         $collections = Collection::query()
             ->where('tenant_id', $tenantId)
             ->where('contract_id', $contract->id)
@@ -116,9 +129,8 @@ final class CancelContractAction
 
         $activeCollections = $this->stateResolver->activeOnly($collections);
 
-        // Absent or already-cancelled schedule: no-op, per CP6.
         if ($activeCollections === []) {
-            return;
+            return 0;
         }
 
         $cancelledAt = now();
@@ -132,5 +144,13 @@ final class CancelContractAction
                 'updated_by' => $actorId,
             ])->save();
         }
+
+        return count($activeCollections);
+    }
+
+    private function auditRecorder(): CollectionAuditRecorderInterface
+    {
+        return $this->auditRecorder
+            ?? app(CollectionAuditRecorderInterface::class);
     }
 }
