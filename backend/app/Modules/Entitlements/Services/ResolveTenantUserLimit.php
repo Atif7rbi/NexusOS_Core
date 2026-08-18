@@ -25,11 +25,12 @@ final class ResolveTenantUserLimit
             ];
         }
 
+        $limit = $license->users_limit_override
+            ?? $license->plan->users_limit;
+
         return [
             'available' => true,
-            'limit' => $license->plan->users_limit === null
-                ? null
-                : (int) $license->plan->users_limit,
+            'limit' => $limit === null ? null : (int) $limit,
         ];
     }
 }
