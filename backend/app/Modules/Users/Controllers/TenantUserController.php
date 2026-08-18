@@ -5,13 +5,16 @@ namespace App\Modules\Users\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Modules\Entitlements\Services\ResolveTenantUserLimit;
 use App\Modules\Leads\Support\EnsureTenantUserCanBePaused;
-use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Shared\Authorization\TenantAdministratorAuthority;
+use App\Modules\Shared\Phone\SaudiMobileNormalizer;
 use App\Modules\Shared\Services\RevokeUserTokens;
+use App\Modules\Shared\Support\ApiErrorResponse;
 use App\Modules\Users\Requests\StoreTenantUserRequest;
 use App\Modules\Users\Requests\UpdateTenantUserRequest;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,21 +22,21 @@ use Illuminate\Validation\ValidationException;
 
 class TenantUserController extends Controller
 {
-    private const DEMO_USERS_LIMIT = 3;
     public function __construct(
         private readonly SaudiMobileNormalizer $phoneNormalizer,
         private readonly EnsureTenantUserCanBePaused $ensureCanBePaused,
         private readonly RevokeUserTokens $revokeTokens,
+        private readonly ResolveTenantUserLimit $resolveUserLimit,
+        private readonly ApiErrorResponse $apiError,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
         $this->ensureAdministrator($request);
         $membership = $this->currentMembership($request);
+        $seatPolicy = $this->resolveUserLimit->handle((string) $membership->tenant_id);
 
-        $query = TenantUser::query()
-            ->where('tenant_id', $membership->tenant_id)
-            ->where('status', '!=', TenantUser::STATUS_REMOVED)
+        $query = $this->tenantSeatQuery((string) $membership->tenant_id)
             ->with([
                 'user:id,name,email,phone,role,last_login_at,created_at,updated_at',
             ])
@@ -82,25 +85,20 @@ class TenantUserController extends Controller
                         )
                     ),
                 'summary' => [
-                    'total' => TenantUser::query()
-                        ->where('tenant_id', $membership->tenant_id)
-                        ->where('status', '!=', TenantUser::STATUS_REMOVED)
-                        ->count(),
+                    'total' => $this->tenantSeatQuery((string) $membership->tenant_id)->count(),
 
-                    'active' => TenantUser::query()
-                        ->where('tenant_id', $membership->tenant_id)
+                    'active' => $this->tenantSeatQuery((string) $membership->tenant_id)
                         ->where('status', TenantUser::STATUS_ACTIVE)
                         ->count(),
 
-                    'paused' => TenantUser::query()
-                        ->where('tenant_id', $membership->tenant_id)
+                    'paused' => $this->tenantSeatQuery((string) $membership->tenant_id)
                         ->whereIn('status', [
                             TenantUser::STATUS_PAUSED,
                             TenantUser::STATUS_SUSPENDED,
                         ])
                         ->count(),
 
-                    'limit' => self::DEMO_USERS_LIMIT,
+                    'limit' => $seatPolicy['available'] ? $seatPolicy['limit'] : null,
                 ],
             ],
         ]);
@@ -112,20 +110,6 @@ class TenantUserController extends Controller
         $this->ensureAdministrator($request);
 
         $actorMembership = $this->currentMembership($request);
-
-        $currentCount = TenantUser::query()
-            ->where('tenant_id', $actorMembership->tenant_id)
-            ->where('status', '!=', TenantUser::STATUS_REMOVED)
-            ->count();
-
-        if ($currentCount >= self::DEMO_USERS_LIMIT) {
-            throw ValidationException::withMessages([
-                'users' => [
-                    'تم الوصول إلى الحد المتاح للمستخدمين في النسخة الحالية.',
-                ],
-            ]);
-        }
-
         $validated = $request->validated();
 
         $membership = DB::transaction(
@@ -134,6 +118,46 @@ class TenantUserController extends Controller
                 $actorMembership,
                 $request
             ): TenantUser {
+                DB::table('tenants')
+                    ->where('id', $actorMembership->tenant_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $seatPolicy = $this->resolveUserLimit->handle(
+                    (string) $actorMembership->tenant_id
+                );
+
+                if (! $seatPolicy['available']) {
+                    throw new HttpResponseException(
+                        $this->apiError->make(
+                            409,
+                            'user_seat_limit_unavailable',
+                            'تعذر تحديد الحد التجاري للمستخدمين لهذا الحساب.',
+                        )
+                    );
+                }
+
+                $currentCount = $this->tenantSeatQuery(
+                    (string) $actorMembership->tenant_id
+                )->count();
+
+                if (
+                    $seatPolicy['limit'] !== null
+                    && $currentCount >= $seatPolicy['limit']
+                ) {
+                    throw new HttpResponseException(
+                        $this->apiError->make(
+                            409,
+                            'user_seat_limit_reached',
+                            'تم الوصول إلى الحد المتاح للمستخدمين في الباقة الحالية.',
+                            [
+                                'limit' => $seatPolicy['limit'],
+                                'current' => $currentCount,
+                            ],
+                        )
+                    );
+                }
+
                 $user = User::query()->create([
                     'name' => trim($validated['name']),
                     'email' => mb_strtolower(
@@ -177,6 +201,7 @@ class TenantUserController extends Controller
 
         $this->ensureSameTenant($membership, $user);
         $this->ensureAdministrator($request);
+        $this->ensureTenantManagedUser($user);
 
         return response()->json([
             'data' => [
@@ -197,6 +222,7 @@ class TenantUserController extends Controller
 
         $this->ensureSameTenant($actorMembership, $user);
         $this->ensureAdministrator($request);
+        $this->ensureTenantManagedUser($user);
         $this->ensureProtectedOwnerMutation($request->user(), $user);
 
         $validated = $request->validated();
@@ -222,6 +248,7 @@ class TenantUserController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                $this->ensureTenantManagedUser($membership);
                 $this->ensureProtectedOwnerMutation(
                     $request->user(),
                     $membership,
@@ -308,6 +335,7 @@ class TenantUserController extends Controller
 
         $this->ensureSameTenant($actorMembership, $user);
         $this->ensureAdministrator($request);
+        $this->ensureTenantManagedUser($user);
 
         if ($user->user_id === $request->user()->id) {
             throw ValidationException::withMessages([
@@ -326,6 +354,7 @@ class TenantUserController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->ensureTenantManagedUser($membership);
             $this->ensureProtectedOwnerMutation(
                 $request->user(),
                 $membership,
@@ -390,6 +419,16 @@ class TenantUserController extends Controller
         );
     }
 
+    private function ensureTenantManagedUser(TenantUser $membership): void
+    {
+        $membership->loadMissing('user:id,role');
+
+        abort_if(
+            $membership->user->isSystemOwner(),
+            404,
+        );
+    }
+
     private function ensureProtectedOwnerMutation(
         User $actor,
         TenantUser $targetMembership,
@@ -402,5 +441,20 @@ class TenantUserController extends Controller
             403,
             'لا يمكن إدارة مالك النظام من خلال شاشة إدارة المستخدمين.'
         );
+    }
+
+    private function tenantSeatQuery(string $tenantId): Builder
+    {
+        return TenantUser::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', '!=', TenantUser::STATUS_REMOVED)
+            ->whereHas(
+                'user',
+                static fn (Builder $query) => $query->where(
+                    'role',
+                    '!=',
+                    User::ROLE_SYSTEM_OWNER,
+                )
+            );
     }
 }
