@@ -34,20 +34,24 @@ final class ProvisionPilotEntitlements
         CarbonImmutable $startsAt,
         CarbonImmutable $endsAt,
         ?CarbonImmutable $graceEndsAt,
+        ?int $usersLimitOverride = null,
     ): array {
-        if ($planKey !== CommercialModuleCatalog::PILOT_FULL_PLAN) {
-            throw new DomainException("Unsupported provisioning plan [{$planKey}].");
-        }
-
+        $planDefinition = $this->planDefinition($planKey);
         $this->assertPeriod($status, $startsAt, $endsAt, $graceEndsAt);
+
+        if ($usersLimitOverride !== null && $usersLimitOverride <= 0) {
+            throw new DomainException('users_limit_override must be a positive integer when supplied.');
+        }
 
         return DB::transaction(function () use (
             $tenantReference,
             $planKey,
+            $planDefinition,
             $status,
             $startsAt,
             $endsAt,
             $graceEndsAt,
+            $usersLimitOverride,
         ): array {
             $tenant = Tenant::query()
                 ->where(function ($query) use ($tenantReference): void {
@@ -67,7 +71,7 @@ final class ProvisionPilotEntitlements
             $modules = $this->ensureCatalog();
             $moduleKeys = $this->catalog->keys();
             $this->dependencies->handle($moduleKeys);
-            $plan = $this->ensurePilotFullPlan($planKey, $modules);
+            $plan = $this->ensureApprovedPlan($planKey, $planDefinition, $modules);
 
             $exact = TenantLicense::query()
                 ->where('tenant_id', $tenant->id)
@@ -79,6 +83,11 @@ final class ProvisionPilotEntitlements
                     $graceEndsAt === null,
                     static fn ($query) => $query->whereNull('grace_ends_at'),
                     static fn ($query) => $query->where('grace_ends_at', $graceEndsAt),
+                )
+                ->when(
+                    $usersLimitOverride === null,
+                    static fn ($query) => $query->whereNull('users_limit_override'),
+                    static fn ($query) => $query->where('users_limit_override', $usersLimitOverride),
                 )
                 ->lockForUpdate()
                 ->first();
@@ -117,10 +126,29 @@ final class ProvisionPilotEntitlements
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'grace_ends_at' => $graceEndsAt,
+                'users_limit_override' => $usersLimitOverride,
             ]);
 
             return $this->verifiedResult($tenant, $plan, $license, true);
         });
+    }
+
+    /** @return array{name_ar: string, name_en: string, users_limit: ?int} */
+    private function planDefinition(string $planKey): array
+    {
+        return match ($planKey) {
+            CommercialModuleCatalog::PILOT_FULL_PLAN => [
+                'name_ar' => 'الباقة التجريبية الكاملة',
+                'name_en' => 'Pilot Full',
+                'users_limit' => self::PILOT_FULL_USERS_LIMIT,
+            ],
+            CommercialModuleCatalog::DEMO_FULL_PLAN => [
+                'name_ar' => 'باقة العرض الكاملة',
+                'name_en' => 'Demo Full',
+                'users_limit' => null,
+            ],
+            default => throw new DomainException("Unsupported provisioning plan [{$planKey}]."),
+        };
     }
 
     /** @return array<string, Module> */
@@ -154,18 +182,24 @@ final class ProvisionPilotEntitlements
         return $modules;
     }
 
-    /** @param array<string, Module> $modules */
-    private function ensurePilotFullPlan(string $planKey, array $modules): Plan
-    {
+    /**
+     * @param array{name_ar: string, name_en: string, users_limit: ?int} $definition
+     * @param array<string, Module> $modules
+     */
+    private function ensureApprovedPlan(
+        string $planKey,
+        array $definition,
+        array $modules,
+    ): Plan {
         $plan = Plan::query()->where('key', $planKey)->lockForUpdate()->first();
 
         if ($plan === null) {
             $plan = Plan::query()->create([
                 'key' => $planKey,
-                'name_ar' => 'الباقة التجريبية الكاملة',
-                'name_en' => 'Pilot Full',
+                'name_ar' => $definition['name_ar'],
+                'name_en' => $definition['name_en'],
                 'status' => Plan::STATUS_ACTIVE,
-                'users_limit' => self::PILOT_FULL_USERS_LIMIT,
+                'users_limit' => $definition['users_limit'],
             ]);
             $plan->modules()->attach(array_map(
                 static fn (Module $module): string => (string) $module->id,
@@ -176,13 +210,13 @@ final class ProvisionPilotEntitlements
         }
 
         if (
-            $plan->name_ar !== 'الباقة التجريبية الكاملة'
-            || $plan->name_en !== 'Pilot Full'
+            $plan->name_ar !== $definition['name_ar']
+            || $plan->name_en !== $definition['name_en']
             || $plan->status !== Plan::STATUS_ACTIVE
-            || $plan->users_limit !== self::PILOT_FULL_USERS_LIMIT
+            || $plan->users_limit !== $definition['users_limit']
         ) {
             throw new DomainException(
-                'The existing [pilot_full] plan conflicts with the approved definition.',
+                "The existing [{$planKey}] plan conflicts with the approved definition.",
             );
         }
 
@@ -191,7 +225,7 @@ final class ProvisionPilotEntitlements
 
         if ($actual !== $expected) {
             throw new DomainException(
-                'The existing [pilot_full] plan module composition conflicts with the approved definition.',
+                "The existing [{$planKey}] plan module composition conflicts with the approved definition.",
             );
         }
 
@@ -254,13 +288,7 @@ final class ProvisionPilotEntitlements
 
         if ($effectiveModules !== $expected) {
             throw new DomainException(
-                'Provisioning verification failed: effective modules do not match [pilot_full].',
-            );
-        }
-
-        if ($plan->users_limit !== self::PILOT_FULL_USERS_LIMIT) {
-            throw new DomainException(
-                'Provisioning verification failed: [pilot_full] user-seat policy does not match the approved definition.',
+                "Provisioning verification failed: effective modules do not match [{$plan->key}].",
             );
         }
 
