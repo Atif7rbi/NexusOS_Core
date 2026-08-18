@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Modules\Collections\Actions\SaveDraftCollectionScheduleAction;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\CreatesCollectionScheduleFixtures;
 
 final class CollectionScheduleAuditPersistenceTest extends ApiTestCase
@@ -31,6 +32,24 @@ final class CollectionScheduleAuditPersistenceTest extends ApiTestCase
             'contract_id' => $context['contract_id'],
             'event' => 'collection_draft_schedule_saved',
             'actor_id' => $context['user_id'],
+        ]);
+    }
+
+    public function test_collection_audit_rejects_cross_tenant_contract_reference(): void
+    {
+        $first = $this->createCollectionContractContext();
+        $second = $this->createCollectionContractContext();
+
+        $this->expectException(QueryException::class);
+
+        DB::table('collection_schedule_audits')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $second['tenant_id'],
+            'contract_id' => $first['contract_id'],
+            'event' => 'cross_tenant_probe',
+            'actor_id' => $second['user_id'],
+            'context' => json_encode([], JSON_THROW_ON_ERROR),
+            'recorded_at' => now(),
         ]);
     }
 
