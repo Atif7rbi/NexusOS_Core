@@ -18,7 +18,8 @@ final class ProvisionTenantEntitlements extends Command
         {--status=active : License status}
         {--starts-at= : Required ISO-8601 timestamp with timezone}
         {--ends-at= : Required ISO-8601 timestamp with timezone}
-        {--grace-ends-at= : ISO-8601 timestamp with timezone; grace only}';
+        {--grace-ends-at= : ISO-8601 timestamp with timezone; grace only}
+        {--users-limit-override= : Optional positive per-license user-seat limit}';
 
     protected $description = 'Provision the approved NexusOS module catalog, plan, and Tenant license';
 
@@ -35,6 +36,7 @@ final class ProvisionTenantEntitlements extends Command
             $startsAt = $this->parseRequiredTimestamp('starts-at');
             $endsAt = $this->parseRequiredTimestamp('ends-at');
             $graceEndsAt = $this->parseOptionalTimestamp('grace-ends-at');
+            $usersLimitOverride = $this->parseOptionalPositiveInteger('users-limit-override');
 
             if ($tenant === '') {
                 throw new DomainException('--tenant is required.');
@@ -47,6 +49,7 @@ final class ProvisionTenantEntitlements extends Command
                 startsAt: $startsAt,
                 endsAt: $endsAt,
                 graceEndsAt: $graceEndsAt,
+                usersLimitOverride: $usersLimitOverride,
             );
 
             $this->info($result['created']
@@ -56,6 +59,7 @@ final class ProvisionTenantEntitlements extends Command
             $this->line('Plan: '.$result['plan']->key);
             $this->line('License: '.$result['license']->id);
             $this->line('Effective modules: '.implode(', ', $result['effective_modules']));
+            $this->line('Users limit override: '.($result['license']->users_limit_override ?? 'inherit'));
 
             return self::SUCCESS;
         } catch (DomainException $exception) {
@@ -86,6 +90,21 @@ final class ProvisionTenantEntitlements extends Command
         $value = trim((string) $this->option($option));
 
         return $value === '' ? null : $this->parseTimestamp($option, $value);
+    }
+
+    private function parseOptionalPositiveInteger(string $option): ?int
+    {
+        $value = trim((string) $this->option($option));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (! preg_match('/^[1-9]\d*$/', $value)) {
+            throw new DomainException("--{$option} must be a positive integer.");
+        }
+
+        return (int) $value;
     }
 
     private function parseTimestamp(string $option, string $value): CarbonImmutable
