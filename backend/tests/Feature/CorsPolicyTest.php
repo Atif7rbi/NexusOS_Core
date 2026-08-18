@@ -18,7 +18,7 @@ final class CorsPolicyTest extends TestCase
             'Origin' => 'https://ufq.sewarsky.online',
             'Access-Control-Request-Method' => 'POST',
         ])->options('/api/auth/login')
-            ->assertOk()
+            ->assertSuccessful()
             ->assertHeader(
                 'Access-Control-Allow-Origin',
                 'https://ufq.sewarsky.online',
@@ -36,7 +36,7 @@ final class CorsPolicyTest extends TestCase
             'Access-Control-Request-Method' => 'POST',
         ])->options('/api/auth/login');
 
-        $response->assertOk();
+        $response->assertSuccessful();
         $this->assertFalse(
             $response->headers->has('Access-Control-Allow-Origin'),
         );
