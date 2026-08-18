@@ -10,6 +10,8 @@ use App\Models\TenantLicense;
 use App\Modules\Entitlements\Services\ResolveTenantUserLimit;
 use App\Modules\Entitlements\Support\CommercialModuleCatalog;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 final class ProvisionEntitlementsSeatPolicyTest extends ApiTestCase
 {
@@ -98,6 +100,24 @@ final class ProvisionEntitlementsSeatPolicyTest extends ApiTestCase
         $this->assertDatabaseMissing('tenant_licenses', [
             'tenant_id' => $tenant->id,
         ]);
+    }
+
+    public function test_database_rejects_non_positive_license_override(): void
+    {
+        $tenant = $this->createTenant('db-override-seat-policy-tenant');
+
+        $this->provision($tenant, CommercialModuleCatalog::PILOT_FULL_PLAN)
+            ->assertSuccessful();
+
+        $licenseId = TenantLicense::query()
+            ->where('tenant_id', $tenant->id)
+            ->value('id');
+
+        $this->expectException(QueryException::class);
+
+        DB::table('tenant_licenses')
+            ->where('id', $licenseId)
+            ->update(['users_limit_override' => 0]);
     }
 
     private function createTenant(string $slug): Tenant
