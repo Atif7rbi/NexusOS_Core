@@ -35,6 +35,7 @@ final class TenantLicense extends Model
         'starts_at',
         'ends_at',
         'grace_ends_at',
+        'users_limit_override',
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ final class TenantLicense extends Model
             'starts_at' => 'immutable_datetime',
             'ends_at' => 'immutable_datetime',
             'grace_ends_at' => 'immutable_datetime',
+            'users_limit_override' => 'integer',
         ];
     }
 
