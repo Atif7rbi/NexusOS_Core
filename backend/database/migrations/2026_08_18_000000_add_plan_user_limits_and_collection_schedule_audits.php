@@ -27,18 +27,29 @@ return new class extends Migration
 
         Schema::create('collection_schedule_audits', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignUlid('tenant_id')
-                ->constrained('tenants')
-                ->restrictOnDelete();
-            $table->foreignUlid('contract_id')
-                ->constrained('contracts')
-                ->restrictOnDelete();
+            $table->ulid('tenant_id');
+            $table->ulid('contract_id');
             $table->string('event', 80);
             $table->foreignId('actor_id')
                 ->constrained('users')
                 ->restrictOnDelete();
             $table->jsonb('context')->default(DB::raw("'{}'::jsonb"));
             $table->timestampTz('recorded_at')->useCurrent();
+
+            $table->foreign('tenant_id', 'collection_schedule_audits_tenant_id_foreign')
+                ->references('id')
+                ->on('tenants')
+                ->onUpdate('restrict')
+                ->onDelete('restrict');
+
+            $table->foreign(
+                ['tenant_id', 'contract_id'],
+                'collection_schedule_audits_tenant_contract_foreign',
+            )
+                ->references(['tenant_id', 'id'])
+                ->on('contracts')
+                ->onUpdate('restrict')
+                ->onDelete('restrict');
 
             $table->index(
                 ['tenant_id', 'contract_id', 'recorded_at'],
