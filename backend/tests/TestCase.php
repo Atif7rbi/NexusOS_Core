@@ -22,6 +22,27 @@ abstract class TestCase extends BaseTestCase
             );
         }
 
+        $configCache = getenv('APP_CONFIG_CACHE');
+        $defaultConfigCache = dirname(__DIR__).'/bootstrap/cache/config.php';
+
+        if (($configCache === false || $configCache === '') && is_file($defaultConfigCache)) {
+            throw new RuntimeException(
+                'Unsafe test configuration: a Laravel config cache is present. Set APP_CONFIG_CACHE to an isolated non-existent path before running tests.',
+            );
+        }
+
         parent::setUp();
+
+        $runtimeDatabase = config('database.connections.'.config('database.default').'.database');
+
+        if ($runtimeDatabase !== $expectedDatabase) {
+            throw new RuntimeException(
+                sprintf(
+                    'Unsafe Laravel test database resolution. Expected [%s], got [%s].',
+                    $expectedDatabase,
+                    $runtimeDatabase ?: 'undefined',
+                )
+            );
+        }
     }
 }
