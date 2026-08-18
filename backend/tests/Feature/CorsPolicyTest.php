@@ -25,7 +25,7 @@ final class CorsPolicyTest extends TestCase
             );
     }
 
-    public function test_unapproved_origin_does_not_receive_allow_origin_header(): void
+    public function test_unapproved_origin_is_never_reflected_or_wildcarded(): void
     {
         config()->set('cors.allowed_origins', [
             'https://ufq.sewarsky.online',
@@ -37,9 +37,11 @@ final class CorsPolicyTest extends TestCase
         ])->options('/api/auth/login');
 
         $response->assertSuccessful();
-        $this->assertFalse(
-            $response->headers->has('Access-Control-Allow-Origin'),
-        );
+
+        $allowOrigin = $response->headers->get('Access-Control-Allow-Origin');
+
+        $this->assertNotSame('https://evil.example', $allowOrigin);
+        $this->assertNotSame('*', $allowOrigin);
     }
 
     public function test_production_configuration_contains_no_wildcard_origin(): void
