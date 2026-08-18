@@ -1,12 +1,10 @@
 # NexusOS Entitlements v1 — Provisioning Runbook
 
-Status: Approved for CP18–CP20 implementation
+Status: Implemented — production runtime verification required after each deployment
 
 ## Scope
 
-This runbook provisions the approved commercial Module catalog, the
-`pilot_full` Plan, and one explicitly dated current Tenant License. It does
-not provision quotas, billing, payments, or environment-specific identity.
+This runbook provisions the approved commercial Module catalog, the `pilot_full` Plan, its commercial user-seat policy, and one explicitly dated current Tenant License.
 
 Commercial Modules:
 
@@ -18,24 +16,25 @@ Commercial Modules:
 - `contracts`
 - `collections`
 
-Dashboard, Users, Settings, authentication, and Company Profile remain core
-platform capabilities and are not controlled by commercial entitlements.
+`pilot_full` has `users_limit = 5`. `system_owner` is platform-level and does not consume a Tenant seat or appear in Tenant Users management. Removed memberships do not consume a seat; active, paused, and suspended memberships do.
+
+Dashboard, Users, Settings, authentication, and Company Profile remain core platform capabilities and are not commercial Modules.
 
 ## Required release order
 
-Run the following sequence independently against each environment database:
+Run independently against each environment database:
 
-1. Put the application into maintenance mode.
-2. Deploy the approved code.
-3. Run the approved migrations.
-4. Run the provisioning command with the exact Tenant and approved dates.
-5. Verify that all seven effective Modules are reported.
-6. Clear or rebuild the required Laravel caches.
-7. Bring the application up.
-8. Perform authentication, navigation, and representative API smoke checks.
+1. Take/verify the required environment backup.
+2. Put the application into maintenance mode when appropriate.
+3. Deploy the approved code.
+4. Run approved migrations.
+5. Run the provisioning command with the exact Tenant and approved dates when provisioning a new entitlement period.
+6. Verify all seven effective Modules and `pilot_full.users_limit = 5`.
+7. Configure the exact environment CORS origin (`CORS_ALLOWED_ORIGINS`) and rebuild Laravel config cache.
+8. Bring the application up.
+9. Perform authentication, navigation, representative API, seat-policy, and CORS smoke checks.
 
-No Demo, UFQ, database-name, email, or environment bypass exists. Demo and
-UFQ must each be provisioned in their own database.
+Demo and UFQ are provisioned independently in their own databases. No Demo, email, Tenant, or environment bypass is permitted.
 
 ## Command
 
@@ -48,18 +47,21 @@ php artisan nexusos:provision-entitlements \
   --ends-at='<ISO-8601 timestamp with timezone>'
 ```
 
-For `grace`, `--grace-ends-at` is required and must be later than
-`--ends-at`. It must be omitted for other statuses.
+For `grace`, `--grace-ends-at` is required and later than `--ends-at`.
 
-The command does not choose a default commercial period. The deployment
-operator must provide both dates explicitly.
+## CORS
+
+Use exact origins only. Examples:
+
+```text
+Demo: CORS_ALLOWED_ORIGINS=https://demo.sewarsky.online
+UFQ:  CORS_ALLOWED_ORIGINS=https://ufq.sewarsky.online
+```
+
+Comma-separated exact origins are supported when an environment genuinely requires more than one. Do not use `*` in production.
 
 ## Safe reruns and conflicts
 
-An exact rerun for the same Tenant, Plan, status, period, and effective
-configuration is a verified no-op. An overlapping entitled License period is a
-conflict and the command fails without replacing, expiring, cancelling, or
-otherwise mutating the existing License. A time-expired historical License does
-not block a later non-overlapping period.
+An exact provisioning rerun is a verified no-op. An overlapping entitled License period is a conflict and fails without replacing, expiring, cancelling, or editing the existing License.
 
-Renewal and Plan changes are outside Entitlements v1.
+Renewal, Plan changes, and Tenant-specific seat overrides remain outside Entitlements v1 and belong to the future Platform Owner lifecycle.
