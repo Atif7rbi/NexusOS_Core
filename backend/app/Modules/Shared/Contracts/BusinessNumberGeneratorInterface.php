@@ -12,8 +12,8 @@ interface BusinessNumberGeneratorInterface
      * }
      */
     public function generate(
+        string $tenantId,
         string $prefix,
         int $year,
-        ?int $requestedSequence = null,
     ): array;
 }

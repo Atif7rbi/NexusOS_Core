@@ -17,11 +17,17 @@ class BusinessNumberGenerator implements BusinessNumberGeneratorInterface
      * }
      */
     public function generate(
+        string $tenantId,
         string $prefix,
         int $year,
-        ?int $requestedSequence = null,
     ): array {
         $normalizedPrefix = strtoupper(trim($prefix));
+
+        if ($tenantId === '') {
+            throw new BusinessNumberGenerationException(
+                'Business number tenant is required.'
+            );
+        }
 
         if (! preg_match('/^[A-Z]{2,10}$/', $normalizedPrefix)) {
             throw new BusinessNumberGenerationException(
@@ -35,19 +41,14 @@ class BusinessNumberGenerator implements BusinessNumberGeneratorInterface
             );
         }
 
-        if ($requestedSequence !== null && $requestedSequence < 1) {
-            throw new BusinessNumberGenerationException(
-                'Business number sequence must be greater than zero.'
-            );
-        }
-
         try {
             return DB::transaction(function () use (
+                $tenantId,
                 $normalizedPrefix,
                 $year,
-                $requestedSequence,
             ): array {
                 DB::table('business_number_sequences')->insertOrIgnore([
+                    'tenant_id' => $tenantId,
                     'prefix' => $normalizedPrefix,
                     'year' => $year,
                     'current_value' => 0,
@@ -56,6 +57,7 @@ class BusinessNumberGenerator implements BusinessNumberGeneratorInterface
                 ]);
 
                 $sequenceRow = DB::table('business_number_sequences')
+                    ->where('tenant_id', $tenantId)
                     ->where('prefix', $normalizedPrefix)
                     ->where('year', $year)
                     ->lockForUpdate()
@@ -67,19 +69,14 @@ class BusinessNumberGenerator implements BusinessNumberGeneratorInterface
                     );
                 }
 
-                $sequence = $requestedSequence
-                    ?? ((int) $sequenceRow->current_value + 1);
-
-                $newCurrentValue = max(
-                    (int) $sequenceRow->current_value,
-                    $sequence,
-                );
+                $sequence = (int) $sequenceRow->current_value + 1;
 
                 DB::table('business_number_sequences')
+                    ->where('tenant_id', $tenantId)
                     ->where('prefix', $normalizedPrefix)
                     ->where('year', $year)
                     ->update([
-                        'current_value' => $newCurrentValue,
+                        'current_value' => $sequence,
                         'updated_at' => now(),
                     ]);
 
