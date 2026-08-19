@@ -16,11 +16,7 @@ class StoreProjectRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sequence_number' => [
-                'nullable',
-                'integer',
-                'min:1',
-            ],
+            'sequence_number' => ['prohibited'],
             'name' => [
                 'required',
                 'string',

@@ -31,14 +31,11 @@ class CreateProjectAction
             $year = $this->clock->now($tenantId)->year;
 
             $number = $this->numberGenerator->generate(
+                tenantId: $tenantId,
                 prefix: 'PRJ',
                 year: $year,
-                requestedSequence: isset($data['sequence_number'])
-                    ? (int) $data['sequence_number']
-                    : null,
             );
 
-            unset($data['sequence_number']);
             unset(
                 $data['tenant_id'],
                 $data['created_by'],

@@ -231,7 +231,6 @@ class ProjectsApiTest extends ApiTestCase
 
         foreach ($projects as $projectId => $projectNumber) {
             $createdProjectId = $this->postJson('/api/projects', [
-                'sequence_number' => (int) substr($projectNumber, -3),
                 'name' => "مشروع ترحيل {$projectNumber}",
                 'project_type' => 'residential',
                 'city' => 'الرياض',
@@ -244,7 +243,6 @@ class ProjectsApiTest extends ApiTestCase
         }
 
         $unassignedProjectId = $this->postJson('/api/projects', [
-            'sequence_number' => 6,
             'name' => 'مشروع خارج قرار الترحيل',
             'project_type' => 'commercial',
             'city' => 'جدة',
@@ -296,33 +294,88 @@ class ProjectsApiTest extends ApiTestCase
             );
     }
 
-    public function test_user_can_request_custom_sequence_and_next_number_continues_after_it(): void
+    public function test_project_sequence_number_is_server_controlled(): void
     {
         $user = $this->createActiveUser();
 
         Sanctum::actingAs($user);
 
         $this->postJson('/api/projects', [
-            'sequence_number' => 55,
-            'name' => 'مشروع برقم مخصص',
+            'sequence_number' => 999999,
+            'name' => 'محاولة التحكم في رقم المشروع',
             'project_type' => 'mixed_use',
             'city' => 'الدمام',
         ])
-            ->assertCreated()
-            ->assertJsonPath(
-                'data.project.project_number',
-                'PRJ-2026-055'
-            );
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('sequence_number');
 
         $this->postJson('/api/projects', [
-            'name' => 'المشروع التالي',
+            'name' => 'أول مشروع صحيح',
             'project_type' => 'residential',
             'city' => 'الخبر',
         ])
             ->assertCreated()
             ->assertJsonPath(
                 'data.project.project_number',
-                'PRJ-2026-056'
+                'PRJ-2026-001'
+            );
+    }
+
+    public function test_project_numbering_is_independent_per_tenant(): void
+    {
+        $tenantAUser = $this->createActiveUser();
+        $tenantBUser = $this->createActiveUser();
+
+        Sanctum::actingAs($tenantAUser);
+
+        $this->postJson('/api/projects', [
+            'name' => 'مشروع Tenant A الأول',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+        ])
+            ->assertCreated()
+            ->assertJsonPath(
+                'data.project.project_number',
+                'PRJ-2026-001'
+            );
+
+        Sanctum::actingAs($tenantBUser);
+
+        $this->postJson('/api/projects', [
+            'name' => 'مشروع Tenant B الأول',
+            'project_type' => 'commercial',
+            'city' => 'جدة',
+        ])
+            ->assertCreated()
+            ->assertJsonPath(
+                'data.project.project_number',
+                'PRJ-2026-001'
+            );
+
+        Sanctum::actingAs($tenantAUser);
+
+        $this->postJson('/api/projects', [
+            'name' => 'مشروع Tenant A الثاني',
+            'project_type' => 'residential',
+            'city' => 'الرياض',
+        ])
+            ->assertCreated()
+            ->assertJsonPath(
+                'data.project.project_number',
+                'PRJ-2026-002'
+            );
+
+        Sanctum::actingAs($tenantBUser);
+
+        $this->postJson('/api/projects', [
+            'name' => 'مشروع Tenant B الثاني',
+            'project_type' => 'commercial',
+            'city' => 'جدة',
+        ])
+            ->assertCreated()
+            ->assertJsonPath(
+                'data.project.project_number',
+                'PRJ-2026-002'
             );
     }
 
@@ -517,7 +570,6 @@ class ProjectsApiTest extends ApiTestCase
         Sanctum::actingAs($user);
 
         $this->postJson('/api/projects', [
-            'sequence_number' => 0,
             'name' => '',
             'project_type' => 'invalid_type',
             'city' => '',
@@ -527,7 +579,6 @@ class ProjectsApiTest extends ApiTestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
-                'sequence_number',
                 'name',
                 'project_type',
                 'city',
