@@ -15,9 +15,6 @@ class PostgreSqlConnectionTest extends TestCase
             'select current_database() as database_name'
         )->database_name;
 
-        $this->assertSame(
-            'sewaellf_nexusos_core_testing',
-            $databaseName
-        );
+        $this->assertSame($this->expectedTestDatabase(), $databaseName);
     }
 }

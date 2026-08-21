@@ -63,7 +63,8 @@ generalization, migration-safe cleanup, and validation.
 Current work includes:
 
 - Generalizing entitlement Plan provisioning and persisted identifiers.
-- Moving the test database identity to the Core namespace.
+- Generalizing the test database configuration while retaining the existing
+  isolated test infrastructure.
 - Keeping historical applied migrations compatible while removing customer
   bootstrap defaults from fresh Core installations.
 - Running focused and full validation before Demo review.

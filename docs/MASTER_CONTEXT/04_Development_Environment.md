@@ -109,16 +109,20 @@ Testing may include:
 
 ## Isolated PostgreSQL Test Database
 
-The Core test suite is pinned to the isolated PostgreSQL database:
+The Core repository does not prescribe a hosting-specific database name.
+Before running backend tests, the operator must explicitly set both:
 
 ```text
-sewaellf_nexusos_core_testing
+DB_DATABASE=<isolated database>
+NEXUSOS_TEST_DATABASE=<the same isolated database>
 ```
 
-This database must be created and owned through the hosting control plane or
-an authorized database owner before server-side validation. It must never
-point at a Demo, customer, or production database. Laravel tests must use an
-isolated `APP_CONFIG_CACHE` path when a production config cache exists.
+`NEXUSOS_TEST_DATABASE` must end in `_testing`; the test bootstrap rejects a
+missing, mismatched, or unsafe name before Laravel initializes. This permits
+the existing isolated test infrastructure to remain in place while preventing
+tests from pointing at a Demo, customer, or production database. Laravel tests
+must also use an isolated `APP_CONFIG_CACHE` path when a production config
+cache exists.
 ---
 # Documentation
 Documentation resides inside:

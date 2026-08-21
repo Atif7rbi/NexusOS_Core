@@ -203,7 +203,8 @@ Remaining decisions then include:
 
 # Immediate Priorities
 
-1. Complete generic test database provisioning through the hosting control plane.
+1. Run backend validation using the existing isolated test database with the
+   explicit `DB_DATABASE` and `NEXUSOS_TEST_DATABASE` safety contract.
 2. Resolve historical migration compatibility without changing applied customer data.
 3. Run full backend/frontend validation.
 4. Verify the cleaned Core on the Demo environment.
