@@ -30,7 +30,7 @@ final class TenantUserLimitOverrideCommandTest extends ApiTestCase
 
         $this->artisan('nexusos:provision-entitlements', [
             '--tenant' => (string) $tenant->id,
-            '--plan' => CommercialModuleCatalog::PILOT_FULL_PLAN,
+            '--plan' => CommercialModuleCatalog::BUSINESS_FULL_PLAN,
             '--status' => TenantLicense::STATUS_ACTIVE,
             '--starts-at' => '2026-08-01T00:00:00Z',
             '--ends-at' => '2026-11-30T23:59:59Z',

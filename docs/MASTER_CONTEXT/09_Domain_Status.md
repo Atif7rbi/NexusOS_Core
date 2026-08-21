@@ -62,30 +62,28 @@ Historical documentation is retained for reference only.
 
 # Domain Overview
 
-> تم تحديث صفوف Entitlements بتاريخ 15 أغسطس 2026 لتعكس معمارية CP18–CP20 المجمدة والتنفيذ الجاري على فرع المراجعة. الانتقال إلى `Frozen` ينتظر PostgreSQL runtime validation والاعتماد النهائي.
-
 | Domain | Status | Notes |
 |---------|--------|-------|
 | Identity | Completed | Stateless authentication, System Owner role, tenant membership. |
-| RBAC | In Progress | Basic role/membership checks exist (Tenant, System Owner); no full permission matrix yet. |
+| RBAC | Frozen | Tenant-scoped role matrix and backend authorization enforcement are implemented. |
 | Tenant | Completed | Tenants and tenant-user membership tables and enforcement in place. |
-| Tenant License | In Progress | Entitlements v1 architecture and implementation complete; PostgreSQL runtime validation pending before freeze. |
-| Plan | In Progress | `pilot_full` composition and dependency validation implemented; runtime validation pending. |
-| Module | In Progress | Seven-key commercial Module catalog and fail-closed resolver implemented; runtime validation pending. |
-| Tenant Module | In Progress | Explicit `enabled`/`disabled` Tenant overrides implemented with frozen precedence; runtime validation pending. |
+| Tenant License | Frozen | Entitlements v1 supports tenant-scoped License history, periods, seat overrides, and fail-closed resolution. |
+| Plan | Frozen | `business_full` and `demo_full` compositions and dependency validation are implemented. |
+| Module | Frozen | Seven-key commercial Module catalog and fail-closed resolver are implemented. |
+| Tenant Module | Frozen | Explicit `enabled`/`disabled` Tenant overrides follow frozen precedence. |
 | User | Completed | Tenant user CRUD (`api/users`) implemented and tested. |
 | Project | Frozen | Full lifecycle (draft/active/completed/cancelled/archived), tenant-scoped, tested. |
 | Customer | Completed | Tenant-scoped API, archive/restore, tested (`v1 frozen` per module docs). |
 | Unit | Frozen | Full lifecycle incl. `reserved` and `sold` states added for Reservations/Contracts integration. |
 | Reservation | Frozen | Full lifecycle (`active`/`converted`/`cancelled`/`expired`); `converted` added to support Contracts activation. |
-| Sales / Contracts | **Frozen (Contracts Backend v1 approved)** | Full lifecycle (draft/active/completed/cancelled), created only from Reservations, ownership policy (one open contract per reservation, cancelled contracts are historical), 30 passing tests. Frontend not yet implemented. |
+| Sales / Contracts | Frozen | Full lifecycle, contextual Reservation-to-draft Contract flow, static-export-compatible frontend, and ownership policy are implemented. |
 | Accounting | Planned | Financial operations and bookkeeping. |
 | Payment | Planned | Payment registration and reconciliation. |
 | Expense | Planned | Expense tracking and approval. |
 | Revenue | Planned | Revenue recognition and reporting. |
 | Document | Planned | File storage and document management. |
 | Notification | Planned | System notifications and messaging. |
-| Audit | Planned | Audit trail and operational history. |
+| Audit | In Progress | Durable Collection Schedule audit events are implemented; a cross-domain audit platform remains deferred. |
 | Reporting | Planned | Business reports and analytics. |
 
 ---

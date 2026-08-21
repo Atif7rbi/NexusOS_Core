@@ -20,7 +20,7 @@ final class CommercialModuleCatalog
 
     public const COLLECTIONS = 'collections';
 
-    public const PILOT_FULL_PLAN = 'pilot_full';
+    public const BUSINESS_FULL_PLAN = 'business_full';
 
     public const DEMO_FULL_PLAN = 'demo_full';
 

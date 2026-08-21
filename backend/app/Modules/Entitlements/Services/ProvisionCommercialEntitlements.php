@@ -13,9 +13,9 @@ use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
-final class ProvisionPilotEntitlements
+final class ProvisionCommercialEntitlements
 {
-    private const PILOT_FULL_USERS_LIMIT = 5;
+    private const BUSINESS_FULL_USERS_LIMIT = 5;
 
     public function __construct(
         private readonly CommercialModuleCatalog $catalog,
@@ -137,10 +137,10 @@ final class ProvisionPilotEntitlements
     private function planDefinition(string $planKey): array
     {
         return match ($planKey) {
-            CommercialModuleCatalog::PILOT_FULL_PLAN => [
-                'name_ar' => 'الباقة التجريبية الكاملة',
-                'name_en' => 'Pilot Full',
-                'users_limit' => self::PILOT_FULL_USERS_LIMIT,
+            CommercialModuleCatalog::BUSINESS_FULL_PLAN => [
+                'name_ar' => 'الباقة التجارية الكاملة',
+                'name_en' => 'Business Full',
+                'users_limit' => self::BUSINESS_FULL_USERS_LIMIT,
             ],
             CommercialModuleCatalog::DEMO_FULL_PLAN => [
                 'name_ar' => 'باقة العرض الكاملة',

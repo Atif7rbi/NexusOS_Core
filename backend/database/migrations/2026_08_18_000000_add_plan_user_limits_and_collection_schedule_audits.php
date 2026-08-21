@@ -22,7 +22,7 @@ return new class extends Migration
         ");
 
         DB::table('plans')
-            ->where('key', 'pilot_full')
+            ->where('key', 'business_full')
             ->update(['users_limit' => 5]);
 
         Schema::create('collection_schedule_audits', function (Blueprint $table): void {

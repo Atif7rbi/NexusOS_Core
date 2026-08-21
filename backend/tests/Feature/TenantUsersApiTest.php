@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Models\TenantLicense;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Modules\Entitlements\Support\CommercialModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -364,9 +365,9 @@ class TenantUsersApiTest extends TestCase
         ]);
 
         $plan = Plan::query()->create([
-            'key' => 'pilot_full',
-            'name_ar' => 'الباقة التجريبية الكاملة',
-            'name_en' => 'Pilot Full',
+            'key' => CommercialModuleCatalog::BUSINESS_FULL_PLAN,
+            'name_ar' => 'الباقة التجارية الكاملة',
+            'name_en' => 'Business Full',
             'status' => Plan::STATUS_ACTIVE,
             'users_limit' => 5,
         ]);

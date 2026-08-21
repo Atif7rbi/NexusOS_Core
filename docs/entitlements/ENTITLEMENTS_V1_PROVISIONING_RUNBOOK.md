@@ -18,10 +18,11 @@ Commercial Modules:
 
 Approved Plans:
 
-- `pilot_full`: all seven Modules, `users_limit = 5`.
+- `business_full`: all seven Modules, `users_limit = 5`.
 - `demo_full`: all seven Modules, `users_limit = null` (unlimited).
 
-> Naming note: `pilot_full` remains the current runtime/database key for the five-seat commercial Plan. Do not rename it manually in provisioning commands. A future rename, if approved, must be coordinated with the Entitlements implementation and persisted data.
+The former `pilot_full` key is migrated forward to `business_full` by Core
+migration. Do not rename Plan keys manually outside the reviewed migration.
 
 A current Tenant License may carry `users_limit_override`. When present it overrides the Plan seat limit for that Tenant and License period. When null, the Plan limit is inherited.
 
@@ -52,7 +53,7 @@ Customer example:
 ```bash
 php artisan nexusos:provision-entitlements \
   --tenant='<tenant-ulid-or-exact-slug>' \
-  --plan='pilot_full' \
+  --plan='business_full' \
   --status='active' \
   --starts-at='<ISO-8601 timestamp with timezone>' \
   --ends-at='<ISO-8601 timestamp with timezone>'
@@ -97,7 +98,7 @@ php artisan nexusos:set-user-limit \
   --inherit
 ```
 
-For example, a customer Tenant on `pilot_full` inherits five seats. If a commercial upgrade is approved to eight seats, `--limit=8` makes its effective limit eight without affecting other Tenants using `pilot_full`.
+For example, a customer Tenant on `business_full` inherits five seats. If a commercial upgrade is approved to eight seats, `--limit=8` makes its effective limit eight without affecting other Tenants using `business_full`.
 
 ## CORS
 

@@ -41,7 +41,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
             ->assertSuccessful();
 
         $this->assertSame(7, Module::query()->count());
-        $plan = Plan::query()->where('key', CommercialModuleCatalog::PILOT_FULL_PLAN)->firstOrFail();
+        $plan = Plan::query()->where('key', CommercialModuleCatalog::BUSINESS_FULL_PLAN)->firstOrFail();
         $this->assertSame(7, $plan->modules()->count());
         $this->assertDatabaseHas('tenant_licenses', [
             'tenant_id' => $tenant->id,
@@ -166,7 +166,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
 
         $this->artisan('nexusos:provision-entitlements', [
             '--tenant' => 'demo@example.test',
-            '--plan' => CommercialModuleCatalog::PILOT_FULL_PLAN,
+            '--plan' => CommercialModuleCatalog::BUSINESS_FULL_PLAN,
             '--status' => TenantLicense::STATUS_ACTIVE,
             '--starts-at' => self::STARTS_AT,
             '--ends-at' => self::ENDS_AT,
@@ -197,7 +197,7 @@ final class ProvisionEntitlementsCommandTest extends ApiTestCase
     {
         return array_merge([
             '--tenant' => (string) $tenant->id,
-            '--plan' => CommercialModuleCatalog::PILOT_FULL_PLAN,
+            '--plan' => CommercialModuleCatalog::BUSINESS_FULL_PLAN,
             '--status' => TenantLicense::STATUS_ACTIVE,
             '--starts-at' => self::STARTS_AT,
             '--ends-at' => self::ENDS_AT,
