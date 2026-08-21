@@ -46,19 +46,20 @@ Multi-tenant Business Operating System / ERP platform.
 Current phase:
 
 ```text
-Gate 0 — Core Generalization & Documentation Cleanup
+Gate 0 — Final Core Review & Release Readiness
 ```
 
 Status:
 
-Active
+Review Ready
 
-The Core contains a small remaining set of migration-sensitive compatibility
-references inherited from the earlier customer implementation. Active product
-runtime defaults and product identifiers are being generalized before major
-Accounting Core implementation begins.
+Gate 0A–0D source cleanup is complete: active product runtime defaults,
+identifiers, fixtures, and bootstrap behavior have been generalized. Gate 0E
+has passed the isolated backend and frontend validation suites. Gate 0F
+tracked-file review found no unintended customer-specific runtime coupling.
 
-These remnants are being removed or generalized before major Accounting Core implementation begins.
+The branch is awaiting final review approval. No merge, Demo deployment, or
+runtime smoke test has been performed as part of this status.
 
 ---
 
@@ -100,23 +101,14 @@ Gate 0E — Tests + build + Demo validation
 Gate 0F — Final clean-Core review
 ```
 
-Gate 0A repository inventory is complete.
-
-The tracked-file audit confirmed residual coupling in:
-
-- Root repository documentation.
-- MASTER_CONTEXT documentation.
-- Domain-document metadata.
-- Entitlement provisioning documentation.
-- Backend command and service names.
-- Authentication token naming.
-- Historical/customer-specific migrations and defaults.
-- Test database and fixtures.
-- Frontend package name.
-- Frontend local-storage namespaces.
-- Default branding fallback.
-
-Cleanup is being performed incrementally with review before commit.
+| Gate | Status | Result |
+|---|---|---|
+| 0A — Repository audit | Completed | Repository and migration history inventoried. |
+| 0B — Leakage audit | Completed | Tracked-file audit classified every remaining historical reference. |
+| 0C — Documentation | Completed | Core documentation and product identity generalized. |
+| 0D — Code/config cleanup | Completed | Runtime names, fixtures, bootstrap defaults, and plan identity generalized safely. |
+| 0E — Automated validation | Completed | Backend: 450 tests / 2768 assertions. Frontend: 64 files / 284 tests; lint and static build passed. |
+| 0F — Final source review | Completed | No unintended customer-specific runtime identity remains. |
 
 ## Historical Migration Compatibility
 
@@ -203,13 +195,11 @@ Remaining decisions then include:
 
 # Immediate Priorities
 
-1. Run backend validation using the existing isolated test database with the
-   explicit `DB_DATABASE` and `NEXUSOS_TEST_DATABASE` safety contract.
-2. Resolve historical migration compatibility without changing applied customer data.
-3. Run full backend/frontend validation.
-4. Verify the cleaned Core on the Demo environment.
-5. Perform final clean-Core review.
-6. Resume Accounting Core DDL-readiness verification.
+1. Perform final branch review and approve or request remediation.
+2. After explicit approval, merge and deploy to the validation environment,
+   then perform the Demo runtime smoke test.
+3. Declare Gate 0 complete only after that approved runtime verification.
+4. Resume Accounting Core DDL-readiness verification.
 
 ---
 
@@ -240,7 +230,8 @@ Current project health is structurally strong:
 - Multi-tenant architecture is established.
 - Core workflows are implemented and exercised.
 - Automated backend and frontend test coverage exists across critical areas.
-- The remaining current risk is primarily historical identity/coupling cleanup before broader ERP expansion.
+- The remaining Gate 0 risk is release review and approved runtime smoke
+  verification; source cleanup and automated validation are complete.
 
 ---
 

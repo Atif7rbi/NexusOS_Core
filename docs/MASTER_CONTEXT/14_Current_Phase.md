@@ -20,13 +20,13 @@ It is intentionally narrower than the Roadmap and Current Project Status documen
 Phase:
 
 ```text
-Gate 0 — Core Generalization & Documentation Cleanup
+Gate 0 — Final Core Review & Release Readiness
 ```
 
 Status:
 
 ```text
-ACTIVE
+REVIEW READY
 ```
 
 ---
@@ -52,22 +52,22 @@ Gate 0E — Tests + build + Demo validation
 Gate 0F — Final clean-Core review
 ```
 
-The repository audit, tracked-file leakage inventory, and documentation
-generalization are complete. Active work is limited to runtime/configuration
-generalization, migration-safe cleanup, and validation.
+Gate 0A–0D source work is complete. Gate 0E has passed isolated backend and
+frontend validation. Gate 0F source review is complete and the branch is ready
+for final review; merge, deployment, and Demo smoke verification remain
+explicitly pending approval.
 
 ---
 
 # Current Work
 
-Current work includes:
+Completed work includes:
 
-- Generalizing entitlement Plan provisioning and persisted identifiers.
-- Generalizing the test database configuration while retaining the existing
-  isolated test infrastructure.
-- Keeping historical applied migrations compatible while removing customer
-  bootstrap defaults from fresh Core installations.
-- Running focused and full validation before Demo review.
+- Generalized entitlement Plan provisioning and the persisted Core plan key.
+- Generic, environment-configured test-database safety checks while retaining
+  the existing isolated test infrastructure.
+- Migration-compatible historical cleanup and tenant-neutral fresh bootstrap.
+- Full isolated backend validation plus frontend tests, lint, and static build.
 
 ---
 
@@ -95,9 +95,9 @@ Gate 0 is complete only when:
 5. Historical migration handling has been deliberately resolved.
 6. Backend tests pass.
 7. Frontend tests, lint, and build pass as applicable.
-8. Demo validation succeeds.
+8. Approved Demo deployment and runtime smoke verification succeeds.
 9. Final repository-wide leakage scan shows no unintended customer-specific coupling.
-10. The final diff is reviewed and approved.
+10. The final branch review is approved.
 
 ---
 
