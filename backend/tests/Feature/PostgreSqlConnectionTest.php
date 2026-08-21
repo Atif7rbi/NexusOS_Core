@@ -16,7 +16,7 @@ class PostgreSqlConnectionTest extends TestCase
         )->database_name;
 
         $this->assertSame(
-            'sewaellf_ufq_pilot_testing',
+            'sewaellf_nexusos_core_testing',
             $databaseName
         );
     }

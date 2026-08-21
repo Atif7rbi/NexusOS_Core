@@ -106,6 +106,19 @@ Testing may include:
 - Manual functional validation.
 - UI verification.
 - Production verification after deployment.
+
+## Isolated PostgreSQL Test Database
+
+The Core test suite is pinned to the isolated PostgreSQL database:
+
+```text
+sewaellf_nexusos_core_testing
+```
+
+This database must be created and owned through the hosting control plane or
+an authorized database owner before server-side validation. It must never
+point at a Demo, customer, or production database. Laravel tests must use an
+isolated `APP_CONFIG_CACHE` path when a production config cache exists.
 ---
 # Documentation
 Documentation resides inside:

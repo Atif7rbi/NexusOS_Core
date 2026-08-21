@@ -9,7 +9,7 @@ abstract class TestCase extends BaseTestCase
 {
     protected function setUp(): void
     {
-        $expectedDatabase = 'sewaellf_ufq_pilot_testing';
+        $expectedDatabase = 'sewaellf_nexusos_core_testing';
         $configuredDatabase = getenv('DB_DATABASE');
 
         if ($configuredDatabase !== $expectedDatabase) {

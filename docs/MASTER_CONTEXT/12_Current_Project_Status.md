@@ -53,7 +53,10 @@ Status:
 
 Active
 
-The Core currently contains residual naming, documentation, defaults, tests, migrations, and runtime identifiers inherited from the earlier Pilot/customer-specific implementation.
+The Core contains a small remaining set of migration-sensitive compatibility
+references inherited from the earlier customer implementation. Active product
+runtime defaults and product identifiers are being generalized before major
+Accounting Core implementation begins.
 
 These remnants are being removed or generalized before major Accounting Core implementation begins.
 
@@ -114,6 +117,16 @@ The tracked-file audit confirmed residual coupling in:
 - Default branding fallback.
 
 Cleanup is being performed incrementally with review before commit.
+
+## Historical Migration Compatibility
+
+Applied migrations are never rewritten through a deployment. Fresh Core
+installations now begin without a seeded customer company identity and use a
+neutral bootstrap Tenant. The historical migration named
+`assign_historical_projects_to_ufq_tenant` remains intentionally unchanged:
+it is a migration-sensitive compatibility record for legacy Pilot databases,
+does not participate in normal fresh Core data, and must be retired only by a
+separate, reviewed migration-history policy.
 
 ---
 
@@ -190,13 +203,12 @@ Remaining decisions then include:
 
 # Immediate Priorities
 
-1. Finish documentation generalization.
-2. Generalize runtime names, frontend namespaces, branding, and test fixtures.
-3. Resolve historical migration strategy safely.
-4. Run full backend/frontend validation.
-5. Verify the cleaned Core on the Demo environment.
-6. Perform final clean-Core review.
-7. Resume Accounting Core DDL-readiness verification.
+1. Complete generic test database provisioning through the hosting control plane.
+2. Resolve historical migration compatibility without changing applied customer data.
+3. Run full backend/frontend validation.
+4. Verify the cleaned Core on the Demo environment.
+5. Perform final clean-Core review.
+6. Resume Accounting Core DDL-readiness verification.
 
 ---
 

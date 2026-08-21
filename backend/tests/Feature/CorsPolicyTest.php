@@ -11,24 +11,24 @@ final class CorsPolicyTest extends TestCase
     public function test_approved_origin_receives_cors_header(): void
     {
         config()->set('cors.allowed_origins', [
-            'https://ufq.sewarsky.online',
+            'https://tenant.example.test',
         ]);
 
         $this->withHeaders([
-            'Origin' => 'https://ufq.sewarsky.online',
+            'Origin' => 'https://tenant.example.test',
             'Access-Control-Request-Method' => 'POST',
         ])->options('/api/auth/login')
             ->assertSuccessful()
             ->assertHeader(
                 'Access-Control-Allow-Origin',
-                'https://ufq.sewarsky.online',
+                'https://tenant.example.test',
             );
     }
 
     public function test_unapproved_origin_is_never_reflected_or_wildcarded(): void
     {
         config()->set('cors.allowed_origins', [
-            'https://ufq.sewarsky.online',
+            'https://tenant.example.test',
         ]);
 
         $response = $this->withHeaders([
@@ -49,13 +49,13 @@ final class CorsPolicyTest extends TestCase
         $original = getenv('CORS_ALLOWED_ORIGINS');
 
         try {
-            putenv('CORS_ALLOWED_ORIGINS=https://ufq.sewarsky.online,*');
+            putenv('CORS_ALLOWED_ORIGINS=https://tenant.example.test,*');
 
             /** @var array<string, mixed> $cors */
             $cors = require config_path('cors.php');
 
             $this->assertSame(
-                ['https://ufq.sewarsky.online'],
+                ['https://tenant.example.test'],
                 $cors['allowed_origins'],
             );
         } finally {

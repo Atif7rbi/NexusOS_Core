@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 return new class extends Migration
@@ -107,16 +106,10 @@ return new class extends Migration
 
         $tenantId = (string) Str::ulid();
 
-        $companyName = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')
-                ->value('company_name_ar')
-            : null;
-
         DB::table('tenants')->insert([
             'id' => $tenantId,
-            'name' => $companyName
-                ?: 'شركة أفق السكنية',
-            'slug' => 'ufq-pilot',
+            'name' => 'NexusOS Default Tenant',
+            'slug' => 'nexusos-default',
             'status' => 'active',
             'timezone' => 'Asia/Riyadh',
             'locale' => 'ar-SA',

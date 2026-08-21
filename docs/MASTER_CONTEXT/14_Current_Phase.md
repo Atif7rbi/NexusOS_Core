@@ -52,9 +52,9 @@ Gate 0E — Tests + build + Demo validation
 Gate 0F — Final clean-Core review
 ```
 
-The repository audit and tracked-file leakage inventory have been completed.
-
-Documentation generalization is currently active.
+The repository audit, tracked-file leakage inventory, and documentation
+generalization are complete. Active work is limited to runtime/configuration
+generalization, migration-safe cleanup, and validation.
 
 ---
 
@@ -62,14 +62,11 @@ Documentation generalization is currently active.
 
 Current work includes:
 
-- Rewriting root repository identity documents.
-- Generalizing MASTER_CONTEXT.
-- Updating domain-document metadata.
-- Reviewing entitlement provisioning documentation.
-- Preparing later cleanup of runtime product names.
-- Preparing frontend namespace and branding generalization.
-- Preparing generic test fixtures/configuration.
-- Deferring historical migration changes until their compatibility implications are reviewed.
+- Generalizing entitlement Plan provisioning and persisted identifiers.
+- Moving the test database identity to the Core namespace.
+- Keeping historical applied migrations compatible while removing customer
+  bootstrap defaults from fresh Core installations.
+- Running focused and full validation before Demo review.
 
 ---
 
