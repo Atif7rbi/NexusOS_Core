@@ -1,119 +1,131 @@
-# NexusOS Pilot
-
+# NexusOS Core
 # MASTER_CONTEXT
 
-> Official Project Knowledge Base
+> Official Product Knowledge Base
 
 ---
 
 # Purpose
 
-This directory contains the official documentation for the NexusOS Pilot project.
+This directory contains the primary high-level engineering and product context for NexusOS Core.
 
-It is the single source of truth for the project architecture, engineering decisions, development methodology, workflows, and current implementation status.
+It documents product identity, engineering philosophy, methodology, architecture, frozen decisions, implementation status, roadmap, current phase, and major project decisions.
 
-Every engineer working on the project must use these documents as the primary reference before making any architectural or implementation decision.
+Engineers and AI agents should review the relevant documents before making material architectural or implementation changes.
 
 ---
 
 # Scope
 
-This documentation covers:
+MASTER_CONTEXT covers:
 
-- Project Vision
-- Engineering Philosophy
-- Development Methodology
-- Team Responsibilities
-- Development Environment
-- Git Workflow
-- Deployment Workflow
-- Backend Architecture
-- Database Architecture
-- Domain Status
-- Frozen Decisions
-- Official Documents
-- Current Project Status
-- Roadmap
-- Current Development Phase
-- Project Decision Log
+- Product overview.
+- Engineering philosophy.
+- Development methodology.
+- Team and decision responsibilities.
+- Development environment.
+- Git workflow.
+- Deployment workflow.
+- Backend architecture.
+- Database architecture.
+- Domain status.
+- Frozen decisions.
+- Documentation structure.
+- Current project status.
+- Product roadmap.
+- Current engineering phase.
+- Project decision log.
 
----
-
-# Documentation Principles
-
-This documentation follows the same engineering standards as the source code.
-
-Documentation is considered part of the project itself.
-
-Changes must be reviewed before being accepted.
-
-Architecture decisions must never exist only inside conversations.
-
-Once approved, every important decision must be documented here.
+Detailed domain specifications live elsewhere under `docs/` and remain authoritative within their specific scopes.
 
 ---
 
-# Single Source of Truth
+# Documentation Authority
 
-If any difference exists between:
+Documentation is an engineering asset, not informal commentary.
 
-- Chat conversations
-- Personal notes
-- Temporary documents
-- This documentation
+Material architectural decisions should not exist only in chat history.
 
-This documentation becomes the official reference after approval.
+After approval, they should be recorded in the appropriate repository document.
 
----
+When sources conflict, use this priority:
 
-# Modification Rules
+1. Explicit current Product Owner decision.
+2. Newer approved/frozen domain or architecture specification.
+3. Enforced database constraints and automated tests.
+4. Current implementation.
+5. High-level orientation documents.
 
-These documents must not be modified casually.
-
-Major architectural changes require review before documentation updates.
-
-Implementation changes that do not affect architecture do not require documentation updates.
+Material conflicts should be surfaced and resolved explicitly.
 
 ---
 
 # Reading Order
 
-New engineers should read the documentation in the following order:
+Recommended reading order:
 
-1. Project Overview
-2. Project Philosophy
-3. Development Methodology
-4. Team Roles
-5. Development Environment
-6. Git Workflow
-7. Deployment Workflow
-8. Backend Architecture
-9. Database Architecture
-10. Domain Status
-11. Frozen Decisions
-12. Official Documents
-13. Current Project Status
-14. Roadmap
-15. Current Phase
-16. Decision Log
+1. `00_Project_Overview.md`
+2. `01_Project_Philosophy.md`
+3. `02_Development_Methodology.md`
+4. `03_Team_Roles.md`
+5. `04_Development_Environment.md`
+6. `05_Git_Workflow.md`
+7. `06_Deployment_Workflow.md`
+8. `07_Backend_Architecture.md`
+9. `08_Database_Architecture.md`
+10. `09_Domain_Status.md`
+11. `10_Frozen_Decisions.md`
+12. `11_Project_Documents.md`
+13. `12_Current_Project_Status.md`
+14. `13_Roadmap.md`
+15. `14_Current_Phase.md`
+16. `99_Project_Decision_Log.md`
 
 ---
 
 # Repository
 
-Official Repository:
+Official Core repository:
 
-Atif7rbi/ufq-pilot
+```text
+Atif7rbi/NexusOS_Core
+```
+
+Default approved baseline:
+
+```text
+main
+```
 
 ---
 
-# Status
+# Core / Customer Separation
 
-This documentation is maintained continuously throughout the lifetime of the project.
+MASTER_CONTEXT describes NexusOS Core.
 
-Last major update:
+Customer-specific deployments are downstream consumers of approved Core releases.
 
-MASTER_CONTEXT Initial Release
+Customer identity, branding, domains, credentials, migration data, and one-off business exceptions must not redefine Core architecture.
+
+---
+
+# Living Documents
+
+The following are expected to change as the project progresses:
+
+- `09_Domain_Status.md`
+- `12_Current_Project_Status.md`
+- `13_Roadmap.md`
+- `14_Current_Phase.md`
+- `99_Project_Decision_Log.md`
+
+Architecture and frozen-decision documents should change only through deliberate review.
+
+---
+
+# Current Transition
+
+NexusOS Core is currently undergoing systematic generalization from its historical Pilot/customer-specific origins before major Accounting and ERP expansion proceeds.
 
 ---
 

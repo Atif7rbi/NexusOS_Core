@@ -1,10 +1,10 @@
 # CRM / Leads v1 — Architecture & Business Rules
 
-**Project:** NexusOS Pilot  
-**Module:** CRM / Leads v1  
-**Version:** 1.0  
+**Project:** NexusOS Core
+**Module:** CRM / Leads v1
+**Version:** 1.0
 **Status:** FROZEN<br>
-**Repository:** `Atif7rbi/ufq-pilot`
+**Repository:** `Atif7rbi/NexusOS_Core`
 
 ---
 

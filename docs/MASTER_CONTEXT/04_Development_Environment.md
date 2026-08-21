@@ -1,10 +1,10 @@
-# NexusOS Pilot
+# NexusOS Core
 # Development Environment
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the official development environment used by the NexusOS Pilot project.
+This document defines the official development environment used by NexusOS Core.
 Every development, testing, and deployment activity should be performed using an environment compatible with these specifications.
 ---
 # Technology Stack
@@ -32,7 +32,7 @@ The project follows:
 ---
 # Repository
 Official Repository
-Atif7rbi/ufq-pilot
+Atif7rbi/NexusOS_Core
 Default Branch
 main
 Feature development should always be performed in dedicated branches before merging into main.

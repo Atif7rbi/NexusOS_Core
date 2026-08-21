@@ -35,7 +35,7 @@ describe("AppearanceProfileSelector", () => {
   });
 
   it("shows four preview cards and marks the current profile", async () => {
-    window.localStorage.setItem("ufq_theme:user:7", "light-1");
+    window.localStorage.setItem("nexusos_theme:user:7", "light-1");
     renderSelector();
 
     expect(screen.getByText("المظهر")).toBeTruthy();
@@ -58,7 +58,7 @@ describe("AppearanceProfileSelector", () => {
   });
 
   it("selects and persists a preview profile", async () => {
-    window.localStorage.setItem("ufq_theme:user:7", "light-1");
+    window.localStorage.setItem("nexusos_theme:user:7", "light-1");
     renderSelector();
 
     fireEvent.click(screen.getByRole("button", { name: /Dark 2/ }));
@@ -67,7 +67,7 @@ describe("AppearanceProfileSelector", () => {
       expect(document.documentElement.dataset.theme).toBe("dark-2");
     });
     expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(window.localStorage.getItem("ufq_theme:user:7")).toBe("dark-2");
+    expect(window.localStorage.getItem("nexusos_theme:user:7")).toBe("dark-2");
     expect(
       screen
         .getByRole("button", { name: /Dark 2/ })

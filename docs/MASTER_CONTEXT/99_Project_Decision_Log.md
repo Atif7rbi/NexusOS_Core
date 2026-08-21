@@ -1,4 +1,4 @@
-# NexusOS Pilot
+# NexusOS Core
 
 # Project Decision Log
 

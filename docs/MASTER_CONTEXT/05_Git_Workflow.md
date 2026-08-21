@@ -1,15 +1,15 @@
-# NexusOS Pilot
+# NexusOS Core
 # Git Workflow
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the official Git workflow used throughout the NexusOS Pilot project.
+This document defines the official Git workflow used throughout NexusOS Core.
 Following a consistent workflow improves traceability, simplifies code review, and minimizes deployment risk.
 ---
 # Repository
 Official Repository
-Atif7rbi/ufq-pilot
+Atif7rbi/NexusOS_Core
 Default Branch
 main
 The main branch always represents the latest approved production-ready code.

@@ -1,4 +1,4 @@
-# NexusOS Pilot
+# NexusOS Core
 
 # Domain Status
 
@@ -10,7 +10,7 @@ Status: Living Document
 
 # Purpose
 
-This document provides the official implementation status of every business domain within the NexusOS Pilot project.
+This document provides the official implementation status of every business domain within NexusOS Core.
 
 It serves as the primary reference for project progress and identifies which domains are completed, under development, planned, or frozen.
 
@@ -167,7 +167,7 @@ Every new domain should be added to this document before implementation begins.
 
 Project progress should always be measurable through completed business domains rather than isolated technical tasks.
 
-This document provides a single source of truth for the implementation status of the NexusOS Pilot backend.
+This document provides a single source of truth for the implementation status of the NexusOS Core backend.
 
 ---
 

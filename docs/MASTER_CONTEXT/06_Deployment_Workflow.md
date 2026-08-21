@@ -1,10 +1,10 @@
-# NexusOS Pilot
+# NexusOS Core
 # Deployment Workflow
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the official deployment workflow for the NexusOS Pilot project.
+This document defines the official deployment workflow for NexusOS Core.
 The objective is to ensure that every production deployment is predictable, repeatable, and carries the lowest practical risk.
 ---
 # Deployment Philosophy

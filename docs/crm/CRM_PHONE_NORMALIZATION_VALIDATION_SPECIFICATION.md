@@ -1,16 +1,16 @@
 # CRM / Leads v1 — Phone Normalization & Validation Specification
 
-**Project:** NexusOS Pilot
+**Project:** NexusOS Core
 **Module:** CRM / Leads v1
 **Version:** 1.0
 **Status:** FROZEN
-**Repository:** `Atif7rbi/ufq-pilot`
+**Repository:** `Atif7rbi/NexusOS_Core`
 
 ---
 
 ## 1. Purpose
 
-This document defines the single mobile-number contract used by CRM / Leads v1 and the existing NexusOS Pilot fields that represent mobile numbers.
+This document defines the single mobile-number contract used by CRM / Leads v1 and the existing NexusOS Core fields that represent mobile numbers.
 
 It defines the business-visible rules for preprocessing, validation, persistence, matching, duplicate handling, frontend behavior, database enforcement, rollout safety, and testing before CRM DDL or implementation begins.
 

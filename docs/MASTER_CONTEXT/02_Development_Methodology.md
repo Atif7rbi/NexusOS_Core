@@ -1,10 +1,10 @@
-# NexusOS Pilot
+# NexusOS Core
 # Development Methodology
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the official development workflow used throughout the NexusOS Pilot project.
+This document defines the official development workflow used throughout NexusOS Core.
 Every feature, bug fix, refactoring task, and architectural improvement follows the same lifecycle to ensure consistency, maintainability, and production quality.
 ---
 # Development Philosophy

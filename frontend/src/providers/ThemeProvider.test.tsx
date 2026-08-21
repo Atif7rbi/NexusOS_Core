@@ -66,7 +66,7 @@ function setCurrentUser(userId: number | null): void {
 }
 
 function userThemeKey(userId: number): string {
-  return `ufq_theme:user:${userId}`;
+  return `nexusos_theme:user:${userId}`;
 }
 
 async function expectRootTheme(
@@ -124,13 +124,13 @@ describe("ThemeProvider", () => {
 
   it("removes malformed scoped and legacy values before using the safe default", async () => {
     window.localStorage.setItem(userThemeKey(7), "unknown-profile");
-    window.localStorage.setItem("ufq_theme", "malformed-theme");
+    window.localStorage.setItem("nexusos_theme", "malformed-theme");
 
     renderProvider(7);
 
     await expectRootTheme("dark-1", true);
     expect(window.localStorage.getItem(userThemeKey(7))).toBeNull();
-    expect(window.localStorage.getItem("ufq_theme")).toBeNull();
+    expect(window.localStorage.getItem("nexusos_theme")).toBeNull();
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
@@ -140,12 +140,12 @@ describe("ThemeProvider", () => {
   ] as const)(
     "migrates legacy %s storage once to the authenticated user",
     async (legacy, profile, isDark) => {
-      window.localStorage.setItem("ufq_theme", legacy);
+      window.localStorage.setItem("nexusos_theme", legacy);
       renderProvider(7);
 
       await expectRootTheme(profile, isDark);
       expect(window.localStorage.getItem(userThemeKey(7))).toBe(profile);
-      expect(window.localStorage.getItem("ufq_theme")).toBeNull();
+      expect(window.localStorage.getItem("nexusos_theme")).toBeNull();
     }
   );
 
@@ -227,7 +227,7 @@ describe("ThemeProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "dark-2" }));
 
     await expectRootTheme("dark-2", true);
-    expect(window.localStorage.getItem("ufq_theme")).toBeNull();
+    expect(window.localStorage.getItem("nexusos_theme")).toBeNull();
     expect(window.localStorage.length).toBe(0);
   });
 });

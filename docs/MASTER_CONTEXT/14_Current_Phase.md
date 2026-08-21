@@ -1,8 +1,7 @@
-# NexusOS Pilot
-
+# NexusOS Core
 # Current Phase
 
-Version: 1.0
+Version: 2.0
 
 Status: Living Document
 
@@ -10,160 +9,144 @@ Status: Living Document
 
 # Purpose
 
-This document defines the current engineering phase of the NexusOS Pilot project.
+This document defines the immediate engineering focus of NexusOS Core.
 
-It provides a concise reference describing where the project currently stands, the objectives of the active phase, and the criteria required before moving to the next phase.
-
-This document represents the project's current operational focus.
+It is intentionally narrower than the Roadmap and Current Project Status documents.
 
 ---
 
 # Current Phase
 
-Phase Name
+Phase:
 
-Backend Business Domains
+```text
+Gate 0 — Core Generalization & Documentation Cleanup
+```
 
-Status
+Status:
 
-Active
-
----
-
-# Phase Objective
-
-The objective of the current phase is to complete the implementation of the project's core business domains according to the approved architecture.
-
-Implementation should remain fully aligned with:
-
-- Project Philosophy
-- Backend Architecture
-- Database Architecture
-- Frozen Decisions
-- Domain Specifications
+```text
+ACTIVE
+```
 
 ---
 
-# Current Activities
+# Why This Phase Exists
 
-Engineering work currently focuses on:
+NexusOS Core evolved from an earlier operational Pilot/customer implementation.
 
-- Domain implementation.
-- Business rules.
-- Lifecycle management.
-- Domain services.
-- Domain operations.
-- Result DTOs.
-- Business exceptions.
-- Automated testing.
-- Domain documentation.
+The repository now serves as the official generic product Core, but historical customer and Pilot identifiers still exist in documentation, runtime names, tests, defaults, migrations, and frontend namespaces.
+
+Major ERP and Accounting expansion must not proceed on top of those unresolved product-identity remnants.
 
 ---
 
-# Engineering Priorities
+# Gate 0 Structure
 
-Current priorities are:
+```text
+Gate 0A — Read-only repository audit
+Gate 0B — Repository-wide client/Pilot leakage audit
+Gate 0C — Documentation cleanup/generalization
+Gate 0D — Code/config/seed/demo-data generalization
+Gate 0E — Tests + build + Demo validation
+Gate 0F — Final clean-Core review
+```
 
-1. Maintain architectural consistency.
-2. Complete one domain at a time.
-3. Validate every implementation.
-4. Keep documentation synchronized.
-5. Preserve production readiness.
+The repository audit and tracked-file leakage inventory have been completed.
 
-No implementation should compromise these priorities.
+Documentation generalization is currently active.
 
 ---
 
-# Work Sequence
+# Current Work
 
-Every domain should follow the same sequence.
+Current work includes:
 
-1. Architecture review.
-2. Database verification.
-3. Service implementation.
-4. Business validation.
-5. Automated testing.
-6. Documentation.
-7. Functional approval.
-8. Freeze.
+- Rewriting root repository identity documents.
+- Generalizing MASTER_CONTEXT.
+- Updating domain-document metadata.
+- Reviewing entitlement provisioning documentation.
+- Preparing later cleanup of runtime product names.
+- Preparing frontend namespace and branding generalization.
+- Preparing generic test fixtures/configuration.
+- Deferring historical migration changes until their compatibility implications are reviewed.
 
-No domain should bypass this sequence.
+---
+
+# Explicit Non-Scope
+
+During this phase do not introduce:
+
+- Accounting migrations.
+- New ERP domains.
+- New business rules unrelated to generalization.
+- Customer-specific features.
+- Broad refactors unrelated to identified Core cleanup.
+- Hidden deployment changes.
 
 ---
 
 # Exit Criteria
 
-The current phase is considered complete when:
+Gate 0 is complete only when:
 
-- Core business domains have been implemented.
-- Domain testing has passed.
-- Documentation is complete.
-- Architectural consistency has been verified.
-- The project is ready to begin Application Layer implementation.
+1. Core documentation reflects NexusOS Core rather than the former Pilot.
+2. Runtime namespaces and generic product identity are cleaned.
+3. Customer-specific defaults and branding are removed or properly externalized.
+4. Tests use generic product fixtures where appropriate.
+5. Historical migration handling has been deliberately resolved.
+6. Backend tests pass.
+7. Frontend tests, lint, and build pass as applicable.
+8. Demo validation succeeds.
+9. Final repository-wide leakage scan shows no unintended customer-specific coupling.
+10. The final diff is reviewed and approved.
 
 ---
 
 # Next Phase
 
-The next planned phase is:
+After Gate 0:
 
-Application Layer
+```text
+Accounting Core Architecture Verification
+→ Remaining Freeze Decisions
+→ DDL Readiness Review
+→ DDL
+→ Accounting Implementation
+```
 
-Its primary objectives include:
+Accounting implementation must not begin merely because Gate 0 documentation is complete.
 
-- Use case implementation.
-- Transaction coordination.
-- API orchestration.
-- Result translation.
-- Integration with completed business domains.
+The Accounting design must first be explicitly declared:
 
-Implementation of the next phase should not begin until the current phase has been successfully completed.
+```text
+FROZEN + DDL-READY
+```
 
 ---
 
-# Success Indicators
+# Engineering Priority
 
-The current phase is progressing successfully when:
+The current priority is product correctness and source-of-truth cleanup, not feature velocity.
 
-- Domains are completed sequentially.
-- Automated tests continue to pass.
-- Documentation remains current.
-- No architectural inconsistencies are introduced.
-- Business rules remain centralized within the Domain Layer.
+The goal is to ensure that all subsequent ERP work is built on a genuinely generic NexusOS Core foundation.
 
 ---
 
 # Update Policy
 
-This document should be updated whenever:
+Update this document when:
 
-- The active project phase changes.
-- Major phase objectives are completed.
-- Engineering priorities are revised.
-
-Routine implementation work does not require updates.
-
----
-
-# Relationship to Other Documents
-
-This document complements:
-
-- Current Project Status
-- Roadmap
-- Domain Status
-
-Those documents describe overall progress.
-
-This document describes the project's immediate engineering focus.
+- Gate 0 changes subphase materially.
+- Gate 0 completes.
+- Accounting architecture verification becomes the active phase.
+- A new major engineering phase begins.
 
 ---
 
 # Guiding Principle
 
-The project should always have one clearly defined active phase.
-
-Engineering effort should remain focused on completing the current phase before beginning the next.
+One clearly defined active phase should govern major engineering work at a time.
 
 ---
 

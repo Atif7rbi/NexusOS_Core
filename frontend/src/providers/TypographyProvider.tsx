@@ -35,8 +35,8 @@ type TypographyContextValue = {
   setFontFamily: (fontFamily: FontFamily) => void;
 };
 
-const TEXT_SIZE_STORAGE_KEY = "ufq_text_size";
-const FONT_STORAGE_KEY = "ufq_font";
+const TEXT_SIZE_STORAGE_KEY = "nexusos_text_size";
+const FONT_STORAGE_KEY = "nexusos_font";
 const DEFAULT_TEXT_SIZE: TextSizeProfile = "large";
 const DEFAULT_FONT: FontFamily = "tajawal";
 

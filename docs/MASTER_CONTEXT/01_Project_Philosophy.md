@@ -1,10 +1,10 @@
-# NexusOS Pilot
+# NexusOS Core
 # Project Philosophy
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the engineering philosophy that guides every design and implementation decision throughout the NexusOS Pilot project.
+This document defines the engineering philosophy that guides every design and implementation decision throughout NexusOS Core.
 These principles are intentionally stable and should only change through explicit architectural review.
 ---
 # Philosophy
@@ -50,10 +50,10 @@ Infrastructure provides technical capabilities.
 Presentation handles user interaction.
 ---
 # Production Before Perfection
-The Pilot is built for a real customer.
+NexusOS Core is built for real operational use.
 The objective is not theoretical perfection.
-The objective is delivering a reliable production system while preserving architectural quality.
-Future improvements are expected, but they should evolve from production experience rather than speculation.
+The objective is delivering reliable production-quality software while preserving architectural quality.
+Future improvements should evolve from validated operational experience rather than speculation.
 ---
 # Incremental Evolution
 The system evolves through small validated steps.

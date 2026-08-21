@@ -54,10 +54,10 @@ vi.mock("@/providers/AuthProvider", () => ({
 
 vi.mock("@/providers/SystemSettingsProvider", () => ({
   useSystemSettings: () => ({
-    company_name_ar: "شركة أفق السكنية",
-    company_name_en: "UFQ Real Estate",
-    short_name_ar: "أفق",
-    short_name_en: "UFQ",
+    company_name_ar: "شركة المثال العقارية",
+    company_name_en: "Example Real Estate",
+    short_name_ar: "المثال",
+    short_name_en: "Example",
     company_tagline_ar: "للتطوير العقاري",
     company_tagline_en: "Real Estate Development",
     logo_path: null,
@@ -80,7 +80,7 @@ describe("Topbar", () => {
 
     act(() => vi.runOnlyPendingTimers());
 
-    expect(screen.getByText("شركة أفق السكنية")).toBeTruthy();
+    expect(screen.getByText("شركة المثال العقارية")).toBeTruthy();
     expect(screen.getByText("— للتطوير العقاري")).toBeTruthy();
     expect(
       screen.getByRole("heading", { name: "لوحة التحكم" })

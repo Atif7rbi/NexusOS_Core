@@ -49,7 +49,7 @@ class ProjectsApiTest extends ApiTestCase
         Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/projects', [
-            'name' => 'مشروع أفق السكني',
+            'name' => 'مشروع المثال السكني',
             'project_type' => 'residential',
             'city' => 'الرياض',
             'district' => 'الياسمين',
@@ -69,7 +69,7 @@ class ProjectsApiTest extends ApiTestCase
 
         $this->assertDatabaseHas('projects', [
             'project_number' => 'PRJ-2026-001',
-            'name' => 'مشروع أفق السكني',
+            'name' => 'مشروع المثال السكني',
             'project_type' => 'residential',
             'status' => 'draft',
             'city' => 'الرياض',

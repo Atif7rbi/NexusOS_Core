@@ -1,10 +1,10 @@
-# NexusOS Pilot
+# NexusOS Core
 # Team Roles
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the official responsibilities and decision authority of every participant involved in the NexusOS Pilot project.
+This document defines the official responsibilities and decision authority of every participant involved in NexusOS Core.
 Clear ownership prevents duplicated responsibilities, conflicting decisions, and architectural inconsistency.
 ---
 # Team Structure

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Validator;
 
 class CreateAdminUser extends Command
 {
-    protected $signature = 'ufq:create-admin';
+    protected $signature = 'nexusos:create-admin';
 
     protected $description = 'Create the first administrator account safely';
     public function __construct(private readonly SaudiMobileNormalizer $phoneNormalizer) { parent::__construct(); }

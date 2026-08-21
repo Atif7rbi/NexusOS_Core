@@ -28,7 +28,7 @@ type ThemeContextValue = {
   setTheme: (theme: ThemeProfile) => void;
 };
 
-const STORAGE_KEY = "ufq_theme";
+const STORAGE_KEY = "nexusos_theme";
 
 function getUserStorageKey(userId: number): string {
   return `${STORAGE_KEY}:user:${userId}`;

@@ -91,8 +91,8 @@ describe("TypographyProvider", () => {
       expect(document.documentElement.dataset.textSize).toBe("large");
     });
     expect(document.documentElement.dataset.font).toBe("tajawal");
-    expect(window.localStorage.getItem("ufq_text_size:user:11")).toBe("large");
-    expect(window.localStorage.getItem("ufq_font:user:11")).toBe("tajawal");
+    expect(window.localStorage.getItem("nexusos_text_size:user:11")).toBe("large");
+    expect(window.localStorage.getItem("nexusos_font:user:11")).toBe("tajawal");
 
     rerenderProvider(view, null);
     await waitFor(() => {
@@ -101,8 +101,8 @@ describe("TypographyProvider", () => {
 
     rerenderProvider(view, 22);
     expect(screen.getByText("large:tajawal")).toBeTruthy();
-    expect(window.localStorage.getItem("ufq_text_size:user:22")).toBeNull();
-    expect(window.localStorage.getItem("ufq_font:user:22")).toBeNull();
+    expect(window.localStorage.getItem("nexusos_text_size:user:22")).toBeNull();
+    expect(window.localStorage.getItem("nexusos_font:user:22")).toBeNull();
 
     rerenderProvider(view, 11);
     await waitFor(() => {
@@ -111,15 +111,15 @@ describe("TypographyProvider", () => {
   });
 
   it("removes malformed user storage and safely applies defaults", async () => {
-    window.localStorage.setItem("ufq_text_size:user:7", "huge");
-    window.localStorage.setItem("ufq_font:user:7", "unsupported");
+    window.localStorage.setItem("nexusos_text_size:user:7", "huge");
+    window.localStorage.setItem("nexusos_font:user:7", "unsupported");
     renderProvider(7);
 
     await waitFor(() => {
       expect(document.documentElement.dataset.textSize).toBe("large");
     });
     expect(document.documentElement.dataset.font).toBe("tajawal");
-    expect(window.localStorage.getItem("ufq_text_size:user:7")).toBeNull();
-    expect(window.localStorage.getItem("ufq_font:user:7")).toBeNull();
+    expect(window.localStorage.getItem("nexusos_text_size:user:7")).toBeNull();
+    expect(window.localStorage.getItem("nexusos_font:user:7")).toBeNull();
   });
 });

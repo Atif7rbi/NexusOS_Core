@@ -1,8 +1,8 @@
 # Collections Frontend Specification v1
 
 **Status:** FROZEN
-**Project:** NexusOS Pilot
-**Repository:** Atif7rbi/ufq-pilot
+**Project:** NexusOS Core
+**Repository:** Atif7rbi/NexusOS_Core
 **Depends on:** Collections Backend API Specification v1
 
 ---

@@ -355,8 +355,8 @@ class TenantUsersApiTest extends TestCase
         string $role = User::ROLE_ADMINISTRATOR,
     ): array {
         $tenant = Tenant::query()->create([
-            'name' => 'شركة أفق',
-            'slug' => 'ufq',
+            'name' => 'شركة المثال',
+            'slug' => 'example-company',
             'status' => Tenant::STATUS_ACTIVE,
             'timezone' => 'Asia/Riyadh',
             'locale' => 'ar-SA',
