@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -30,7 +29,7 @@ return new class extends Migration
                 ->exists();
 
             if ($corePlanExists) {
-                throw new RuntimeException(
+                throw new \RuntimeException(
                     'Cannot rename the legacy pilot_full plan because business_full already exists. Resolve the duplicate commercial Plan explicitly before retrying.',
                 );
             }
@@ -64,7 +63,7 @@ return new class extends Migration
                 ->exists();
 
             if ($legacyPlanExists) {
-                throw new RuntimeException(
+                throw new \RuntimeException(
                     'Cannot restore pilot_full because a plan with that key already exists.',
                 );
             }
