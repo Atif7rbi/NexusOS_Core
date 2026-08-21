@@ -19,7 +19,7 @@ const context: BusinessContext = {
       },
       project: {
         id: "01K00000000000000000000002",
-        project_number: "PILOT-1",
+        project_number: "PRJ-1",
         name: "مشروع النخيل",
         status: "active",
       },
@@ -101,7 +101,7 @@ describe("CustomerBusinessContext", () => {
     );
 
     expect(screen.getByText("الرحلة التجارية")).toBeTruthy();
-    expect(screen.getByText("PILOT-1 — مشروع النخيل · نشط")).toBeTruthy();
+    expect(screen.getByText("PRJ-1 — مشروع النخيل · نشط")).toBeTruthy();
     expect(screen.getByText("A-101 · شقة · مباعة")).toBeTruthy();
     expect(screen.getByText("محول إلى عقد")).toBeTruthy();
     expect(screen.getAllByText("130,000 SAR")).toHaveLength(2);
