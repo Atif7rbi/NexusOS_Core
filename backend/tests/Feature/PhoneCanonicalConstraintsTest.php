@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 namespace Tests\Feature;
+use App\Models\SystemSetting;
+use App\Models\Tenant;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,6 +19,8 @@ final class PhoneCanonicalConstraintsTest extends TestCase
     }
     public function test_database_rejects_noncanonical_phone(): void
     {
+        $this->createSystemSettingsFixture();
+
         $this->expectException(QueryException::class); DB::table('system_settings')->update(['phone'=>'+966501234567']);
     }
     public function test_forced_install_failure_is_atomic(): void
@@ -29,11 +33,27 @@ final class PhoneCanonicalConstraintsTest extends TestCase
     }
     public function test_preflight_does_not_modify_invalid_data(): void
     {
+        $this->createSystemSettingsFixture();
+
         $m=$this->migration(); $m->down(); DB::table('system_settings')->update(['phone'=>'+966501234567']);
         try { $m->up(); self::fail('Expected preflight failure.'); }
         catch (RuntimeException $e) { self::assertStringContainsString('system_settings_noncanonical=1',$e->getMessage()); self::assertSame('+966501234567',DB::table('system_settings')->value('phone')); foreach(self::NAMES as $n) self::assertFalse($this->exists($n)); }
         finally { DB::table('system_settings')->update(['phone'=>null]); $m->up(); }
     }
     private function migration(): Migration { return require database_path('migrations/2026_08_01_000000_enforce_canonical_phone_constraints.php'); }
-    private function exists(string $name): bool { return DB::table('pg_constraint')->where('conname',$name)->exists(); }
+    private function exists(string $name): bool
+    {
+        return DB::table('pg_constraint as constraint')
+            ->join('pg_class as relation', 'relation.oid', '=', 'constraint.conrelid')
+            ->join('pg_namespace as namespace', 'namespace.oid', '=', 'relation.relnamespace')
+            ->where('constraint.conname', $name)
+            ->whereRaw('namespace.nspname = current_schema()')
+            ->exists();
+    }
+    private function createSystemSettingsFixture(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        SystemSetting::forTenant((string) $tenant->id);
+    }
 }
