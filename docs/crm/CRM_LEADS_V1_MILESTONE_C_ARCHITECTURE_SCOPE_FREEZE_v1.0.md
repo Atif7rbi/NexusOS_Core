@@ -1,11 +1,11 @@
 # CRM Leads v1 — Milestone C Architecture & Scope Freeze
 
-**Project:** NexusOS Pilot
+**Project:** NexusOS Core
 **Module:** CRM / Leads v1
 **Milestone:** C — Sales Follow-up & Pipeline Completion
 **Version:** 1.0
 **Status:** FROZEN
-**Repository:** `Atif7rbi/ufq-pilot`
+**Repository:** `Atif7rbi/NexusOS_Core`
 
 ---
 

@@ -21,7 +21,7 @@ import type {
   TranslationKey,
 } from "@/i18n/types";
 
-const STORAGE_KEY = "ufq_locale";
+const STORAGE_KEY = "nexusos_locale";
 
 type LanguageContextValue = {
   locale: AppLocale;

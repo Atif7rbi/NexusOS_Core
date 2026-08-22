@@ -10,9 +10,9 @@ return new class extends Migration
         /*
          * Phase 2.6 explicit business ownership assignment.
          *
-         * The Product Owner confirmed that these five historical Pilot
-         * projects belong to شركة أفق السكنية. This is not inferred from
-         * Units, Reservations, or the existence of a single Tenant.
+         * Historical single-tenant ownership assignment. The explicit IDs
+         * and project numbers are retained for migration compatibility and
+         * are not inferred from Units, Reservations, or tenant count.
          */
         $tenantId = '01KXPBAATGZQBH4JRVETAH5SX1';
 

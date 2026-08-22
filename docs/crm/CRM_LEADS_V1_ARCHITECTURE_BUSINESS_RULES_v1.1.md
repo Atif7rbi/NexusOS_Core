@@ -1,8 +1,8 @@
 # CRM / Leads v1 — Architecture & Business Rules v1.1
 
-**Status:** FROZEN  
-**Project:** NexusOS Pilot  
-**Date:** 2026-08-02  
+**Status:** FROZEN
+**Project:** NexusOS Core
+**Date:** 2026-08-02
 **Decisions:** #1–#12 + A, B, C, D — CLOSED
 
 ---

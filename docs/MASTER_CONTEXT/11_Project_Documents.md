@@ -1,4 +1,4 @@
-# NexusOS Pilot
+# NexusOS Core
 
 # Project Documents
 
@@ -10,7 +10,7 @@ Status: Living Document
 
 # Purpose
 
-This document defines the official documentation structure of the NexusOS Pilot project.
+This document defines the official documentation structure of NexusOS Core.
 
 It identifies the categories of project documentation, their responsibilities, and how they relate to one another.
 

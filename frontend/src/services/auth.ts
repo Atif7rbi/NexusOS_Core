@@ -8,7 +8,7 @@ import { parseApiError } from "@/lib/api-error";
 import { normalizeEffectiveModules } from "@/lib/entitlements";
 import type { CommercialModuleKey } from "@/types/entitlement";
 
-const TOKEN_STORAGE_KEY = "ufq_pilot_access_token";
+const TOKEN_STORAGE_KEY = "nexusos_access_token";
 
 function getApiBaseUrl(): string {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;

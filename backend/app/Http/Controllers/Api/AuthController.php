@@ -60,7 +60,7 @@ class AuthController extends Controller
             'last_login_at' => now(),
         ])->save();
 
-        $token = $user->createToken('ufq-pilot')->plainTextToken;
+        $token = $user->createToken('nexusos')->plainTextToken;
 
         return response()->json([
             'message' => 'تم تسجيل الدخول بنجاح.',

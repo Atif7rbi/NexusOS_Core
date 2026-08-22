@@ -9,7 +9,7 @@ abstract class TestCase extends BaseTestCase
 {
     protected function setUp(): void
     {
-        $expectedDatabase = 'sewaellf_ufq_pilot_testing';
+        $expectedDatabase = $this->expectedTestDatabase();
         $configuredDatabase = getenv('DB_DATABASE');
 
         if ($configuredDatabase !== $expectedDatabase) {
@@ -44,5 +44,27 @@ abstract class TestCase extends BaseTestCase
                 )
             );
         }
+    }
+
+    protected function expectedTestDatabase(): string
+    {
+        $database = getenv('NEXUSOS_TEST_DATABASE');
+
+        if (! is_string($database) || $database === '') {
+            throw new RuntimeException(
+                'Unsafe test database configuration. Set NEXUSOS_TEST_DATABASE and DB_DATABASE to the same isolated database before running tests.',
+            );
+        }
+
+        if (! preg_match('/^[A-Za-z0-9_]+_testing$/', $database)) {
+            throw new RuntimeException(
+                sprintf(
+                    'Unsafe test database name [%s]. NEXUSOS_TEST_DATABASE must end with [_testing].',
+                    $database,
+                ),
+            );
+        }
+
+        return $database;
     }
 }

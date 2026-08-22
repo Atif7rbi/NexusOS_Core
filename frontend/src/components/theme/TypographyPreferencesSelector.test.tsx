@@ -44,8 +44,8 @@ describe("TypographyPreferencesSelector", () => {
       expect(document.documentElement.dataset.textSize).toBe("extra-large");
     });
     expect(document.documentElement.dataset.font).toBe("noto-sans-arabic");
-    expect(window.localStorage.getItem("ufq_text_size:user:7")).toBe("extra-large");
-    expect(window.localStorage.getItem("ufq_font:user:7")).toBe("noto-sans-arabic");
+    expect(window.localStorage.getItem("nexusos_text_size:user:7")).toBe("extra-large");
+    expect(window.localStorage.getItem("nexusos_font:user:7")).toBe("noto-sans-arabic");
     expect(screen.getByText("IBM Plex")).toBeTruthy();
     expect(screen.getByText("Noto Sans")).toBeTruthy();
   });

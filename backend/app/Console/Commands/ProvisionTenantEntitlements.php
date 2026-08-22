@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Modules\Entitlements\Services\ProvisionPilotEntitlements;
+use App\Modules\Entitlements\Services\ProvisionCommercialEntitlements;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Console\Command;
@@ -14,7 +14,7 @@ final class ProvisionTenantEntitlements extends Command
 {
     protected $signature = 'nexusos:provision-entitlements
         {--tenant= : Exact Tenant ULID or slug}
-        {--plan=pilot_full : Approved Plan key}
+        {--plan=business_full : Approved Plan key}
         {--status=active : License status}
         {--starts-at= : Required ISO-8601 timestamp with timezone}
         {--ends-at= : Required ISO-8601 timestamp with timezone}
@@ -24,7 +24,7 @@ final class ProvisionTenantEntitlements extends Command
     protected $description = 'Provision the approved NexusOS module catalog, plan, and Tenant license';
 
     public function __construct(
-        private readonly ProvisionPilotEntitlements $provisioner,
+        private readonly ProvisionCommercialEntitlements $provisioner,
     ) {
         parent::__construct();
     }

@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -39,20 +38,10 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::table('system_settings')->insert([
-            'company_name_ar' => 'شركة أفق السكنية للتطوير العقاري',
-            'company_name_en' => 'Ufq Housing Development Company',
-            'short_name_ar' => 'أفق',
-            'short_name_en' => 'Ufq',
-            'primary_color' => '#0f172a',
-            'secondary_color' => '#475569',
-            'language' => 'ar',
-            'timezone' => 'Asia/Riyadh',
-            'currency' => 'SAR',
-            'date_format' => 'Y-m-d',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        /*
+         * Company identity is tenant-owned. A fresh Core installation must
+         * not seed any customer identity before its first tenant is created.
+         */
     }
 
     public function down(): void

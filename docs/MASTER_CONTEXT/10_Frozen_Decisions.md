@@ -1,4 +1,4 @@
-# NexusOS Pilot
+# NexusOS Core
 
 # Frozen Decisions
 

@@ -1,4 +1,4 @@
-# NexusOS Pilot
+# NexusOS Core
 
 # Backend Architecture
 
@@ -10,7 +10,7 @@ Status: Frozen
 
 # Purpose
 
-This document defines the official backend architecture of the NexusOS Pilot project.
+This document defines the official backend architecture of NexusOS Core.
 
 It describes the responsibilities of every backend layer, the execution flow of every business operation, and the engineering rules governing backend development.
 

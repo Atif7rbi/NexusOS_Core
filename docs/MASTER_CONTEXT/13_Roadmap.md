@@ -1,8 +1,7 @@
-# NexusOS Pilot
-
+# NexusOS Core
 # Roadmap
 
-Version: 1.0
+Version: 2.0
 
 Status: Living Document
 
@@ -10,281 +9,299 @@ Status: Living Document
 
 # Purpose
 
-This document defines the official roadmap of the NexusOS Pilot project.
+This document defines the high-level product and engineering roadmap for NexusOS Core.
 
-It provides a high-level view of the project's planned evolution and identifies the major engineering milestones leading to production readiness.
-
-The roadmap communicates direction rather than implementation details.
+It describes strategic progression rather than detailed implementation tasks.
 
 ---
 
-# Roadmap Philosophy
-
-The roadmap represents the intended progression of the project.
-
-It is not a task list.
-
-Detailed implementation plans belong in domain specifications, development plans, and issue tracking systems.
-
----
-
-# Guiding Principles
+# Roadmap Principles
 
 The roadmap should remain:
 
-- Stable.
-- High level.
-- Business-oriented.
+- Product-oriented.
 - Architecture-driven.
-- Flexible enough to accommodate approved changes.
+- Incremental.
+- Multi-tenant by default.
+- Commercially reusable.
+- Flexible where implementation evidence requires refinement.
 
-Implementation details should never replace roadmap objectives.
-
----
-
-# Major Phases
-
-The project progresses through a sequence of major engineering phases.
+A roadmap phase does not authorize implementation without the relevant architecture and scope approval.
 
 ---
 
-## Phase 1
+# Foundation Already Established
 
-Project Foundation
+NexusOS already contains a substantial operational Core, including:
 
-Status
+- Platform and repository foundations.
+- Backend and database architecture.
+- Authentication and tenant isolation.
+- Authorization and entitlements.
+- Core operational business domains.
+- Frontend workflows.
+- API integration.
+- Static-export-compatible deployment patterns.
+- Automated backend and frontend validation.
 
-Completed
-
-Objectives
-
-- Repository initialization.
-- Documentation framework.
-- Development workflow.
-- Project structure.
-- Engineering standards.
-
----
-
-## Phase 2
-
-Core Architecture
-
-Status
-
-Completed
-
-Objectives
-
-- Backend architecture.
-- Database architecture.
-- Engineering methodology.
-- Frozen architectural decisions.
-- Documentation hierarchy.
+Earlier roadmap models that treated Application Layer, Presentation Layer, and Frontend Integration as wholly future phases are therefore historical and no longer represent repository reality.
 
 ---
 
-## Phase 3
+# Phase 0 — Core Generalization
 
-Backend Business Domains
+Status:
 
-Status
+Review Ready — source cleanup and automated validation are complete; approved
+validation deployment and runtime smoke verification remain pending.
 
-In Progress
+Objectives:
 
-Notes (updated 28 July 2026)
+- Remove residual Pilot/customer identity from Core.
+- Generalize documentation.
+- Generalize runtime namespaces and product naming.
+- Remove client-specific branding defaults.
+- Generalize test fixtures and configuration.
+- Safely resolve historical client-specific migration baggage.
+- Validate the resulting clean Core.
 
-Completed within this phase: Project, Customer, Unit, Reservation, and Contracts (Sales)
-domains — each with business rules, validation, and passing automated tests. Remaining
-within this phase: Accounting, Payment, Expense, Revenue, Document, Notification, Audit,
-Reporting domains (all still Planned; see `09_Domain_Status.md`).
+Exit condition:
 
-Objectives
-
-- Business domain implementation.
-- Domain services.
-- Business rules.
-- Validation.
-- Testing.
-- Domain documentation.
+NexusOS Core can be treated as a reusable commercial product without hidden customer-specific identity or behavior.
 
 ---
 
-## Phase 4
+# Phase 1 — Accounting Core
 
-Application Layer
+Status:
 
-Status
+Architecture substantially frozen; DDL readiness pending.
+
+Objectives:
+
+- Chart of Accounts.
+- Accounting Periods.
+- Journal Entries.
+- Journal Lines.
+- Posting lifecycle.
+- Reversals.
+- Entry numbering.
+- Concurrency and transactional integrity.
+- Accounting settings.
+- Opening-balance onboarding.
+- Accounting audit/control events.
+- Business-source posting contract.
+
+Core principle:
+
+```text
+Business Transaction
+→ Accounting Rule
+→ Journal Entry
+→ Journal Lines
+→ Ledger / Reporting
+```
+
+Accounting implementation begins only after explicit DDL-readiness approval.
+
+---
+
+# Phase 2 — Receivables and Payments
+
+Status:
 
 Planned
 
-Objectives
+Objectives:
 
-- Use cases.
-- Transaction coordination.
-- API orchestration.
-- Result translation.
-- Integration with domain services.
+- Distinguish scheduled collections from actual payments.
+- Record customer receipts.
+- Integrate receivables with Accounting Core.
+- Preserve idempotent and auditable financial transitions.
+- Support contract/customer receivable visibility.
 
----
+Important invariant:
 
-## Phase 5
-
-Presentation Layer
-
-Status
-
-In Progress (largely delivered for completed domains)
-
-Notes (updated 28 July 2026)
-
-HTTP API, Sanctum-based authentication, tenant-scoped authorization, request validation
-(Form Requests), and JSON response formatting are already implemented and tested for
-Project, Customer, Unit, Reservation, and Contracts. This phase will continue as new
-domains (Accounting, Payment, etc.) are implemented.
-
-Objectives
-
-- HTTP API.
-- Authentication.
-- Authorization.
-- Request validation.
-- Response formatting.
+```text
+Collection Schedule ≠ Payment
+Scheduled Amount ≠ Collected Amount
+```
 
 ---
 
-## Phase 6
+# Phase 3 — Vendors, Expenses and Accounts Payable
 
-Frontend Integration
-
-Status
-
-In Progress
-
-Notes (updated 28 July 2026)
-
-Frontend workflows already exist for Dashboard, Projects, Customers, Units, and
-Reservations. Contracts has no frontend yet — this is the next planned frontend work.
-
-Objectives
-
-- Backend integration.
-- User workflows.
-- Dashboard implementation.
-- Role-based functionality.
-- User experience refinement.
-
----
-
-## Phase 7
-
-System Validation
-
-Status
+Status:
 
 Planned
 
-Objectives
+Objectives:
 
-- Functional testing.
-- Integration testing.
+- Vendor management.
+- Expense recording.
+- Payables lifecycle.
+- Supplier settlements.
+- Accounting integration.
+- Audit-safe financial transitions.
+
+---
+
+# Phase 4 — Project Costing
+
+Status:
+
+Planned
+
+Objectives:
+
+- Attribute relevant operational costs to projects.
+- Support project-level cost visibility.
+- Integrate costing with expenses/payables and Accounting Core.
+- Avoid premature generic dimensional-accounting complexity.
+
+---
+
+# Phase 5 — Budgeting
+
+Status:
+
+Planned
+
+Objectives:
+
+- Budget definitions.
+- Budget versus actual comparison.
+- Project and organizational planning where justified.
+- Controlled integration with accounting data.
+
+---
+
+# Phase 6 — ERP and Financial Reporting
+
+Status:
+
+Planned
+
+Objectives:
+
+- Ledger-based accounting reports.
+- Operational/financial reporting.
+- Receivables/payables visibility.
+- Project financial views.
+- Export and review workflows.
+
+Reporting must derive from authoritative operational and accounting data rather than duplicated cached truth.
+
+---
+
+# Phase 7 — Approval Workflows
+
+Status:
+
+Planned
+
+Objectives:
+
+- Introduce approval controls only where proven business processes require them.
+- Preserve explicit authorization and audit history.
+- Avoid building a universal workflow engine prematurely.
+
+---
+
+# Phase 8 — Document Management
+
+Status:
+
+Planned
+
+Objectives:
+
+- Business-document attachment and organization.
+- Domain-safe document ownership.
+- Access control.
+- Auditability and lifecycle management.
+
+---
+
+# Phase 9 — ERP Hardening
+
+Status:
+
+Planned
+
+Objectives:
+
+- Cross-domain integration validation.
+- Security review.
 - Performance validation.
-- Security verification.
-- Operational readiness.
+- Concurrency review.
+- Migration/release hardening.
+- Backup and recovery validation.
+- Operational monitoring readiness.
 
 ---
 
-## Phase 8
+# Phase 10 — Commercial ERP Release
 
-Production Readiness
-
-Status
+Status:
 
 Planned
 
-Objectives
+Objectives:
 
-- Production deployment.
-- Monitoring.
-- Operational verification.
-- Documentation review.
-- Release approval.
-
----
-
-# Long-Term Vision
-
-After production readiness, the project may continue with additional improvements, including:
-
-- New business domains.
-- Performance optimization.
-- Additional integrations.
-- Reporting enhancements.
-- AI-assisted capabilities.
-- Enterprise scalability.
-
-These initiatives should be evaluated based on business value.
+- Establish approved commercial release baseline.
+- Validate upgrade path for downstream customer deployments.
+- Finalize operating and deployment documentation.
+- Verify licensing/entitlement behavior.
+- Confirm production readiness.
 
 ---
 
-# Prioritization Strategy
+# Deferred Scope
 
-Engineering priorities should follow this order:
+Unless a structural dependency proves otherwise, the following remain deferred:
 
-1. Correct architecture.
-2. Complete business functionality.
-3. Stability.
-4. Maintainability.
-5. Performance optimization.
-6. New features.
+- VAT/ZATCA implementation.
+- Payroll.
+- Inventory.
+- Bank reconciliation.
+- Fixed assets.
+- Generic tax engine.
+- Universal cost-center/dimensions framework.
+- Enterprise-scale workflow engine.
+- SAP-level accounting abstractions.
 
-Work should not bypass earlier priorities.
+---
+
+# Prioritization
+
+Priorities are:
+
+1. Correctness and integrity.
+2. Clear domain ownership.
+3. Tenant safety.
+4. Auditability.
+5. Operational usefulness.
+6. Maintainability.
+7. Performance where evidence requires optimization.
+8. New scope.
 
 ---
 
 # Roadmap Maintenance
 
-The roadmap should be reviewed whenever:
+Review this roadmap when:
 
-- A major phase is completed.
-- Project priorities change.
-- New strategic objectives are approved.
-- Significant architectural changes occur.
-
-Minor implementation progress does not require roadmap updates.
-
----
-
-# Relationship to Other Documents
-
-This roadmap complements, but does not replace:
-
-- Master Context documents.
-- Domain specifications.
-- Current Project Status.
-- Development documentation.
-
-Each document serves a different purpose.
-
----
-
-# Success Criteria
-
-The roadmap is considered successfully completed when:
-
-- All planned phases have been completed.
-- Core business domains are production-ready.
-- Documentation is current.
-- Production deployment has been validated.
-- The project is operationally stable.
+- A strategic phase completes.
+- Major product direction changes.
+- Architecture evidence materially changes sequencing.
+- A deferred capability becomes structurally necessary.
 
 ---
 
 # Guiding Principle
 
-A roadmap defines direction rather than destination details.
-
-Engineering decisions should always align with the long-term architectural vision while remaining adaptable to validated business requirements.
+NexusOS should grow into a capable ERP through validated layers, not by prematurely reproducing enterprise-suite complexity.
 
 ---
 

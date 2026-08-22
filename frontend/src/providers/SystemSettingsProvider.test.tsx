@@ -174,7 +174,7 @@ describe("SystemSettingsProvider", () => {
         json: vi.fn().mockResolvedValue({ data: settings }),
       })
     );
-    window.localStorage.setItem("ufq_locale", "en-US");
+    window.localStorage.setItem("nexusos_locale", "en-US");
 
     render(
       <SystemSettingsProvider>

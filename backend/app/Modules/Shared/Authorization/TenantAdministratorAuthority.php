@@ -7,7 +7,7 @@ namespace App\Modules\Shared\Authorization;
 use App\Models\User;
 
 /**
- * The Pilot has two administrative identities with the same tenant authority.
+ * NexusOS Core has two administrative identities with the same tenant authority.
  * Keep this distinction in one place while the stored roles remain unchanged.
  */
 final class TenantAdministratorAuthority

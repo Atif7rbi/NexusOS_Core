@@ -1,4 +1,4 @@
-# NexusOS Pilot
+# NexusOS Core
 
 # Database Architecture
 
@@ -10,7 +10,7 @@ Status: Frozen
 
 # Purpose
 
-This document defines the official database architecture of the NexusOS Pilot project.
+This document defines the official database architecture of NexusOS Core.
 
 It establishes the principles, responsibilities, and engineering rules that govern the database layer.
 

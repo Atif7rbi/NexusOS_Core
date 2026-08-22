@@ -16,8 +16,8 @@ function hrefsForRole(role: UserRole | null): string[] {
   );
 }
 
-describe("pilot navigation visibility", () => {
-  it("does not expose incomplete pilot modules", () => {
+describe("Core navigation visibility", () => {
+  it("does not expose incomplete modules", () => {
     const hrefs = navigationGroups.flatMap(
       (group) => group.items.map((item) => item.href)
     );
@@ -61,7 +61,7 @@ describe("pilot navigation visibility", () => {
     );
   });
 
-  it("keeps completed pilot modules visible", () => {
+  it("keeps completed Core modules visible", () => {
     const hrefs = hrefsForRole("sales");
 
     expect(hrefs).toContain("/");

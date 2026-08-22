@@ -27,17 +27,17 @@ final class ProvisionEntitlementsSeatPolicyTest extends ApiTestCase
         parent::tearDown();
     }
 
-    public function test_pilot_full_provisioning_persists_five_user_limit(): void
+    public function test_business_full_provisioning_persists_five_user_limit(): void
     {
         $tenant = $this->createTenant('seat-policy-tenant');
 
-        $this->provision($tenant, CommercialModuleCatalog::PILOT_FULL_PLAN)
+        $this->provision($tenant, CommercialModuleCatalog::BUSINESS_FULL_PLAN)
             ->assertSuccessful();
 
         $this->assertSame(
             5,
             Plan::query()
-                ->where('key', CommercialModuleCatalog::PILOT_FULL_PLAN)
+                ->where('key', CommercialModuleCatalog::BUSINESS_FULL_PLAN)
                 ->value('users_limit'),
         );
 
@@ -72,7 +72,7 @@ final class ProvisionEntitlementsSeatPolicyTest extends ApiTestCase
 
         $this->provision(
             $tenant,
-            CommercialModuleCatalog::PILOT_FULL_PLAN,
+            CommercialModuleCatalog::BUSINESS_FULL_PLAN,
             8,
         )->assertSuccessful();
 
@@ -93,7 +93,7 @@ final class ProvisionEntitlementsSeatPolicyTest extends ApiTestCase
 
         $this->provision(
             $tenant,
-            CommercialModuleCatalog::PILOT_FULL_PLAN,
+            CommercialModuleCatalog::BUSINESS_FULL_PLAN,
             0,
         )->assertFailed();
 
@@ -106,7 +106,7 @@ final class ProvisionEntitlementsSeatPolicyTest extends ApiTestCase
     {
         $tenant = $this->createTenant('db-override-seat-policy-tenant');
 
-        $this->provision($tenant, CommercialModuleCatalog::PILOT_FULL_PLAN)
+        $this->provision($tenant, CommercialModuleCatalog::BUSINESS_FULL_PLAN)
             ->assertSuccessful();
 
         $licenseId = TenantLicense::query()

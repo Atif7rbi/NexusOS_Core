@@ -1,8 +1,7 @@
-# NexusOS Pilot
-
+# NexusOS Core
 # Current Project Status
 
-Version: 1.0
+Version: 2.0
 
 Status: Living Document
 
@@ -10,228 +9,247 @@ Status: Living Document
 
 # Purpose
 
-This document provides the official snapshot of the current state of the NexusOS Pilot project.
+This document provides the current operational snapshot of NexusOS Core.
 
-It summarizes completed work, active development, and upcoming milestones.
+It records the active engineering focus, completed product foundations, major known transitions, and the next approved architectural direction.
 
-Unlike architectural documents, this document is expected to change frequently throughout the project lifecycle.
-
----
-
-# Project Overview
-
-Project Name
-
-NexusOS Pilot
-
-Project Type
-
-Business Operating System
-
-Current Phase
-
-Core Backend Domains — Contracts v1 Approved, Frontend Catch-up Pending
-
-Overall Status
-
-Active Development
+It must be updated when a major phase, repository baseline, or strategic priority changes.
 
 ---
 
-# Completed Milestones
+# Project Identity
 
-The following milestones have been successfully completed.
+Project:
 
-## Project Foundation
+NexusOS Core
 
-Status
+Repository:
 
-Completed
+```text
+Atif7rbi/NexusOS_Core
+```
 
-Includes:
+Default branch:
 
-- Repository initialization
-- Project structure
-- Development workflow
-- Documentation framework
+```text
+main
+```
 
----
+Product type:
 
-## Development Environment
-
-Status
-
-Completed
-
-Includes:
-
-- Development environment definition
-- Git workflow
-- Deployment workflow
-- Team responsibilities
+Multi-tenant Business Operating System / ERP platform.
 
 ---
 
-## Core Architecture
+# Current Engineering Phase
 
-Status
+Current phase:
 
-Completed
+```text
+Gate 0 — Final Core Review & Release Readiness
+```
 
-Includes:
+Status:
 
-- Project philosophy
-- Backend architecture
-- Database architecture
-- Frozen architectural decisions
+Review Ready
 
----
+Gate 0A–0D source cleanup is complete: active product runtime defaults,
+identifiers, fixtures, and bootstrap behavior have been generalized. Gate 0E
+has passed the isolated backend and frontend validation suites. Gate 0F
+tracked-file review found no unintended customer-specific runtime coupling.
 
-## Documentation Framework
-
-Status
-
-Completed
-
-Includes:
-
-- Master Context
-- Documentation hierarchy
-- Domain status tracking
-- Project documentation standards
+The branch is awaiting final review approval. No merge, Demo deployment, or
+runtime smoke test has been performed as part of this status.
 
 ---
 
-# Completed Backend Domains (as of 28 July 2026, main @ 5cb2cdd)
+# Current Core Foundation
 
-The following domains have reached Frozen/Completed status with passing automated tests:
+The repository already contains mature operational functionality across the following areas:
 
-- **Identity & Tenant**: stateless auth, tenant membership, System Owner role.
-- **Project**: full lifecycle (draft/active/completed/cancelled/archived), tenant-scoped.
-- **Customer**: tenant-scoped CRUD, archive/restore.
-- **Unit**: full lifecycle incl. `reserved` and `sold` states.
-- **Reservation**: full lifecycle incl. `converted` state (added to support Contracts).
-- **Contracts (Sales)**: Contracts Backend v1 — full lifecycle (draft/active/completed/cancelled),
-  created only from Reservations, contract ownership policy (one open contract per
-  reservation; cancelled contracts are historical and don't block a replacement),
-  atomic transactions with row locks across Contract/Reservation/Unit, 30 passing tests.
-  **API only — no Contracts frontend yet.**
+- Authentication.
+- Multi-tenant membership.
+- Users and authorization.
+- Roles and permissions.
+- Entitlements and commercial seat policy.
+- Projects.
+- Customers.
+- Units.
+- CRM Leads.
+- Lead follow-ups and conversion workflows.
+- Reservations.
+- Contracts.
+- Collection schedules.
+- Dashboard operational views.
+- Shared form-validation UX.
+- Static-export-compatible frontend routing where required.
 
-Backend test suite: 122 tests passing (1 environment-specific failure unrelated to
-business logic — a hardcoded database-name assertion tied to a specific server).
-
----
-
-# Active Work
-
-The following activities are currently in progress or immediately next.
-
-- Contracts frontend (UI for creating, viewing, and managing contract lifecycle actions).
-- Broader project-wide code review (frontend + static analysis) requested by Product Owner,
-  not yet started at time of writing.
-- Keeping this documentation set synchronized with backend reality (this update itself is
-  part of that effort — see `99_Project_Decision_Log.md` policy).
-
-Progress should be reflected in this document whenever significant milestones are completed.
+Several of these domains have gone through multiple production-oriented architecture, implementation, test, review, and remediation cycles.
 
 ---
 
-# Upcoming Milestones
+# Core Generalization Status
 
-Planned future work includes:
+The active cleanup is organized as:
 
-- Contracts frontend implementation.
-- Payments / Installments (explicitly out of scope for Contracts v1).
-- Documents module (contract documents/attachments).
-- Accounting, Expense, Revenue, Reporting, Notification, Audit domains (all still Planned).
-- Production preparation and system validation once remaining core domains stabilize.
+```text
+Gate 0A — Read-only repository audit
+Gate 0B — Repository-wide client/Pilot leakage audit
+Gate 0C — Documentation cleanup/generalization
+Gate 0D — Code/config/seed/demo-data generalization
+Gate 0E — Tests + build + Demo validation
+Gate 0F — Final clean-Core review
+```
 
-The order may evolve according to project priorities.
+| Gate | Status | Result |
+|---|---|---|
+| 0A — Repository audit | Completed | Repository and migration history inventoried. |
+| 0B — Leakage audit | Completed | Tracked-file audit classified every remaining historical reference. |
+| 0C — Documentation | Completed | Core documentation and product identity generalized. |
+| 0D — Code/config cleanup | Completed | Runtime names, fixtures, bootstrap defaults, and plan identity generalized safely. |
+| 0E — Automated validation | Completed | Backend: 450 tests / 2768 assertions. Frontend: 64 files / 284 tests; lint and static build passed. |
+| 0F — Final source review | Completed | No unintended customer-specific runtime identity remains. |
+
+## Historical Migration Compatibility
+
+Applied migrations are never rewritten through a deployment. Fresh Core
+installations now begin without a seeded customer company identity and use a
+neutral bootstrap Tenant. The historical migration named
+`assign_historical_projects_to_ufq_tenant` remains intentionally unchanged:
+it is a migration-sensitive compatibility record for legacy Pilot databases,
+does not participate in normal fresh Core data, and must be retired only by a
+separate, reviewed migration-history policy.
 
 ---
 
-# Completed Domains
+# Current Development Environment
 
-See "Completed Backend Domains" above for the authoritative, up-to-date list. Cross-reference
-`09_Domain_Status.md` for the full domain-by-domain status table.
+Current server validation checkout:
+
+```text
+/home/sewaellf/nexusos-core-demo
+```
+
+Current Demo deployment:
+
+```text
+https://demo.sewarsky.online
+```
+
+These are environment-specific operational details and are not NexusOS product identity.
 
 ---
 
-# Current Priorities
+# Accounting Architecture Status
 
-The highest current priorities are:
+Accounting architecture work has progressed substantially, including frozen direction for:
 
-1. Complete backend business domains.
-2. Maintain architectural consistency.
-3. Preserve documentation quality.
-4. Validate implementations through testing.
-5. Prepare for production deployment.
+- Chart of Accounts.
+- Journal Entry lifecycle.
+- Journal Lines.
+- Posting invariants.
+- Reversals.
+- Accounting Periods.
+- Entry numbering.
+- Concurrency and locking.
+- Business-source integration.
+- Opening-balance principles.
+- Audit boundaries.
+
+However, Accounting remains:
+
+```text
+FROZEN — NOT YET DDL-READY
+```
+
+No Accounting migrations should be implemented until Core generalization and the remaining architecture verification are complete.
 
 ---
 
-# Documentation Status
+# Remaining Pre-DDL Accounting Verification
 
-Documentation is considered an active engineering asset.
+After Gate 0, read-only Core verification must cover:
 
-Current documentation includes:
+- Database engine and test configuration.
+- Tenant identifiers and lifecycle.
+- User identifiers and deletion semantics.
+- Actor foreign-key conventions.
+- Audit infrastructure and write path.
+- Numbering and sequence infrastructure.
+- Permission/action conventions.
+- Tenant-safe FK and constraint patterns.
+- Existing Accounting-related scaffolding, if any.
 
-- Project overview
-- Architecture
-- Development methodology
-- Deployment workflow
-- Database architecture
-- Frozen decisions
-- Project documentation
-- Domain status
-- Current project status
+Remaining decisions then include:
 
-Additional documentation will be added as the project expands.
+- AccountingSettings exact model.
+- OpeningBalanceOperation exact model.
+- Accounting Period reopen metadata behavior.
+- Account classification vocabulary and storage.
+- Actor/Tenant FK deletion behavior.
+- Accounting audit event matrix.
+- SAR eligibility enforcement.
+- Shared versus dedicated numbering infrastructure.
+
+---
+
+# Immediate Priorities
+
+1. Perform final branch review and approve or request remediation.
+2. After explicit approval, merge and deploy to the validation environment,
+   then perform the Demo runtime smoke test.
+3. Declare Gate 0 complete only after that approved runtime verification.
+4. Resume Accounting Core DDL-readiness verification.
+
+---
+
+# Core / Customer Release Policy
+
+The governing product direction is:
+
+```text
+NexusOS_Core
+→ develop
+→ test
+→ review
+→ approve
+
+approved Core release
+→ downstream customer upgrade
+```
+
+Customer-specific repositories are not sources for generic product development.
 
 ---
 
 # Project Health
 
-Current engineering objectives are:
+Current project health is structurally strong:
 
-- Maintain stable architecture.
-- Avoid unnecessary redesign.
-- Complete domains sequentially.
-- Keep implementation synchronized with documentation.
-- Preserve production readiness.
-
----
-
-# Status Update Policy
-
-This document should be updated whenever one of the following occurs:
-
-- A major milestone is completed.
-- A project phase changes.
-- A significant domain reaches completion.
-- Project priorities change.
-- Production readiness advances.
-
-Routine implementation work does not require continuous updates.
+- Mature operational foundation exists.
+- Multi-tenant architecture is established.
+- Core workflows are implemented and exercised.
+- Automated backend and frontend test coverage exists across critical areas.
+- The remaining Gate 0 risk is release review and approved runtime smoke
+  verification; source cleanup and automated validation are complete.
 
 ---
 
-# Success Criteria
+# Update Policy
 
-The project will be considered production-ready when:
+Update this document when:
 
-- Core business domains are completed.
-- Testing is successfully completed.
-- Documentation is current.
-- Deployment procedures are validated.
-- Production verification is completed.
+- Gate 0 completes.
+- Accounting becomes DDL-ready.
+- A major ERP domain is completed.
+- The default Core baseline materially changes.
+- Deployment or release policy changes.
 
 ---
 
 # Guiding Principle
 
-Project progress should be measured by completed, validated, and documented milestones rather than by the volume of code written.
-
-This document represents the official operational snapshot of the NexusOS Pilot project at any point in time.
+Project status must reflect verified repository reality, not historical plans.
 
 ---
 

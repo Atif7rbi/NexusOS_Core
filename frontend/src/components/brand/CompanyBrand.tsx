@@ -33,7 +33,7 @@ export function CompanyBrand({
   const { isArabic } = useTranslation();
 
   const logoSource =
-    settings.logo_path || "/brand/ufq-mark.svg";
+    settings.logo_path || "/brand/nexusos-default-mark.svg";
 
   const companyName = isArabic
     ? settings.company_name_ar

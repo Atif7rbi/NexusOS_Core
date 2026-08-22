@@ -1,10 +1,10 @@
-# NexusOS Pilot
+# NexusOS Core
 # Development Environment
 Version: 1.0
 Status: Frozen
 ---
 # Purpose
-This document defines the official development environment used by the NexusOS Pilot project.
+This document defines the official development environment used by NexusOS Core.
 Every development, testing, and deployment activity should be performed using an environment compatible with these specifications.
 ---
 # Technology Stack
@@ -32,7 +32,7 @@ The project follows:
 ---
 # Repository
 Official Repository
-Atif7rbi/ufq-pilot
+Atif7rbi/NexusOS_Core
 Default Branch
 main
 Feature development should always be performed in dedicated branches before merging into main.
@@ -106,6 +106,23 @@ Testing may include:
 - Manual functional validation.
 - UI verification.
 - Production verification after deployment.
+
+## Isolated PostgreSQL Test Database
+
+The Core repository does not prescribe a hosting-specific database name.
+Before running backend tests, the operator must explicitly set both:
+
+```text
+DB_DATABASE=<isolated database>
+NEXUSOS_TEST_DATABASE=<the same isolated database>
+```
+
+`NEXUSOS_TEST_DATABASE` must end in `_testing`; the test bootstrap rejects a
+missing, mismatched, or unsafe name before Laravel initializes. This permits
+the existing isolated test infrastructure to remain in place while preventing
+tests from pointing at a Demo, customer, or production database. Laravel tests
+must also use an isolated `APP_CONFIG_CACHE` path when a production config
+cache exists.
 ---
 # Documentation
 Documentation resides inside:

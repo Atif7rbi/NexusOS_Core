@@ -34,10 +34,13 @@ Entitlements v1 uses:
 
 `plans.users_limit` is either null (unlimited) or a positive integer. `tenant_licenses.users_limit_override` is either null (inherit the Plan limit) or a positive integer that overrides the Plan limit for that License period.
 
-Approved Plans in the Pilot are:
+Approved Entitlements v1 Plans are:
 
-- `pilot_full`: all seven commercial Modules, `users_limit = 5`.
+- `business_full`: all seven commercial Modules, `users_limit = 5`.
 - `demo_full`: all seven commercial Modules, `users_limit = null` (unlimited Demo usage).
+
+The former `pilot_full` key is renamed to `business_full` by a forward Core
+migration that preserves the existing Plan row and its License relationships.
 
 Foreign keys use restrictive deletion. CHECK constraints protect status, period, Plan seat limits, and License seat overrides. A PostgreSQL trigger rejects overlapping entitled periods for one Tenant without requiring an extension.
 
@@ -69,7 +72,7 @@ The resolver is fail-closed. It does not infer entitlement from role, Tenant ide
 effective_users_limit = tenant_license.users_limit_override ?? plan.users_limit
 ```
 
-This allows commercial upgrades for one customer without changing the shared Plan definition. For example, a Tenant on `pilot_full` inherits five seats by default; setting its current License override to eight raises only that Tenant to eight seats.
+This allows commercial upgrades for one customer without changing the shared Plan definition. For example, a Tenant on the current five-seat commercial Plan inherits five seats by default; setting its current License override to eight raises only that Tenant to eight seats.
 
 Seat consumption is Tenant-scoped:
 
@@ -118,7 +121,7 @@ Login and `GET /api/auth/user` return `effective_modules`. The frontend uses tha
 
 ## Provisioning policy
 
-The idempotent `nexusos:provision-entitlements` Artisan command is the official provisioning path. It creates/verifies the fixed seven-Module catalog, an approved Plan (`pilot_full` or `demo_full`), and an explicitly dated current Tenant License. An optional positive `--users-limit-override` may be supplied when the License is first provisioned.
+The idempotent `nexusos:provision-entitlements` Artisan command is the official provisioning path. It creates/verifies the fixed seven-Module catalog, an approved Entitlements v1 Plan (`business_full` or `demo_full`), and an explicitly dated current Tenant License. An optional positive `--users-limit-override` may be supplied when the License is first provisioned.
 
 An exact rerun is a verified no-op. The provisioning command never silently replaces, expires, cancels, or edits an existing commercial period. Later seat upgrades on the current License use `nexusos:set-user-limit` instead of creating a replacement License.
 

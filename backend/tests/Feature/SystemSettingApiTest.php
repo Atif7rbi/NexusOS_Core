@@ -131,7 +131,7 @@ class SystemSettingApiTest extends ApiTestCase
         self::assertNotSame('شركة المستأجر الأول', SystemSetting::forTenant((string) $secondMembership->tenant_id)->company_name_ar);
     }
 
-    public function test_new_tenant_settings_are_derived_from_that_tenant_not_ufq_identity(): void
+    public function test_new_tenant_settings_do_not_inherit_another_tenant_identity(): void
     {
         $tenant = Tenant::factory()->create([
             'name' => 'شركة المستأجر الجديد',
@@ -147,8 +147,8 @@ class SystemSettingApiTest extends ApiTestCase
         self::assertSame('UTC', $settings->timezone);
         self::assertSame('en-US', $settings->language);
         self::assertSame('USD', $settings->currency);
-        self::assertNotSame('شركة أفق السكنية', $settings->company_name_ar);
-        self::assertNotSame('Ufq', $settings->short_name_en);
+        self::assertNotSame('شركة المثال التجارية', $settings->company_name_ar);
+        self::assertNotSame('Example', $settings->short_name_en);
     }
 
     public function test_existing_tenant_company_profile_is_not_replaced_by_new_defaults(): void
@@ -156,15 +156,15 @@ class SystemSettingApiTest extends ApiTestCase
         $tenant = Tenant::factory()->create();
         $existing = SystemSetting::query()->create([
             'tenant_id' => $tenant->id,
-            'company_name_ar' => 'شركة أفق السكنية',
-            'short_name_ar' => 'أفق',
+            'company_name_ar' => 'شركة المثال التجارية',
+            'short_name_ar' => 'المثال',
         ]);
 
         $resolved = SystemSetting::forTenant((string) $tenant->id);
 
         self::assertSame($existing->id, $resolved->id);
-        self::assertSame('شركة أفق السكنية', $resolved->company_name_ar);
-        self::assertSame('أفق', $resolved->short_name_ar);
+        self::assertSame('شركة المثال التجارية', $resolved->company_name_ar);
+        self::assertSame('المثال', $resolved->short_name_ar);
     }
 
     public function test_company_profile_validation_and_phone_normalization_are_preserved(): void

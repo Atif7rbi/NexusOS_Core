@@ -18,8 +18,11 @@ Commercial Modules:
 
 Approved Plans:
 
-- `pilot_full`: all seven Modules, `users_limit = 5`.
+- `business_full`: all seven Modules, `users_limit = 5`.
 - `demo_full`: all seven Modules, `users_limit = null` (unlimited).
+
+The former `pilot_full` key is migrated forward to `business_full` by Core
+migration. Do not rename Plan keys manually outside the reviewed migration.
 
 A current Tenant License may carry `users_limit_override`. When present it overrides the Plan seat limit for that Tenant and License period. When null, the Plan limit is inherited.
 
@@ -41,16 +44,16 @@ Run independently against each environment database:
 8. Bring the application up.
 9. Perform authentication, navigation, representative API, seat-policy, and CORS smoke checks.
 
-Demo and UFQ are provisioned independently in their own databases. No Demo, email, Tenant, or environment bypass is permitted.
+Each Demo or customer environment is provisioned independently in its own database. No Demo, email, Tenant, or environment bypass is permitted.
 
 ## Provisioning commands
 
-Customer/Pilot example:
+Customer example:
 
 ```bash
 php artisan nexusos:provision-entitlements \
   --tenant='<tenant-ulid-or-exact-slug>' \
-  --plan='pilot_full' \
+  --plan='business_full' \
   --status='active' \
   --starts-at='<ISO-8601 timestamp with timezone>' \
   --ends-at='<ISO-8601 timestamp with timezone>'
@@ -95,15 +98,15 @@ php artisan nexusos:set-user-limit \
   --inherit
 ```
 
-For example, UFQ on `pilot_full` inherits five seats. If a commercial upgrade is approved to eight seats, `--limit=8` makes its effective limit eight without affecting other `pilot_full` customers.
+For example, a customer Tenant on `business_full` inherits five seats. If a commercial upgrade is approved to eight seats, `--limit=8` makes its effective limit eight without affecting other Tenants using `business_full`.
 
 ## CORS
 
 Use exact origins only. Examples:
 
 ```text
-Demo: CORS_ALLOWED_ORIGINS=https://demo.sewarsky.online
-UFQ:  CORS_ALLOWED_ORIGINS=https://ufq.sewarsky.online
+Demo:     CORS_ALLOWED_ORIGINS=https://<demo-origin>
+Customer: CORS_ALLOWED_ORIGINS=https://<customer-origin>
 ```
 
 Comma-separated exact origins are supported when an environment genuinely requires more than one. Do not use `*` in production.

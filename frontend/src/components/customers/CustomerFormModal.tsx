@@ -200,7 +200,7 @@ export function CustomerFormModal({
         status: "Status",
         name: "Customer name",
         namePlaceholder:
-          "Example: Mohammed Ahmed or Afaq Real Estate",
+          "Example: Mohammed Ahmed or Example Real Estate",
         phone: "Phone number",
         phonePlaceholder: "05xxxxxxxx",
         email: "Email",
