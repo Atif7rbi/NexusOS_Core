@@ -6,6 +6,7 @@ $payload = json_decode(base64_decode($argv[1], true), true, flags: JSON_THROW_ON
 
 try {
     $pdo = new PDO($payload['dsn'], $payload['username'], $payload['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $pdo->exec('SET search_path TO '.$pdo->quote($payload['schema']));
     $pdo->beginTransaction();
     $pdo->exec("SET LOCAL lock_timeout = '5s'");
 

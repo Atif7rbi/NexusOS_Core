@@ -7,15 +7,12 @@ namespace Tests\Feature;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class AccountingSchemaConcurrencyTest extends TestCase
 {
-    use RefreshDatabase;
-
     public function test_overlapping_period_race_serializes_and_allows_one_winner(): void
     {
         [$tenant,$actor]=$this->context();
@@ -56,7 +53,7 @@ final class AccountingSchemaConcurrencyTest extends TestCase
         $dsn=sprintf('pgsql:host=%s;port=%s;dbname=%s', $config['host'],$config['port'],$config['database']);
         $running=[];
         foreach ($payloads as $payload) {
-            $payload+=['dsn'=>$dsn,'username'=>$config['username'],'password'=>$config['password']];
+            $payload+=['dsn'=>$dsn,'username'=>$config['username'],'password'=>$config['password'],'schema'=>'public'];
             $process=proc_open([PHP_BINARY,base_path('tests/Support/accounting_schema_worker.php'),base64_encode(json_encode($payload,JSON_THROW_ON_ERROR))],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
             $this->assertIsResource($process); fclose($pipes[0]); $running[]=[$process,$pipes];
         }
