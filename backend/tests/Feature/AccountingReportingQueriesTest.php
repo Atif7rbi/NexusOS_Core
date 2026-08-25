@@ -37,17 +37,17 @@ final class AccountingReportingQueriesTest extends TestCase
         self::assertCount(2,$empty['rows']);
         self::assertSame('0.00',$empty['debit_total']);
 
-        $this->draft($tenant,$actor,'2026-01-01',[[$cash,'999.00','0'],[$equity,'0','999.00']]);
-        $first=$this->post($tenant,$actor,'2026-01-01',[[$cash,'0.10','0'],[$equity,'0','0.10']]);
-        $second=$this->post($tenant,$actor,'2026-01-02',[[$cash,'0.20','0'],[$equity,'0','0.20']]);
-        $this->post($tenant,$actor,'2027-01-01',[[$cash,'5.00','0'],[$equity,'0','5.00']]);
+        $this->draftJournal($tenant,$actor,'2026-01-01',[[$cash,'999.00','0'],[$equity,'0','999.00']]);
+        $first=$this->postJournal($tenant,$actor,'2026-01-01',[[$cash,'0.10','0'],[$equity,'0','0.10']]);
+        $second=$this->postJournal($tenant,$actor,'2026-01-02',[[$cash,'0.20','0'],[$equity,'0','0.20']]);
+        $this->postJournal($tenant,$actor,'2027-01-01',[[$cash,'5.00','0'],[$equity,'0','5.00']]);
         app(ReverseJournalAction::class)->execute((string) $tenant->id,$second,$actor,'2026-01-03','Reference reversal');
         app(ManageAccountAction::class)->archive((string) $tenant->id,$cash,$actor);
 
         [$other,$otherActor]=$this->ready();
         $otherCash=$this->account($other,$otherActor,'1000','asset','current_asset');
         $otherEquity=$this->account($other,$otherActor,'3000','equity','equity');
-        $this->post($other,$otherActor,'2026-01-01',[[$otherCash,'50.00','0'],[$otherEquity,'0','50.00']]);
+        $this->postJournal($other,$otherActor,'2026-01-01',[[$otherCash,'50.00','0'],[$otherEquity,'0','50.00']]);
 
         $beforeReversal=$query->execute((string) $tenant->id,'2026-01-02');
         self::assertSame('0.30',$beforeReversal['debit_total']);
@@ -75,14 +75,14 @@ final class AccountingReportingQueriesTest extends TestCase
         $finance=$this->account($tenant,$actor,'5200','expense','finance_cost');
         $otherExpense=$this->account($tenant,$actor,'5300','expense','other_expense');
 
-        $this->post($tenant,$actor,'2026-01-01',[[$cash,'100.00','0'],[$operatingRevenue,'0','100.00']]);
-        $reversed=$this->post($tenant,$actor,'2026-01-02',[[$cash,'20.00','0'],[$otherRevenue,'0','20.00']]);
+        $this->postJournal($tenant,$actor,'2026-01-01',[[$cash,'100.00','0'],[$operatingRevenue,'0','100.00']]);
+        $reversed=$this->postJournal($tenant,$actor,'2026-01-02',[[$cash,'20.00','0'],[$otherRevenue,'0','20.00']]);
         app(ReverseJournalAction::class)->execute((string) $tenant->id,$reversed,$actor,'2026-01-03','Remove other revenue');
-        $this->post($tenant,$actor,'2026-01-31',[[$cost,'10.00','0'],[$cash,'0','10.00']]);
-        $this->post($tenant,$actor,'2026-02-01',[[$operatingExpense,'20.00','0'],[$cash,'0','20.00']]);
-        $this->post($tenant,$actor,'2026-02-02',[[$finance,'5.00','0'],[$cash,'0','5.00']]);
-        $this->post($tenant,$actor,'2026-02-03',[[$otherExpense,'3.00','0'],[$cash,'0','3.00']]);
-        $this->draft($tenant,$actor,'2026-02-03',[[$otherExpense,'900.00','0'],[$cash,'0','900.00']]);
+        $this->postJournal($tenant,$actor,'2026-01-31',[[$cost,'10.00','0'],[$cash,'0','10.00']]);
+        $this->postJournal($tenant,$actor,'2026-02-01',[[$operatingExpense,'20.00','0'],[$cash,'0','20.00']]);
+        $this->postJournal($tenant,$actor,'2026-02-02',[[$finance,'5.00','0'],[$cash,'0','5.00']]);
+        $this->postJournal($tenant,$actor,'2026-02-03',[[$otherExpense,'3.00','0'],[$cash,'0','3.00']]);
+        $this->draftJournal($tenant,$actor,'2026-02-03',[[$otherExpense,'900.00','0'],[$cash,'0','900.00']]);
 
         $result=app(IncomeStatementQuery::class)->execute((string) $tenant->id,'2026-01-01','2026-02-03');
         self::assertSame('100.00',$result['operating_revenue']);
@@ -108,20 +108,20 @@ final class AccountingReportingQueriesTest extends TestCase
         $equity=$this->account($tenant,$actor,'3000','equity','equity');
         $query=app(BalanceSheetQuery::class);
 
-        $this->post($tenant,$actor,'2026-01-01',[[$cash,'100.00','0'],[$revenue,'0','100.00']]);
+        $this->postJournal($tenant,$actor,'2026-01-01',[[$cash,'100.00','0'],[$revenue,'0','100.00']]);
         $noClosing=$query->execute((string) $tenant->id,'2026-01-01');
         self::assertSame('100.00',$noClosing['assets']);
         self::assertSame('100.00',$noClosing['derived_unclosed_earnings']);
         self::assertTrue($noClosing['is_balanced']);
 
-        $this->post($tenant,$actor,'2026-01-02',[[$expense,'40.00','0'],[$cash,'0','40.00']]);
+        $this->postJournal($tenant,$actor,'2026-01-02',[[$expense,'40.00','0'],[$cash,'0','40.00']]);
         app(ManageAccountAction::class)->archive((string) $tenant->id,$cash,$actor);
         $expenseCase=$query->execute((string) $tenant->id,'2026-01-02');
         self::assertSame('60.00',$expenseCase['assets']);
         self::assertSame('60.00',$expenseCase['derived_unclosed_earnings']);
         self::assertTrue($expenseCase['is_balanced']);
 
-        $this->post($tenant,$actor,'2026-12-31',[[$revenue,'100.00','0'],[$expense,'0','40.00'],[$equity,'0','60.00']]);
+        $this->postJournal($tenant,$actor,'2026-12-31',[[$revenue,'100.00','0'],[$expense,'0','40.00'],[$equity,'0','60.00']]);
         $closed=$query->execute((string) $tenant->id,'2026-12-31');
         self::assertSame('0.00',$closed['derived_unclosed_earnings']);
         self::assertSame('60.00',$closed['equity']);
@@ -131,8 +131,8 @@ final class AccountingReportingQueriesTest extends TestCase
         $partialCash=$this->account($partialTenant,$partialActor,'1000','asset','current_asset');
         $partialRevenue=$this->account($partialTenant,$partialActor,'4000','revenue','operating_revenue');
         $partialEquity=$this->account($partialTenant,$partialActor,'3000','equity','equity');
-        $this->post($partialTenant,$partialActor,'2026-01-01',[[$partialCash,'100.00','0'],[$partialRevenue,'0','100.00']]);
-        $this->post($partialTenant,$partialActor,'2026-12-31',[[$partialRevenue,'40.00','0'],[$partialEquity,'0','40.00']]);
+        $this->postJournal($partialTenant,$partialActor,'2026-01-01',[[$partialCash,'100.00','0'],[$partialRevenue,'0','100.00']]);
+        $this->postJournal($partialTenant,$partialActor,'2026-12-31',[[$partialRevenue,'40.00','0'],[$partialEquity,'0','40.00']]);
         $partial=$query->execute((string) $partialTenant->id,'2026-12-31');
         self::assertSame('40.00',$partial['equity']);
         self::assertSame('60.00',$partial['derived_unclosed_earnings']);
@@ -144,11 +144,11 @@ final class AccountingReportingQueriesTest extends TestCase
         [$tenant,$actor]=$this->ready();
         $cash=$this->account($tenant,$actor,'1000','asset','current_asset');
         $equity=$this->account($tenant,$actor,'3000','equity','equity');
-        $this->post($tenant,$actor,'2026-01-01',[[$cash,'100.00','0'],[$equity,'0','100.00']]);
-        $creditJournal=$this->post($tenant,$actor,'2026-02-01',[[$equity,'20.00','0'],[$cash,'0','20.00']]);
-        $this->post($tenant,$actor,'2026-02-01',[[$cash,'5.00','0'],[$equity,'0','5.00']]);
+        $this->postJournal($tenant,$actor,'2026-01-01',[[$cash,'100.00','0'],[$equity,'0','100.00']]);
+        $creditJournal=$this->postJournal($tenant,$actor,'2026-02-01',[[$equity,'20.00','0'],[$cash,'0','20.00']]);
+        $this->postJournal($tenant,$actor,'2026-02-01',[[$cash,'5.00','0'],[$equity,'0','5.00']]);
         app(ReverseJournalAction::class)->execute((string) $tenant->id,$creditJournal,$actor,'2026-02-02','Restore cash');
-        $this->draft($tenant,$actor,'2026-02-02',[[$cash,'999.00','0'],[$equity,'0','999.00']]);
+        $this->draftJournal($tenant,$actor,'2026-02-02',[[$cash,'999.00','0'],[$equity,'0','999.00']]);
 
         $asset=app(GeneralLedgerQuery::class)->execute((string) $tenant->id,$cash,'2026-02-01','2026-02-28');
         self::assertSame('100.00',$asset['opening_balance']);
@@ -174,7 +174,7 @@ final class AccountingReportingQueriesTest extends TestCase
         [$tenant,$actor]=$this->ready();
         $cash=$this->account($tenant,$actor,'1000','asset','current_asset');
         $revenue=$this->account($tenant,$actor,'4000','revenue','operating_revenue');
-        $this->post($tenant,$actor,'2026-01-01',[[$cash,'10.00','0'],[$revenue,'0','10.00']]);
+        $this->postJournal($tenant,$actor,'2026-01-01',[[$cash,'10.00','0'],[$revenue,'0','10.00']]);
         $role=(string) getenv('ACCOUNTING_RUNTIME_DB_ROLE');
 
         DB::statement('SET ROLE "'.$role.'"');
@@ -209,7 +209,7 @@ final class AccountingReportingQueriesTest extends TestCase
     }
 
     /** @param list<array{string,string,string}> $lines */
-    private function draft(Tenant $tenant, User $actor, string $date, array $lines): string
+    private function draftJournal(Tenant $tenant, User $actor, string $date, array $lines): string
     {
         return app(ManageManualJournalAction::class)->create((string) $tenant->id,$actor,$date,'Reporting fixture',array_map(
             static fn (array $line): JournalLineData => new JournalLineData($line[0],$line[1],$line[2]),
@@ -218,9 +218,9 @@ final class AccountingReportingQueriesTest extends TestCase
     }
 
     /** @param list<array{string,string,string}> $lines */
-    private function post(Tenant $tenant, User $actor, string $date, array $lines): string
+    private function postJournal(Tenant $tenant, User $actor, string $date, array $lines): string
     {
-        $journal=$this->draft($tenant,$actor,$date,$lines);
+        $journal=$this->draftJournal($tenant,$actor,$date,$lines);
         app(ManageManualJournalAction::class)->post((string) $tenant->id,$journal,$actor);
 
         return $journal;
