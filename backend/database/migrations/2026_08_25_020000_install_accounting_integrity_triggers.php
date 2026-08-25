@@ -65,6 +65,10 @@ return new class extends Migration
               IF NEW.kind='posting' AND EXISTS(SELECT 1 FROM public.accounts WHERE tenant_id=NEW.tenant_id AND parent_id=NEW.id) THEN
                 RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='posting account cannot have children';
               END IF;
+              IF TG_OP='UPDATE' AND NEW.account_type<>OLD.account_type
+                 AND EXISTS(SELECT 1 FROM public.accounts WHERE tenant_id=OLD.tenant_id AND parent_id=OLD.id) THEN
+                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='group account type cannot change while children exist';
+              END IF;
               RETURN NEW;
             END $$;
             CREATE TRIGGER accounts_hierarchy_guard BEFORE INSERT OR UPDATE OF tenant_id,parent_id,kind,account_type,classification,status ON public.accounts FOR EACH ROW EXECUTE FUNCTION public.enforce_account_hierarchy();

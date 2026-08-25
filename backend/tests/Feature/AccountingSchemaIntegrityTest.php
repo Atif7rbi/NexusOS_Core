@@ -144,6 +144,28 @@ final class AccountingSchemaIntegrityTest extends TestCase
             ->update(['code'=>'G101','updated_by'=>$actor,'updated_at'=>now()]);
     }
 
+    public function test_group_account_type_cannot_change_while_child_exists(): void
+    {
+        [$tenant,$actor]=$this->membership('SAR'); $this->activate($tenant,$actor);
+        $group=$this->group($tenant,$actor,'G200');
+        $this->account($tenant,$actor,'2100','asset','current_asset',$group);
+
+        $this->expectException(QueryException::class);
+        DB::table('accounts')->where('tenant_id',$tenant)->where('id',$group)
+            ->update(['account_type'=>'liability','updated_by'=>$actor,'updated_at'=>now()]);
+    }
+
+    public function test_empty_history_free_group_can_change_account_type(): void
+    {
+        [$tenant,$actor]=$this->membership('SAR'); $this->activate($tenant,$actor);
+        $group=$this->group($tenant,$actor,'G300');
+
+        DB::table('accounts')->where('tenant_id',$tenant)->where('id',$group)
+            ->update(['account_type'=>'liability','updated_by'=>$actor,'updated_at'=>now()]);
+
+        $this->assertSame('liability',DB::table('accounts')->where('id',$group)->value('account_type'));
+    }
+
     public function test_stale_opening_projection_is_rejected_when_reversal_posts(): void
     {
         [$tenant,$actor]=$this->membership('SAR'); $this->activate($tenant,$actor);
@@ -215,6 +237,31 @@ final class AccountingSchemaIntegrityTest extends TestCase
             }
         } finally {
             DB::statement('RESET ROLE');
+        }
+    }
+
+    public function test_runtime_role_ownership_of_any_protected_object_fails_preflight(): void
+    {
+        $runtimeRole=(string) getenv('ACCOUNTING_RUNTIME_DB_ROLE');
+        $migrationOwner=(string) DB::selectOne('SELECT current_user AS name')->name;
+        $runtimeIdentifier='"'.str_replace('"','""',$runtimeRole).'"';
+        $ownerIdentifier='"'.str_replace('"','""',$migrationOwner).'"';
+
+        foreach ([
+            ["ALTER SCHEMA public OWNER TO {$runtimeIdentifier}","ALTER SCHEMA public OWNER TO {$ownerIdentifier}"],
+            ["ALTER TABLE public.accounts OWNER TO {$runtimeIdentifier}","ALTER TABLE public.accounts OWNER TO {$ownerIdentifier}"],
+            ["ALTER FUNCTION public.enforce_journal_entry_mutation() OWNER TO {$runtimeIdentifier}","ALTER FUNCTION public.enforce_journal_entry_mutation() OWNER TO {$ownerIdentifier}"],
+        ] as [$assignOwnership,$restoreOwnership]) {
+            DB::unprepared($assignOwnership);
+            try {
+                $migration=require database_path('migrations/2026_08_25_040000_harden_accounting_runtime_privileges.php');
+                $migration->up();
+                $this->fail('Runtime ownership of a protected Accounting object was accepted.');
+            } catch (\RuntimeException $exception) {
+                $this->assertStringContainsString('must not own',$exception->getMessage());
+            } finally {
+                DB::unprepared($restoreOwnership);
+            }
         }
     }
 
