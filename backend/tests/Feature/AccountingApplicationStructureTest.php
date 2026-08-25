@@ -25,5 +25,4 @@ final class AccountingApplicationStructureTest extends TestCase
         }
         self::assertInstanceOf(BusinessPostingService::class, $this->app->make(BusinessPostingServiceInterface::class));
     }
-
 }

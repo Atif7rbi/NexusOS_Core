@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,7 @@ final class AccountingSettingsAndAccountsApiTest extends AccountingApiTestCase
         $this->acting($paused);
         $this->postJson('/api/accounting/activation')->assertForbidden();
 
-        [, $inactiveTenantAdmin] = $this->accountingActor(tenantAttributes: ['status' => \App\Models\Tenant::STATUS_PAUSED]);
+        [, $inactiveTenantAdmin] = $this->accountingActor(tenantAttributes: ['status' => Tenant::STATUS_PAUSED]);
         $this->acting($inactiveTenantAdmin);
         $this->postJson('/api/accounting/activation')->assertForbidden();
 

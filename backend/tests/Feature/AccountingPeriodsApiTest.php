@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 
 final class AccountingPeriodsApiTest extends AccountingApiTestCase
@@ -55,10 +57,10 @@ final class AccountingPeriodsApiTest extends AccountingApiTestCase
         $this->postJson("/api/accounting/periods/{$period}/close")->assertNotFound();
     }
 
-    private function member(object $tenant, string $role): User
+    private function member(Tenant $tenant, string $role): User
     {
         $user = User::factory()->create(['role' => $role, 'status' => User::STATUS_ACTIVE]);
-        \App\Models\TenantUser::factory()->active()->create(['tenant_id' => $tenant->id, 'user_id' => $user->id]);
+        TenantUser::factory()->active()->create(['tenant_id' => $tenant->id, 'user_id' => $user->id]);
 
         return $user;
     }
