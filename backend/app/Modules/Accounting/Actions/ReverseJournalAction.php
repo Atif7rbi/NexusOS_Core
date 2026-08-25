@@ -67,6 +67,7 @@ final class ReverseJournalAction
             if ($opening !== null) {
                 $state = $opening->effect_state === 'effective' ? 'neutralized' : 'effective';
                 DB::table('opening_balance_operations')->where('tenant_id', $tenantId)->where('id', $opening->id)->lockForUpdate()->update(['effect_state' => $state, 'latest_effect_journal_entry_id' => $id, 'effect_updated_by' => $actor->id, 'effect_updated_at' => $at, 'updated_by' => $actor->id, 'updated_at' => $at]);
+                DB::selectOne('SELECT public.validate_opening_balance_operation(?, ?)', [$tenantId, $opening->id]);
                 $this->audit->write($tenantId, $state === 'effective' ? 'opening_balance.reactivated' : 'opening_balance.reversed', 'opening_balance_operation', $opening->id, (int) $actor->id, ['journal_entry_id' => $id], $at);
             }
 
