@@ -12,6 +12,9 @@ return new class extends Migration
         if (DB::getDriverName() !== 'pgsql') {
             throw new RuntimeException('Accounting Foundations requires PostgreSQL.');
         }
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
 
         $type = DB::selectOne(<<<'SQL'
             SELECT data_type
@@ -136,6 +139,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
         $used = DB::selectOne(<<<'SQL'
             SELECT EXISTS(SELECT 1 FROM public.accounting_settings) AS used
             SQL);
@@ -150,5 +156,13 @@ return new class extends Migration
             DROP TABLE public.accounting_source_types;
             ALTER TABLE public.business_number_sequences DROP CONSTRAINT business_number_sequences_value_check;
             SQL);
+    }
+
+    private function skipIsolatedTestSchema(): bool
+    {
+        $schema=DB::selectOne('SELECT current_schema() AS name')->name;
+        if ($schema==='public') { return false; }
+        if (app()->environment('testing')) { return true; }
+        throw new RuntimeException('Accounting Foundations requires the public PostgreSQL schema.');
     }
 };

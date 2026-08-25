@@ -66,5 +66,7 @@ jobs:
           SQL
       - run: php artisan migrate:fresh --force
       - run: php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
+      - name: Core feature regressions
+        run: php artisan test --testsuite=Feature
       - name: Migration rollback safety on empty schema
         run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force

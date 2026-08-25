@@ -9,6 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if ($this->skipIsolatedTestSchema()) { return; }
         DB::unprepared(<<<'SQL'
             CREATE OR REPLACE FUNCTION public.prevent_accounting_source_type_mutation() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$ BEGIN
@@ -203,6 +204,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        if ($this->skipIsolatedTestSchema()) { return; }
         DB::unprepared(<<<'SQL'
             DROP FUNCTION public.enforce_journal_line_parent_state() CASCADE;
             DROP FUNCTION public.validate_system_journal_final_state() CASCADE;
@@ -220,5 +222,13 @@ return new class extends Migration
             DROP FUNCTION public.enforce_accounting_activation() CASCADE;
             DROP FUNCTION public.prevent_accounting_source_type_mutation() CASCADE;
             SQL);
+    }
+
+    private function skipIsolatedTestSchema(): bool
+    {
+        $schema=DB::selectOne('SELECT current_schema() AS name')->name;
+        if ($schema==='public') { return false; }
+        if (app()->environment('testing')) { return true; }
+        throw new RuntimeException('Accounting Foundations requires the public PostgreSQL schema.');
     }
 };

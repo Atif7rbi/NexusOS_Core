@@ -9,6 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if ($this->skipIsolatedTestSchema()) { return; }
         DB::unprepared(<<<'SQL'
             CREATE TABLE public.journal_entries (
                 id char(26) NOT NULL, tenant_id char(26) NOT NULL, accounting_period_id char(26),
@@ -119,6 +120,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        if ($this->skipIsolatedTestSchema()) { return; }
         $tables = ['accounting_audits','opening_balance_operations','journal_lines','journal_entries'];
         foreach ($tables as $table) {
             if (DB::table($table)->exists()) {
@@ -126,5 +128,13 @@ return new class extends Migration
             }
         }
         DB::unprepared('DROP TABLE public.accounting_audits; DROP TABLE public.opening_balance_operations; DROP TABLE public.journal_lines; DROP TABLE public.journal_entries;');
+    }
+
+    private function skipIsolatedTestSchema(): bool
+    {
+        $schema=DB::selectOne('SELECT current_schema() AS name')->name;
+        if ($schema==='public') { return false; }
+        if (app()->environment('testing')) { return true; }
+        throw new RuntimeException('Accounting Foundations requires the public PostgreSQL schema.');
     }
 };

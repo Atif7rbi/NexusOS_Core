@@ -12,6 +12,9 @@ return new class extends Migration
         if (DB::getDriverName() !== 'pgsql') {
             throw new RuntimeException('Accounting runtime hardening requires PostgreSQL.');
         }
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
 
         $runtimeRole = getenv('ACCOUNTING_RUNTIME_DB_ROLE');
 
@@ -95,11 +98,22 @@ return new class extends Migration
 
     public function down(): void
     {
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
         $runtimeRole = getenv('ACCOUNTING_RUNTIME_DB_ROLE');
         if (is_string($runtimeRole)
             && preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $runtimeRole)) {
             $identifier = '"'.str_replace('"', '""', $runtimeRole).'"';
             DB::unprepared("REVOKE ALL ON TABLE public.accounting_source_types,public.accounting_settings,public.accounts,public.accounting_periods,public.journal_entries,public.journal_lines,public.opening_balance_operations,public.accounting_audits FROM {$identifier}");
         }
+    }
+
+    private function skipIsolatedTestSchema(): bool
+    {
+        $schema=DB::selectOne('SELECT current_schema() AS name')->name;
+        if ($schema==='public') { return false; }
+        if (app()->environment('testing')) { return true; }
+        throw new RuntimeException('Accounting Foundations requires the public PostgreSQL schema.');
     }
 };
