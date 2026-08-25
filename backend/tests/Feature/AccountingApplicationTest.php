@@ -139,11 +139,12 @@ final class AccountingApplicationTest extends TestCase
 
         self::assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.validate_opening_balance_operation(char,char)', 'EXECUTE') allowed", [$runtimeRole])->allowed);
 
-        DB::unprepared("GRANT SELECT,UPDATE ON public.users,public.tenant_users TO {$runtimeIdentifier}");
+        $neutralizer = app(ReverseJournalAction::class)->execute((string) $tenant->id, $root->journalEntryId, $actor, '2026-02-01', 'Runtime correction');
+        $reactivator = app(ReverseJournalAction::class)->execute((string) $tenant->id, $neutralizer->journalEntryId, $actor, '2026-02-01', 'Runtime reactivation');
+        self::assertStringNotContainsString('validate_opening_balance_operation', (string) file_get_contents(app_path('Modules/Accounting/Actions/ReverseJournalAction.php')));
+
         DB::unprepared("SET ROLE {$runtimeIdentifier}");
         try {
-            $neutralizer = app(ReverseJournalAction::class)->execute((string) $tenant->id, $root->journalEntryId, $actor, '2026-02-01', 'Runtime correction');
-            $reactivator = app(ReverseJournalAction::class)->execute((string) $tenant->id, $neutralizer->journalEntryId, $actor, '2026-02-01', 'Runtime reactivation');
             DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
 
             self::assertSame('effective', DB::table('opening_balance_operations')->where('id', $operation)->value('effect_state'));
@@ -151,7 +152,6 @@ final class AccountingApplicationTest extends TestCase
         } finally {
             DB::statement('SET CONSTRAINTS ALL DEFERRED');
             DB::statement('RESET ROLE');
-            DB::unprepared("REVOKE SELECT,UPDATE ON public.users,public.tenant_users FROM {$runtimeIdentifier}");
         }
     }
 
