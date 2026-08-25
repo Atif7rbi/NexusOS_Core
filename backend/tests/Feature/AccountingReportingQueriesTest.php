@@ -59,8 +59,17 @@ final class AccountingReportingQueriesTest extends TestCase
         self::assertSame('archived', $result['rows'][0]['status']);
         self::assertSame('0.10', $result['rows'][0]['signed_balance']);
         self::assertSame('0.10', $result['rows'][1]['normal_balance']);
-        self::assertCount(1, $query->execute((string) $tenant->id, '2026-12-31', accountType: 'asset')['rows']);
-        self::assertCount(1, $query->execute((string) $tenant->id, '2026-12-31', classification: 'equity')['rows']);
+        $filteredByType = $query->execute((string) $tenant->id, '2026-12-31', accountType: 'asset');
+        self::assertCount(1, $filteredByType['rows']);
+        self::assertSame($result['debit_total'], $filteredByType['debit_total']);
+        self::assertSame($result['credit_total'], $filteredByType['credit_total']);
+        self::assertSame($result['is_balanced'], $filteredByType['is_balanced']);
+
+        $filteredByClassification = $query->execute((string) $tenant->id, '2026-12-31', classification: 'equity');
+        self::assertCount(1, $filteredByClassification['rows']);
+        self::assertSame($result['debit_total'], $filteredByClassification['debit_total']);
+        self::assertSame($result['credit_total'], $filteredByClassification['credit_total']);
+        self::assertSame($result['is_balanced'], $filteredByClassification['is_balanced']);
         self::assertSame($first, DB::table('journal_entries')->where('id', $first)->value('id'));
     }
 
@@ -97,6 +106,40 @@ final class AccountingReportingQueriesTest extends TestCase
 
         $boundary = app(IncomeStatementQuery::class)->execute((string) $tenant->id, '2026-01-31', '2026-01-31');
         self::assertSame('10.00', $boundary['cost_of_revenue']);
+    }
+
+    public function test_income_statement_derives_complete_and_partial_closing_across_periods_with_tenant_isolation(): void
+    {
+        [$tenant, $actor] = $this->activated();
+        app(ManageAccountingPeriodAction::class)->create((string) $tenant->id, $actor, '2026-01-01', '2026-06-30');
+        app(ManageAccountingPeriodAction::class)->create((string) $tenant->id, $actor, '2026-07-01', '2026-12-31');
+        $cash = $this->account($tenant, $actor, '1000', 'asset', 'current_asset');
+        $equity = $this->account($tenant, $actor, '3000', 'equity', 'equity');
+        $revenue = $this->account($tenant, $actor, '4000', 'revenue', 'operating_revenue');
+        $expense = $this->account($tenant, $actor, '5000', 'expense', 'operating_expense');
+
+        $this->postJournal($tenant, $actor, '2026-01-01', [[$cash, '100.00', '0'], [$revenue, '0', '100.00']]);
+        $this->postJournal($tenant, $actor, '2026-06-30', [[$expense, '40.00', '0'], [$cash, '0', '40.00']]);
+        $this->postJournal($tenant, $actor, '2026-07-01', [[$revenue, '100.00', '0'], [$expense, '0', '40.00'], [$equity, '0', '60.00']]);
+
+        $query = app(IncomeStatementQuery::class);
+        $complete = $query->execute((string) $tenant->id, '2026-01-01', '2026-12-31');
+        self::assertSame('0.00', $complete['revenue']);
+        self::assertSame('0.00', $complete['expense']);
+        self::assertSame('0.00', $complete['net_income']);
+
+        [$partialTenant, $partialActor] = $this->ready();
+        $partialCash = $this->account($partialTenant, $partialActor, '1000', 'asset', 'current_asset');
+        $partialEquity = $this->account($partialTenant, $partialActor, '3000', 'equity', 'equity');
+        $partialRevenue = $this->account($partialTenant, $partialActor, '4000', 'revenue', 'operating_revenue');
+        $this->postJournal($partialTenant, $partialActor, '2026-01-01', [[$partialCash, '200.00', '0'], [$partialRevenue, '0', '200.00']]);
+        $this->postJournal($partialTenant, $partialActor, '2026-12-31', [[$partialRevenue, '80.00', '0'], [$partialEquity, '0', '80.00']]);
+
+        $partial = $query->execute((string) $partialTenant->id, '2026-01-01', '2026-12-31');
+        self::assertSame('120.00', $partial['operating_revenue']);
+        self::assertSame('120.00', $partial['revenue']);
+        self::assertSame('120.00', $partial['net_income']);
+        self::assertSame('0.00', $query->execute((string) $tenant->id, '2026-01-01', '2026-12-31')['net_income']);
     }
 
     public function test_balance_sheet_handles_unclosed_expense_complete_and_partial_closing_without_double_counting(): void
@@ -137,6 +180,41 @@ final class AccountingReportingQueriesTest extends TestCase
         self::assertSame('40.00', $partial['equity']);
         self::assertSame('60.00', $partial['derived_unclosed_earnings']);
         self::assertTrue($partial['is_balanced']);
+    }
+
+    public function test_balance_sheet_applies_reversals_as_of_and_tenant_isolation_exactly(): void
+    {
+        [$tenant, $actor] = $this->ready();
+        $cash = $this->account($tenant, $actor, '1000', 'asset', 'current_asset');
+        $revenue = $this->account($tenant, $actor, '4000', 'revenue', 'operating_revenue');
+        $root = $this->postJournal($tenant, $actor, '2026-01-01', [[$cash, '100.10', '0'], [$revenue, '0', '100.10']]);
+        $this->postJournal($tenant, $actor, '2027-01-01', [[$cash, '25.20', '0'], [$revenue, '0', '25.20']]);
+        app(ReverseJournalAction::class)->execute((string) $tenant->id, $root, $actor, '2026-02-01', 'Reverse reference revenue');
+
+        [$otherTenant, $otherActor] = $this->ready();
+        $otherCash = $this->account($otherTenant, $otherActor, '1000', 'asset', 'current_asset');
+        $otherRevenue = $this->account($otherTenant, $otherActor, '4000', 'revenue', 'operating_revenue');
+        $this->postJournal($otherTenant, $otherActor, '2026-01-01', [[$otherCash, '999.99', '0'], [$otherRevenue, '0', '999.99']]);
+
+        $query = app(BalanceSheetQuery::class);
+        $beforeReversal = $query->execute((string) $tenant->id, '2026-01-31');
+        self::assertSame('100.10', $beforeReversal['assets']);
+        self::assertSame('0.00', $beforeReversal['liabilities']);
+        self::assertSame('0.00', $beforeReversal['equity']);
+        self::assertSame('100.10', $beforeReversal['derived_unclosed_earnings']);
+        self::assertSame('0.00', $beforeReversal['equation_difference']);
+        self::assertTrue($beforeReversal['is_balanced']);
+
+        $afterReversal = $query->execute((string) $tenant->id, '2026-12-31');
+        self::assertSame('0.00', $afterReversal['assets']);
+        self::assertSame('0.00', $afterReversal['derived_unclosed_earnings']);
+        self::assertSame('0.00', $afterReversal['equation_difference']);
+        self::assertTrue($afterReversal['is_balanced']);
+
+        $includingFuture = $query->execute((string) $tenant->id, '2027-01-01');
+        self::assertSame('25.20', $includingFuture['assets']);
+        self::assertSame('25.20', $includingFuture['derived_unclosed_earnings']);
+        self::assertTrue($includingFuture['is_balanced']);
     }
 
     public function test_general_ledger_has_exact_normal_side_opening_running_closing_and_deterministic_order(): void
@@ -191,11 +269,19 @@ final class AccountingReportingQueriesTest extends TestCase
     /** @return array{Tenant, User} */
     private function ready(): array
     {
+        [$tenant, $actor] = $this->activated();
+        app(ManageAccountingPeriodAction::class)->create((string) $tenant->id, $actor, '2025-01-01', '2027-12-31');
+
+        return [$tenant, $actor];
+    }
+
+    /** @return array{Tenant, User} */
+    private function activated(): array
+    {
         $tenant = Tenant::factory()->create(['currency' => 'SAR']);
         $actor = User::factory()->create(['role' => User::ROLE_ADMINISTRATOR, 'status' => User::STATUS_ACTIVE]);
         TenantUser::factory()->forTenant($tenant)->forUser($actor)->active()->create();
         app(ActivateAccountingAction::class)->execute((string) $tenant->id, $actor);
-        app(ManageAccountingPeriodAction::class)->create((string) $tenant->id, $actor, '2025-01-01', '2027-12-31');
 
         return [$tenant, $actor];
     }
