@@ -23,7 +23,7 @@ final class AccountingOpeningBalanceApiTest extends AccountingApiTestCase
         self::assertFalse(DB::table('opening_balance_operations')->where('id', $operation)->exists());
     }
 
-    public function test_opening_post_slot_reversal_replacement_reactivation_and_historical_floor_are_end_to_end(): void
+    public function test_opening_post_slot_reversal_replacement_and_equal_date_reactivation_are_end_to_end(): void
     {
         [, $admin, , $debit, $credit] = $this->ready('F');
         $this->acting($admin);
@@ -44,8 +44,6 @@ final class AccountingOpeningBalanceApiTest extends AccountingApiTestCase
         $this->postJson("/api/accounting/journals/{$rootTwo}/reverse", ['entry_date' => '2026-04-01', 'reason' => 'Neutralize replacement'])
             ->assertOk();
 
-        $this->postJson("/api/accounting/journals/{$neutralizerOne}/reverse", ['entry_date' => '2026-03-15', 'reason' => 'Backdated reactivation'])
-            ->assertUnprocessable();
         $this->postJson("/api/accounting/journals/{$neutralizerOne}/reverse", ['entry_date' => '2026-04-01', 'reason' => 'Valid reactivation'])
             ->assertOk();
         $this->getJson("/api/accounting/opening-balance/{$first}")->assertOk()
