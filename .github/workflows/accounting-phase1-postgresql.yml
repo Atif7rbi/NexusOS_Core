@@ -77,4 +77,4 @@ jobs:
       - name: Migration rollback safety on empty schema
         run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
       - name: Backend formatting
-        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php
+        run: vendor/bin/pint --test -vvv app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php
