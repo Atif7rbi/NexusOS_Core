@@ -14,6 +14,10 @@ return new class extends Migration
         }
 
         DB::unprepared(<<<'SQL'
+            ALTER FUNCTION public.enforce_opening_balance_mutation()
+              SECURITY DEFINER
+              SET search_path = pg_catalog, public;
+
             ALTER FUNCTION public.validate_opening_balance_final_state()
               SECURITY DEFINER
               SET search_path = pg_catalog, public;
@@ -27,6 +31,10 @@ return new class extends Migration
     public function down(): void
     {
         DB::unprepared(<<<'SQL'
+            ALTER FUNCTION public.enforce_opening_balance_mutation()
+              SECURITY INVOKER
+              SET search_path = pg_catalog, public;
+
             ALTER FUNCTION public.validate_opening_balance_final_state()
               SECURITY INVOKER
               SET search_path = pg_catalog, public;

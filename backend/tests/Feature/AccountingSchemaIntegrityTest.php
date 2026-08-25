@@ -221,7 +221,7 @@ final class AccountingSchemaIntegrityTest extends TestCase
         $this->assertFalse((bool) DB::selectOne("SELECT has_table_privilege(?, 'public.accounting_source_types', 'INSERT') allowed",[$role])->allowed);
         $this->assertFalse((bool) DB::selectOne("SELECT has_table_privilege(?, 'public.accounts', 'TRUNCATE') allowed",[$role])->allowed);
         $this->assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.enforce_journal_entry_mutation()', 'EXECUTE') allowed",[$role])->allowed);
-        foreach (['validate_opening_balance_operation(char,char)', 'validate_opening_balance_final_state()', 'schedule_opening_balance_validation()'] as $function) {
+        foreach (['validate_opening_balance_operation(char,char)', 'enforce_opening_balance_mutation()', 'validate_opening_balance_final_state()', 'schedule_opening_balance_validation()'] as $function) {
             $this->assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.'||?, 'EXECUTE') allowed",[$role,$function])->allowed);
         }
 
@@ -233,10 +233,10 @@ final class AccountingSchemaIntegrityTest extends TestCase
             FROM pg_catalog.pg_proc function
             JOIN pg_catalog.pg_namespace schema ON schema.oid=function.pronamespace
             WHERE schema.nspname='public'
-              AND function.proname IN ('validate_opening_balance_final_state','schedule_opening_balance_validation')
+              AND function.proname IN ('enforce_opening_balance_mutation','validate_opening_balance_final_state','schedule_opening_balance_validation')
             ORDER BY function.proname
             SQL);
-        $this->assertCount(2,$entrypoints);
+        $this->assertCount(3,$entrypoints);
         foreach ($entrypoints as $entrypoint) {
             $this->assertTrue($entrypoint->prosecdef);
             $this->assertNotSame($role,$entrypoint->owner);
@@ -274,6 +274,7 @@ final class AccountingSchemaIntegrityTest extends TestCase
         try {
             foreach ([
                 "SELECT public.validate_opening_balance_operation('{$tenant}', '".(string) Str::ulid()."')",
+                'SELECT public.enforce_opening_balance_mutation()',
                 'SELECT public.validate_opening_balance_final_state()',
                 'SELECT public.schedule_opening_balance_validation()',
             ] as $sql) {
