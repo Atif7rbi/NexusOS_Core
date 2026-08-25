@@ -177,7 +177,7 @@ produce the required reports from authoritative data:
 | Trial Balance | Posted lines through an as-of date, Account code/type/classification, exact debit/credit sums |
 | General Ledger | Posted Journal date/number/description/source plus ordered lines and Account identity |
 | Account Activity | One Account's Posted lines ordered by `entry_date`, Journal number, and line number |
-| Balance Sheet | Asset/liability/equity classifications and net Posted balances through an as-of date |
+| Balance Sheet | Net Posted Asset/Liability/Equity balances plus derived unclosed cumulative earnings/loss from Posted Revenue/Expense ending balances, all through an as-of date |
 | Income Statement | Revenue/expense classifications and Posted activity within a date range |
 
 Reversals remain ordinary Posted Journals with opposite lines, so all reports
@@ -198,6 +198,32 @@ liability, equity, or revenue: SUM(credit) - SUM(debit)
 
 The model permits a balance opposite to the normal side; reports show a signed
 balance rather than corrupting or hiding it.
+
+For every as-of date, the Balance Sheet presentation includes:
+
+```text
+derived unclosed cumulative earnings/loss
+  = SUM(credit-normal Revenue ending balances through as-of)
+  - SUM(debit-normal Expense ending balances through as-of)
+```
+
+Its reference balance equation is:
+
+```text
+SUM(debit-normal Asset ending balances)
+  = SUM(credit-normal Liability ending balances)
+  + SUM(credit-normal Equity ending balances)
+  + derived unclosed cumulative earnings/loss
+```
+
+Every term uses Posted Lines with `entry_date <= as_of_date`. Closing Journals,
+when introduced, are ordinary Posted Journals and are included in those same
+ending balances. A complete closing Journal reduces the relevant Revenue and
+Expense ending balances to zero and moves the net amount into Equity; therefore
+the derived term becomes zero for the transferred amount and the presentation
+does not count it twice. A partial closing leaves only the untransferred signed
+Revenue/Expense remainder in the derived term. Reports must not independently
+add period activity or infer closing from source labels.
 
 ## 9. Deferred extension boundaries
 

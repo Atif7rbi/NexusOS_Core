@@ -430,7 +430,18 @@ then assert reference queries for:
 - Trial Balance total debits equal total credits;
 - Account Activity deterministic ordering by date/number/line;
 - General Ledger includes original and reversal, not a hidden target;
-- Balance Sheet signed balances by classification;
+- Balance Sheet signed balances by classification, including the derived
+  unclosed cumulative earnings/loss term;
+- Revenue posted without a closing entry—for example Cash debit `100.00` and
+  Revenue credit `100.00`—produces Asset `100.00`, derived unclosed earnings
+  `100.00`, and a mathematically balanced Balance Sheet;
+- Expense posted without a closing entry—for example Expense debit `40.00` and
+  Cash credit `40.00` after the Revenue case—reduces Asset to `60.00`, adjusts
+  derived unclosed earnings to `60.00`, and keeps the Balance Sheet balanced;
+- a complete closing Journal that debits Revenue `100.00`, credits Expense
+  `40.00`, and credits an Equity posting Account `60.00` leaves Revenue/Expense
+  ending balances and the derived term at zero while Equity carries `60.00`, so
+  the same earnings are not counted twice;
 - Income Statement date-range activity;
 - group balance equals descendant posting Accounts;
 - Drafts never appear;

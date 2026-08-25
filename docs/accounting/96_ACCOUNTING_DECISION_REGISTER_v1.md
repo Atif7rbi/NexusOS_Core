@@ -372,13 +372,13 @@ invariants remain normative in the subject documents and DDL Plan.
 |---|---|
 | Problem | Support reports later without cached truth now |
 | Existing Core reality | Reporting is planned; no Accounting balances exist |
-| Options considered | stored Account balances; summary tables; derive from immutable ledger |
-| Trade-offs | Initial reports query Lines; optimization waits for evidence |
-| Decision | Posted Lines plus Account type/classification/hierarchy/date/number are authoritative; no stored balances |
+| Options considered | stored Account balances; assume P&L is already closed; derive all presentation values from immutable ledger |
+| Trade-offs | Initial reports query Lines and Balance Sheet presentation must derive the unclosed P&L remainder explicitly; optimization waits for evidence |
+| Decision | Posted Lines plus Account type/classification/hierarchy/date/number are authoritative; Balance Sheet uses Posted Asset/Liability/Equity ending balances plus derived unclosed cumulative earnings/loss from the remaining Posted Revenue/Expense ending balances through the as-of date; closing Journals participate in those same balances, so amounts transferred into Equity are not also retained in the derived term; no stored balances |
 | Why | Prevents synchronization contradictions |
 | DB impact | reporting indexes only |
-| Application impact | future queries derive exact balances |
-| Future impact | Materialized projections may be rebuildable, never authoritative |
+| Application impact | future queries derive exact signed balances and test unclosed, partially closed, and fully closed earnings without source-label inference |
+| Future impact | A closing engine may post ordinary Journals; materialized projections may be rebuildable, never authoritative |
 | Status | **FROZEN** |
 
 ## AFD-026 — Trigger timing
