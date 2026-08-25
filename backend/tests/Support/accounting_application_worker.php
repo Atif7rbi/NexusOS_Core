@@ -18,7 +18,9 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 $payload = json_decode(base64_decode($argv[1], true), true, flags: JSON_THROW_ON_ERROR);
-$app = require dirname(__DIR__, 2).'/bootstrap/app.php';
+$basePath = dirname(__DIR__, 2);
+require $basePath.'/vendor/autoload.php';
+$app = require $basePath.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 config([
