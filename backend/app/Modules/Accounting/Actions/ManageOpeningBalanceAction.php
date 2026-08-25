@@ -24,6 +24,7 @@ final class ManageOpeningBalanceAction
         $this->auth->authorize($tenantId, $actor, 'manage_opening_balance');
 
         return $this->tx->run(function () use ($tenantId, $actor, $date, $lines): string {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'manage_opening_balance');
             DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first() ?? throw new AccountingValidationFailed('Accounting is not active.');
             $operationId = (string) Str::ulid();
             $journalId = (string) Str::ulid();
@@ -41,9 +42,14 @@ final class ManageOpeningBalanceAction
     {
         $this->auth->authorize($tenantId, $actor, 'manage_opening_balance');
         $this->tx->run(function () use ($tenantId, $operationId, $actor, $date, $lines): void {
-            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first();
+            $this->auth->authorizeTransactional($tenantId, $actor, 'manage_opening_balance');
+            $journalId = $this->discoverRootJournalId($tenantId, $operationId);
+            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Accounting is not active.');
+            DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $journalId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Opening Balance root Journal was not found.');
             $op = $this->lockDraft($tenantId, $operationId);
-            DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $op->journal_entry_id)->lockForUpdate()->update(['entry_date' => $date, 'updated_by' => $actor->id, 'updated_at' => now()]);
+            DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $journalId)->update(['entry_date' => $date, 'updated_by' => $actor->id, 'updated_at' => now()]);
             DB::table('opening_balance_operations')->where('tenant_id', $tenantId)->where('id', $operationId)->update(['accounting_date' => $date, 'updated_by' => $actor->id, 'updated_at' => now()]);
             $this->replaceLines($tenantId, $op->journal_entry_id, $lines, now());
         });
@@ -53,7 +59,12 @@ final class ManageOpeningBalanceAction
     {
         $this->auth->authorize($tenantId, $actor, 'manage_opening_balance');
         $this->tx->run(function () use ($tenantId, $operationId, $actor): void {
-            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first();
+            $this->auth->authorizeTransactional($tenantId, $actor, 'manage_opening_balance');
+            $journalId = $this->discoverRootJournalId($tenantId, $operationId);
+            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Accounting is not active.');
+            DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $journalId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Opening Balance root Journal was not found.');
             $op = $this->lockDraft($tenantId, $operationId);
             $at = now();
             $this->audit->write($tenantId, 'opening_balance.draft_deleted', 'opening_balance_operation', $operationId, (int) $actor->id, [], $at);
@@ -67,7 +78,12 @@ final class ManageOpeningBalanceAction
         $this->auth->authorize($tenantId, $actor, 'manage_opening_balance');
 
         return $this->tx->run(function () use ($tenantId, $operationId, $actor): PostedJournalResult {
-            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first();
+            $this->auth->authorizeTransactional($tenantId, $actor, 'manage_opening_balance');
+            $journalId = $this->discoverRootJournalId($tenantId, $operationId);
+            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Accounting is not active.');
+            DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $journalId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Opening Balance root Journal was not found.');
             $op = DB::table('opening_balance_operations')->where('tenant_id', $tenantId)->where('id', $operationId)->lockForUpdate()->first() ?? throw new AccountingValidationFailed('Opening Balance was not found.');
             if ($op->status === 'posted') {
                 $j = DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $op->journal_entry_id)->first();
@@ -90,6 +106,20 @@ final class ManageOpeningBalanceAction
         }
 
         return $op;
+    }
+
+    private function discoverRootJournalId(string $tenantId, string $operationId): string
+    {
+        $journalId = DB::table('opening_balance_operations')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $operationId)
+            ->value('journal_entry_id');
+
+        if (! is_string($journalId) || $journalId === '') {
+            throw new AccountingValidationFailed('Opening Balance was not found.');
+        }
+
+        return $journalId;
     }
 
     private function replaceLines(string $tenantId, string $journalId, array $lines, \DateTimeInterface $at): void

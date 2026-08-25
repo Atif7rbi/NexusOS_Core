@@ -16,6 +16,7 @@ use App\Modules\Accounting\Actions\ReverseJournalAction;
 use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
 use App\Modules\Accounting\DTOs\JournalLineData;
+use App\Modules\Accounting\Exceptions\AccountingConflict;
 use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,23 @@ final class AccountingApplicationTest extends TestCase
         self::assertSame('JRN-2026-001', $posted->journalNumber);
         self::assertSame('posted', DB::table('journal_entries')->where('id', $draft)->value('status'));
         self::assertSame(6, DB::table('accounting_audits')->where('tenant_id', $tenant->id)->count());
+    }
+
+    public function test_activation_requires_explicit_idempotency(): void
+    {
+        [$tenant,$actor] = $this->actor();
+        $action = app(ActivateAccountingAction::class);
+        $settingsId = $action->execute((string) $tenant->id, $actor);
+
+        try {
+            $action->execute((string) $tenant->id, $actor);
+            self::fail('Default activation replay was accepted.');
+        } catch (AccountingConflict) {
+            self::assertSame(1, DB::table('accounting_settings')->where('tenant_id', $tenant->id)->count());
+        }
+
+        self::assertSame($settingsId, $action->execute((string) $tenant->id, $actor, idempotent: true));
+        self::assertSame(1, DB::table('accounting_audits')->where('event', 'accounting.activated')->where('tenant_id', $tenant->id)->count());
     }
 
     public function test_unbalanced_manual_post_rolls_back_number_and_audit(): void

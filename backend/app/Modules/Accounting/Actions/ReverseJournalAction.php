@@ -28,10 +28,27 @@ final class ReverseJournalAction
 
         return $this->tx->run(function () use ($tenantId, $targetId, $actor, $entryDate, $reason): PostedJournalResult {
             $opening = $this->findOpening($tenantId, $targetId);
+            $this->auth->authorizeTransactional($tenantId, $actor, 'reverse_journal');
             if ($opening !== null) {
-                DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first();
+                DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                    ?? throw new AccountingValidationFailed('Accounting is not active.');
+                $journalIds = $this->openingJournalIds($tenantId, $targetId);
+                $lockedJournals = DB::table('journal_entries')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('id', $journalIds)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+                $opening = DB::table('opening_balance_operations')
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', $opening->id)
+                    ->lockForUpdate()
+                    ->first() ?? throw new AccountingValidationFailed('Opening Balance was not found.');
+                $target = $lockedJournals->get($targetId);
+            } else {
+                $target = DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $targetId)->lockForUpdate()->first();
             }
-            $target = DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $targetId)->lockForUpdate()->first();
             if ($target === null || $target->status !== 'posted' || $entryDate < $target->entry_date) {
                 throw new AccountingValidationFailed('Only a terminal Posted Journal can be reversed chronologically.');
             }
@@ -60,5 +77,17 @@ final class ReverseJournalAction
     private function findOpening(string $tenantId, string $journalId): ?object
     {
         return DB::selectOne('WITH RECURSIVE a AS (SELECT id,reverses_journal_entry_id FROM journal_entries WHERE tenant_id=? AND id=? UNION ALL SELECT j.id,j.reverses_journal_entry_id FROM journal_entries j JOIN a ON a.reverses_journal_entry_id=j.id WHERE j.tenant_id=?) SELECT o.* FROM a JOIN opening_balance_operations o ON o.tenant_id=? AND o.journal_entry_id=a.id LIMIT 1', [$tenantId, $journalId, $tenantId, $tenantId]);
+    }
+
+    /** @return list<string> */
+    private function openingJournalIds(string $tenantId, string $journalId): array
+    {
+        return array_map(
+            static fn (object $row): string => (string) $row->id,
+            DB::select(
+                'WITH RECURSIVE a AS (SELECT id,reverses_journal_entry_id FROM journal_entries WHERE tenant_id=? AND id=? UNION ALL SELECT j.id,j.reverses_journal_entry_id FROM journal_entries j JOIN a ON a.reverses_journal_entry_id=j.id WHERE j.tenant_id=?) SELECT id FROM a ORDER BY id',
+                [$tenantId, $journalId, $tenantId],
+            ),
+        );
     }
 }

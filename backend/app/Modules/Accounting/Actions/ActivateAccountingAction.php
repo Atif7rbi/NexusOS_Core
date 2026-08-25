@@ -6,6 +6,7 @@ namespace App\Modules\Accounting\Actions;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Modules\Accounting\Exceptions\AccountingConflict;
 use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use App\Modules\Accounting\Support\AccountingAuditWriter;
 use App\Modules\Accounting\Support\AccountingAuthorization;
@@ -17,18 +18,23 @@ final class ActivateAccountingAction
 {
     public function __construct(private readonly AccountingTransaction $tx, private readonly AccountingAuthorization $auth, private readonly AccountingAuditWriter $audit) {}
 
-    public function execute(string $tenantId, User $actor): string
+    public function execute(string $tenantId, User $actor, bool $idempotent = false): string
     {
         $this->auth->authorize($tenantId, $actor, 'activate');
 
-        return $this->tx->run(function () use ($tenantId, $actor): string {
+        return $this->tx->run(function () use ($tenantId, $actor, $idempotent): string {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'activate');
             $tenant = DB::table('tenants')->where('id', $tenantId)->lockForUpdate()->first();
             if ($tenant === null || $tenant->status !== Tenant::STATUS_ACTIVE || $tenant->currency !== 'SAR') {
                 throw new AccountingValidationFailed('Accounting activation requires an active SAR Tenant.');
             }
             $existing = DB::table('accounting_settings')->where('tenant_id', $tenantId)->first();
             if ($existing !== null) {
-                return $existing->id;
+                if ($idempotent) {
+                    return $existing->id;
+                }
+
+                throw new AccountingConflict('Accounting is already active for this Tenant.');
             }
             $id = (string) Str::ulid();
             $at = now();

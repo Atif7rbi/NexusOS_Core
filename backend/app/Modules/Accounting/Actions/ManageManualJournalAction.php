@@ -24,6 +24,7 @@ final class ManageManualJournalAction
         $this->auth->authorize($tenantId, $actor, 'create_manual_draft');
 
         return $this->tx->run(function () use ($tenantId, $actor, $entryDate, $description, $lines): string {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'create_manual_draft');
             $id = (string) Str::ulid();
             $at = now();
             DB::table('journal_entries')->insert(['id' => $id, 'tenant_id' => $tenantId, 'entry_date' => $entryDate, 'description' => $description, 'status' => 'draft', 'origin' => 'manual', 'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => $at, 'updated_at' => $at]);
@@ -38,6 +39,7 @@ final class ManageManualJournalAction
     {
         $this->auth->authorize($tenantId, $actor, 'edit_manual_draft');
         $this->tx->run(function () use ($tenantId, $journalId, $actor, $entryDate, $description, $lines): void {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'edit_manual_draft');
             $j = $this->lockDraft($tenantId, $journalId);
             $at = now();
             DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $journalId)->update(['entry_date' => $entryDate, 'description' => $description, 'updated_by' => $actor->id, 'updated_at' => $at]);
@@ -49,6 +51,7 @@ final class ManageManualJournalAction
     {
         $this->auth->authorize($tenantId, $actor, 'edit_manual_draft');
         $this->tx->run(function () use ($tenantId, $journalId, $actor): void {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'edit_manual_draft');
             $this->lockDraft($tenantId, $journalId);
             $at = now();
             $this->audit->write($tenantId, 'journal.draft_deleted', 'journal_entry', $journalId, (int) $actor->id, [], $at);
@@ -60,7 +63,11 @@ final class ManageManualJournalAction
     {
         $this->auth->authorize($tenantId, $actor, 'post_journal');
 
-        return $this->tx->run(fn () => $this->posting->post($tenantId, $journalId, $actor));
+        return $this->tx->run(function () use ($tenantId, $journalId, $actor): PostedJournalResult {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'post_journal');
+
+            return $this->posting->post($tenantId, $journalId, $actor);
+        });
     }
 
     private function lockDraft(string $tenantId, string $journalId): object

@@ -21,6 +21,9 @@ final class ManageAccountingPeriodAction
         $this->auth->authorize($tenantId, $actor, 'close_period');
 
         return $this->tx->run(function () use ($tenantId, $actor, $startDate, $endDate): string {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'close_period');
+            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Accounting is not active.');
             $id = (string) Str::ulid();
             $at = now();
             DB::table('accounting_periods')->insert(['id' => $id, 'tenant_id' => $tenantId, 'start_date' => $startDate, 'end_date' => $endDate, 'status' => 'open', 'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => $at, 'updated_at' => $at]);
@@ -34,6 +37,9 @@ final class ManageAccountingPeriodAction
     {
         $this->auth->authorize($tenantId, $actor, 'close_period');
         $this->tx->run(function () use ($tenantId, $periodId, $actor, $startDate, $endDate): void {
+            $this->auth->authorizeTransactional($tenantId, $actor, 'close_period');
+            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Accounting is not active.');
             DB::table('accounting_periods')->where('tenant_id', $tenantId)->where('id', $periodId)->lockForUpdate()->first() ?? throw new AccountingValidationFailed('Period was not found.');
             $at = now();
             DB::table('accounting_periods')->where('tenant_id', $tenantId)->where('id', $periodId)->update(['start_date' => $startDate, 'end_date' => $endDate, 'updated_by' => $actor->id, 'updated_at' => $at]);
@@ -58,6 +64,10 @@ final class ManageAccountingPeriodAction
             throw new AccountingValidationFailed('Reopen reason is required.');
         }
         $this->tx->run(function () use ($tenantId, $periodId, $actor, $close, $reason): void {
+            $capability = $close ? 'close_period' : 'reopen_period';
+            $this->auth->authorizeTransactional($tenantId, $actor, $capability);
+            DB::table('accounting_settings')->where('tenant_id', $tenantId)->lockForUpdate()->first()
+                ?? throw new AccountingValidationFailed('Accounting is not active.');
             $at = now();
             $period = DB::table('accounting_periods')->where('tenant_id', $tenantId)->where('id', $periodId)->lockForUpdate()->first() ?? throw new AccountingValidationFailed('Period was not found.');
             if ($period->status !== ($close ? 'open' : 'closed')) {
