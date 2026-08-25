@@ -1,0 +1,72 @@
+name: Accounting Phase 1 PostgreSQL
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/accounting-phase1-postgresql.yml'
+  push:
+    branches:
+      - 'feat/accounting-foundations-ddl-v1'
+
+jobs:
+  postgresql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexusos_accounting_testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexusos_accounting_testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_CONFIG_CACHE: /tmp/nexusos-accounting-config.php
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: nexusos_accounting_testing
+      NEXUSOS_TEST_DATABASE: nexusos_accounting_testing
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      ACCOUNTING_RUNTIME_DB_ROLE: nexusos_runtime
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - name: PostgreSQL preflight
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE nexusos_runtime LOGIN PASSWORD 'runtime-test-password'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          SHOW server_version;
+          SHOW default_transaction_isolation;
+          SHOW lock_timeout;
+          SHOW statement_timeout;
+          SELECT current_database();
+          SQL
+      - run: php artisan migrate:fresh --force
+      - run: php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
+      - name: Core feature regressions
+        run: php artisan test --testsuite=Feature
+      - name: Migration rollback safety on empty schema
+        run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
