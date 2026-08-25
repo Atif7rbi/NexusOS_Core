@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - 'feat/accounting-foundations-ddl-v1'
+      - 'feat/accounting-application-core-v1'
 
 jobs:
   postgresql:
@@ -65,8 +66,12 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
+      - name: Accounting Phase 2 focused tests
+        run: php artisan test --filter='MoneyTest|AccountingApplication'
       - run: php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
       - name: Core feature regressions
         run: php artisan test --testsuite=Feature
       - name: Migration rollback safety on empty schema
         run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
+      - name: Backend formatting
+        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php
