@@ -137,7 +137,7 @@ final class AccountingSchemaIntegrityTest extends TestCase
         $journal=$this->journal($tenant,$actor);
         $this->line($tenant,$journal,$child,1,'25.00','0.00');
         $this->line($tenant,$journal,$other,2,'0.00','25.00');
-        $this->post($journal,$period,$actor,10);
+        $this->postJournal($journal,$period,$actor,10);
 
         $this->expectException(QueryException::class);
         DB::table('accounts')->where('tenant_id',$tenant)->where('id',$group)
@@ -265,7 +265,7 @@ final class AccountingSchemaIntegrityTest extends TestCase
         DB::table('journal_lines')->insert(['id'=>(string) Str::ulid(),'tenant_id'=>$tenant,'journal_entry_id'=>$journal,'line_number'=>$number,'account_id'=>$account,'debit'=>$debit,'credit'=>$credit,'created_at'=>now(),'updated_at'=>now()]);
     }
 
-    private function post(string $journal,string $period,int $actor,int $sequence): void
+    private function postJournal(string $journal,string $period,int $actor,int $sequence): void
     {
         DB::table('journal_entries')->where('id',$journal)->update(['status'=>'posted','accounting_period_id'=>$period,'journal_number'=>'JRN-2026-'.str_pad((string) $sequence,3,'0',STR_PAD_LEFT),'journal_number_year'=>2026,'journal_sequence_number'=>$sequence,'posted_by'=>$actor,'posted_at'=>now(),'updated_by'=>$actor,'updated_at'=>now()]);
     }
@@ -289,7 +289,7 @@ final class AccountingSchemaIntegrityTest extends TestCase
         foreach (DB::table('journal_lines')->where('tenant_id',$tenant)->where('journal_entry_id',$target)->orderBy('line_number')->get() as $line) {
             $this->line($tenant,$journal,(string) $line->account_id,(int) $line->line_number,(string) $line->credit,(string) $line->debit);
         }
-        $this->post($journal,$period,$actor,$sequence);
+        $this->postJournal($journal,$period,$actor,$sequence);
         return $journal;
     }
 
