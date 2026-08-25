@@ -9,6 +9,7 @@ on:
     branches:
       - 'feat/accounting-foundations-ddl-v1'
       - 'feat/accounting-application-core-v1'
+      - 'feat/accounting-api-v1'
 
 jobs:
   postgresql:
