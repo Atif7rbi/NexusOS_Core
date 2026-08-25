@@ -62,6 +62,6 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
-      - run: php artisan test --testsuite=Feature --filter='AccountingSchemaIntegrityTest|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
+      - run: php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
       - name: Migration rollback safety on empty schema
         run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=4 --force
