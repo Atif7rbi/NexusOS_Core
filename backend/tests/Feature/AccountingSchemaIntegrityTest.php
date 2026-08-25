@@ -50,11 +50,14 @@ final class AccountingSchemaIntegrityTest extends TestCase
         $this->activate($otherTenant, $otherActor);
         $this->period($tenant, $actor, '2026-01-01', '2026-12-31');
 
+        DB::beginTransaction();
         try {
             $this->period($tenant, $actor, '2026-12-31', '2027-12-31');
             $this->fail('Inclusive overlap was accepted.');
         } catch (QueryException) {
             $this->assertTrue(true);
+        } finally {
+            DB::rollBack();
         }
 
         $account = $this->account($tenant, $actor, '1000');
@@ -109,6 +112,7 @@ final class AccountingSchemaIntegrityTest extends TestCase
                 'source_type'=>'payment', 'source_id'=>(string) Str::ulid(),
                 'created_by'=>$actor, 'updated_by'=>$actor, 'created_at'=>now(), 'updated_at'=>now(),
             ]);
+            DB::statement('SET CONSTRAINTS journal_entries_system_draft_final_state IMMEDIATE');
         });
     }
 

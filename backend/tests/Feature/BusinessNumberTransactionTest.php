@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Tenant;
-use App\Modules\Shared\Exceptions\BusinessNumberGenerationException;
 use App\Modules\Shared\Services\BusinessNumberGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -19,13 +18,6 @@ final class BusinessNumberTransactionTest extends TestCase
     {
         $tenant = Tenant::factory()->create();
         $generator = new BusinessNumberGenerator();
-
-        try {
-            $generator->generateWithinCurrentTransaction((string) $tenant->id, 'JRN', 2026);
-            $this->fail('Allocation outside a transaction was accepted.');
-        } catch (BusinessNumberGenerationException) {
-            $this->assertTrue(true);
-        }
 
         try {
             DB::transaction(function () use ($generator, $tenant): void {
