@@ -70,7 +70,10 @@ jobs:
         run: php artisan test --filter='MoneyTest|AccountingApplication'
       - run: php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
       - name: Core feature regressions
-        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature
+        # AccountingSchemaConcurrencyTest is executed in the preceding focused
+        # PostgreSQL step. Its committed multi-process fixtures intentionally
+        # cannot participate in Laravel's per-test transaction rollback.
+        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*AccountingSchemaConcurrencyTest)/'
       - name: Migration rollback safety on empty schema
         run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
       - name: Backend formatting
