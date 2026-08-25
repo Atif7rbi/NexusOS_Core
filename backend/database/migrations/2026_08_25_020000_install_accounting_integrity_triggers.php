@@ -70,11 +70,49 @@ return new class extends Migration
 
             CREATE OR REPLACE FUNCTION public.enforce_account_lifecycle_and_history() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
-            DECLARE has_history boolean;
+            DECLARE has_history boolean; structural_change boolean;
             BEGIN
-              SELECT EXISTS(SELECT 1 FROM public.journal_lines l JOIN public.journal_entries j ON j.tenant_id=l.tenant_id AND j.id=l.journal_entry_id WHERE l.tenant_id=OLD.tenant_id AND l.account_id=OLD.id AND j.status='posted') INTO has_history;
-              IF has_history AND (NEW.tenant_id,NEW.code,NEW.kind,NEW.account_type,NEW.classification,NEW.parent_id) IS DISTINCT FROM (OLD.tenant_id,OLD.code,OLD.kind,OLD.account_type,OLD.classification,OLD.parent_id) THEN
-                RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='account structure is immutable after posted history';
+              structural_change := (NEW.tenant_id,NEW.code,NEW.kind,NEW.account_type,NEW.classification,NEW.parent_id)
+                IS DISTINCT FROM
+                (OLD.tenant_id,OLD.code,OLD.kind,OLD.account_type,OLD.classification,OLD.parent_id);
+              IF structural_change THEN
+                PERFORM a.id
+                FROM public.accounts a
+                JOIN (
+                  WITH RECURSIVE subtree(id) AS (
+                    SELECT OLD.id
+                    UNION ALL
+                    SELECT child.id
+                    FROM public.accounts child
+                    JOIN subtree parent ON child.parent_id=parent.id
+                    WHERE child.tenant_id=OLD.tenant_id
+                  ) SELECT id FROM subtree
+                ) descendants ON descendants.id=a.id
+                WHERE a.tenant_id=OLD.tenant_id
+                ORDER BY a.id
+                FOR UPDATE OF a;
+
+                WITH RECURSIVE subtree(id) AS (
+                  SELECT OLD.id
+                  UNION ALL
+                  SELECT child.id
+                  FROM public.accounts child
+                  JOIN subtree parent ON child.parent_id=parent.id
+                  WHERE child.tenant_id=OLD.tenant_id
+                )
+                SELECT EXISTS(
+                  SELECT 1
+                  FROM subtree s
+                  JOIN public.journal_lines l
+                    ON l.tenant_id=OLD.tenant_id AND l.account_id=s.id
+                  JOIN public.journal_entries j
+                    ON j.tenant_id=l.tenant_id AND j.id=l.journal_entry_id
+                  WHERE j.status='posted'
+                ) INTO has_history;
+
+                IF has_history THEN
+                  RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='account subtree structure is immutable after posted history';
+                END IF;
               END IF;
               IF OLD.status='archived' AND NEW.status='archived' AND NEW IS DISTINCT FROM OLD THEN
                 RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='archived account cannot be edited';
@@ -120,7 +158,6 @@ return new class extends Migration
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE p public.accounting_periods%ROWTYPE; n integer; min_line integer; max_line integer; deb numeric(19,2); cred numeric(19,2); target public.journal_entries%ROWTYPE;
             BEGIN
-              PERFORM 1 FROM public.accounting_settings WHERE tenant_id=NEW.tenant_id FOR UPDATE;
               IF OLD.status='posted' THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='posted journal is immutable'; END IF;
               IF (NEW.id,NEW.tenant_id,NEW.origin,NEW.source_type,NEW.source_id,NEW.reverses_journal_entry_id) IS DISTINCT FROM (OLD.id,OLD.tenant_id,OLD.origin,OLD.source_type,OLD.source_id,OLD.reverses_journal_entry_id) THEN
                 RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='journal provenance is immutable';
