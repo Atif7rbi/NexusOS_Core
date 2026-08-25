@@ -50,13 +50,12 @@ final class AccountingApplicationTest extends TestCase
         self::assertFalse(DB::table('business_number_sequences')->where('tenant_id',$tenant->id)->where('prefix','JRN')->exists());
     }
 
-    public function test_business_posting_requires_outer_transaction_and_replays_exact_source():void
+    public function test_business_posting_rejects_non_sar_input():void
     {
         [$tenant,$actor]=$this->ready();$asset=$this->createAccount($tenant,$actor,'1200','asset','current_asset');$equity=$this->createAccount($tenant,$actor,'3200','equity','equity');
         DB::table('accounting_source_types')->insert(['origin'=>'business','key'=>'phase2_fixture','owner_module'=>'tests','description'=>'Phase 2 test fixture']);
-        $request=new BusinessPostingRequest((string)$tenant->id,(int)$actor->id,'phase2_fixture',(string)Str::ulid(),'SAR','2026-03-01','Fixture',[new JournalLineData($asset,'25','0'),new JournalLineData($equity,'0','25')]);
-        $service=app(BusinessPostingServiceInterface::class);
-        $this->expectException(\LogicException::class);$service->post($request);
+        $this->expectException(AccountingValidationFailed::class);
+        new BusinessPostingRequest((string)$tenant->id,(int)$actor->id,'phase2_fixture',(string)Str::ulid(),'USD','2026-03-01','Fixture',[new JournalLineData($asset,'25','0'),new JournalLineData($equity,'0','25')]);
     }
 
     public function test_business_posting_exact_replay_is_idempotent_and_outer_rollback_is_atomic():void
