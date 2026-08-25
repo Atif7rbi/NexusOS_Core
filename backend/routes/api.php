@@ -2,6 +2,11 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Modules\Accounting\Controllers\AccountingPeriodController;
+use App\Modules\Accounting\Controllers\AccountingSettingsController;
+use App\Modules\Accounting\Controllers\AccountController;
+use App\Modules\Accounting\Controllers\JournalController;
+use App\Modules\Accounting\Controllers\OpeningBalanceController;
 use App\Modules\Collections\Controllers\CollectionScheduleController;
 use App\Modules\Collections\Controllers\CollectionsIndexController;
 use App\Modules\Contracts\Controllers\ContractController;
@@ -22,6 +27,40 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/system-settings', [SystemSettingController::class, 'show']);
     Route::put('/system-settings', [SystemSettingController::class, 'update']);
+
+    Route::prefix('accounting')->name('accounting.')->group(function (): void {
+        Route::post('/activation', [AccountingSettingsController::class, 'activate'])->name('activation.store');
+        Route::get('/settings', [AccountingSettingsController::class, 'show'])->name('settings.show');
+
+        Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
+        Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
+        Route::get('/accounts/{account}', [AccountController::class, 'show'])->name('accounts.show');
+        Route::patch('/accounts/{account}', [AccountController::class, 'update'])->name('accounts.update');
+        Route::post('/accounts/{account}/archive', [AccountController::class, 'archive'])->name('accounts.archive');
+        Route::post('/accounts/{account}/restore', [AccountController::class, 'restore'])->name('accounts.restore');
+
+        Route::get('/periods', [AccountingPeriodController::class, 'index'])->name('periods.index');
+        Route::post('/periods', [AccountingPeriodController::class, 'store'])->name('periods.store');
+        Route::get('/periods/{period}', [AccountingPeriodController::class, 'show'])->name('periods.show');
+        Route::patch('/periods/{period}', [AccountingPeriodController::class, 'update'])->name('periods.update');
+        Route::post('/periods/{period}/close', [AccountingPeriodController::class, 'close'])->name('periods.close');
+        Route::post('/periods/{period}/reopen', [AccountingPeriodController::class, 'reopen'])->name('periods.reopen');
+
+        Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');
+        Route::post('/journals', [JournalController::class, 'store'])->name('journals.store');
+        Route::get('/journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
+        Route::patch('/journals/{journal}', [JournalController::class, 'update'])->name('journals.update');
+        Route::delete('/journals/{journal}', [JournalController::class, 'destroy'])->name('journals.destroy');
+        Route::post('/journals/{journal}/post', [JournalController::class, 'post'])->name('journals.post');
+        Route::post('/journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
+
+        Route::get('/opening-balance', [OpeningBalanceController::class, 'index'])->name('opening-balance.index');
+        Route::post('/opening-balance', [OpeningBalanceController::class, 'store'])->name('opening-balance.store');
+        Route::get('/opening-balance/{operation}', [OpeningBalanceController::class, 'show'])->name('opening-balance.show');
+        Route::patch('/opening-balance/{operation}', [OpeningBalanceController::class, 'update'])->name('opening-balance.update');
+        Route::delete('/opening-balance/{operation}', [OpeningBalanceController::class, 'destroy'])->name('opening-balance.destroy');
+        Route::post('/opening-balance/{operation}/post', [OpeningBalanceController::class, 'post'])->name('opening-balance.post');
+    });
 
     Route::middleware('module.entitled:projects')->group(function (): void {
         Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
