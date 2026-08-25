@@ -66,6 +66,8 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
+      - name: Accounting Phase 3 API tests
+        run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
         run: php artisan test --filter='MoneyTest|AccountingApplication'
       - run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
@@ -77,4 +79,4 @@ jobs:
       - name: Migration rollback safety on empty schema
         run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
       - name: Backend formatting
-        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Support/accounting_application_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Support/accounting_application_worker.php
