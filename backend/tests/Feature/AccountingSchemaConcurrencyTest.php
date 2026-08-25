@@ -186,7 +186,7 @@ final class AccountingSchemaConcurrencyTest extends TestCase
         $debit=(string) Str::ulid(); $credit=(string) Str::ulid();
         DB::table('accounts')->insert([
             ['id'=>$debit,'tenant_id'=>$tenant,'code'=>$prefix.'100','name'=>'Debit','kind'=>'posting','account_type'=>'asset','classification'=>'current_asset','parent_id'=>$parent,'status'=>'active','created_by'=>$actor,'updated_by'=>$actor,'created_at'=>now(),'updated_at'=>now()],
-            ['id'=>$credit,'tenant_id'=>$tenant,'code'=>$prefix.'300','name'=>'Credit','kind'=>'posting','account_type'=>'equity','classification'=>'equity','status'=>'active','created_by'=>$actor,'updated_by'=>$actor,'created_at'=>now(),'updated_at'=>now()],
+            ['id'=>$credit,'tenant_id'=>$tenant,'code'=>$prefix.'300','name'=>'Credit','kind'=>'posting','account_type'=>'equity','classification'=>'equity','parent_id'=>null,'status'=>'active','created_by'=>$actor,'updated_by'=>$actor,'created_at'=>now(),'updated_at'=>now()],
         ]); return [$debit,$credit];
     }
 
