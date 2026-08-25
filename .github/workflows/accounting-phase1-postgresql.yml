@@ -41,6 +41,7 @@ jobs:
       NEXUSOS_TEST_DATABASE: nexusos_accounting_testing
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
+      ACCOUNTING_RUNTIME_DB_ROLE: nexusos_runtime
       CACHE_STORE: array
       SESSION_DRIVER: array
       QUEUE_CONNECTION: sync
@@ -55,6 +56,8 @@ jobs:
       - name: PostgreSQL preflight
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE nexusos_runtime LOGIN PASSWORD 'runtime-test-password'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           SHOW server_version;
           SHOW default_transaction_isolation;
           SHOW lock_timeout;
@@ -64,4 +67,4 @@ jobs:
       - run: php artisan migrate:fresh --force
       - run: php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
       - name: Migration rollback safety on empty schema
-        run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=4 --force
+        run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
