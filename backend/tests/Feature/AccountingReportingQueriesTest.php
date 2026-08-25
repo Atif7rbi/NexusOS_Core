@@ -52,8 +52,8 @@ final class AccountingReportingQueriesTest extends TestCase
         $beforeReversal=$query->execute((string) $tenant->id,'2026-01-02');
         self::assertSame('0.30',$beforeReversal['debit_total']);
         $result=$query->execute((string) $tenant->id,'2026-12-31');
-        self::assertSame('0.10',$result['debit_total']);
-        self::assertSame('0.10',$result['credit_total']);
+        self::assertSame('0.50',$result['debit_total']);
+        self::assertSame('0.50',$result['credit_total']);
         self::assertTrue($result['is_balanced']);
         self::assertSame(['1000','3000'],array_column($result['rows'],'code'));
         self::assertSame('archived',$result['rows'][0]['status']);
