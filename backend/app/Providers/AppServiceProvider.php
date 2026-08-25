@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Modules\Collections\Contracts\CollectionAuditRecorderInterface;
 use App\Modules\Collections\Support\DatabaseCollectionAuditRecorder;
+use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
+use App\Modules\Accounting\Services\BusinessPostingService;
 use App\Modules\Shared\Contracts\BusinessNumberGeneratorInterface;
 use App\Modules\Shared\Services\BusinessNumberGenerator;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
             CollectionAuditRecorderInterface::class,
             DatabaseCollectionAuditRecorder::class,
         );
+        $this->app->bind(BusinessPostingServiceInterface::class, BusinessPostingService::class);
     }
 
     public function boot(): void
