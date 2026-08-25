@@ -139,7 +139,7 @@ final class AccountingApplicationTest extends TestCase
 
         self::assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.validate_opening_balance_operation(char,char)', 'EXECUTE') allowed", [$runtimeRole])->allowed);
 
-        DB::unprepared("GRANT SELECT ON public.users,public.tenant_users TO {$runtimeIdentifier}");
+        DB::unprepared("GRANT SELECT,UPDATE ON public.users,public.tenant_users TO {$runtimeIdentifier}");
         DB::unprepared("SET ROLE {$runtimeIdentifier}");
         try {
             $neutralizer = app(ReverseJournalAction::class)->execute((string) $tenant->id, $root->journalEntryId, $actor, '2026-02-01', 'Runtime correction');
@@ -151,7 +151,7 @@ final class AccountingApplicationTest extends TestCase
         } finally {
             DB::statement('SET CONSTRAINTS ALL DEFERRED');
             DB::statement('RESET ROLE');
-            DB::unprepared("REVOKE SELECT ON public.users,public.tenant_users FROM {$runtimeIdentifier}");
+            DB::unprepared("REVOKE SELECT,UPDATE ON public.users,public.tenant_users FROM {$runtimeIdentifier}");
         }
     }
 
