@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         DB::unprepared(<<<'SQL'
-            CREATE FUNCTION public.enforce_opening_balance_mutation() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.enforce_opening_balance_mutation() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE tid char(26); cutoff date;
             BEGIN
@@ -35,7 +35,7 @@ return new class extends Migration
             END $$;
             CREATE TRIGGER opening_balance_mutation_guard BEFORE INSERT OR UPDATE OR DELETE ON public.opening_balance_operations FOR EACH ROW EXECUTE FUNCTION public.enforce_opening_balance_mutation();
 
-            CREATE FUNCTION public.validate_opening_balance_final_state() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.validate_opening_balance_final_state() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE o public.opening_balance_operations%ROWTYPE; j public.journal_entries%ROWTYPE; terminal public.journal_entries%ROWTYPE; hops integer:=0; parity integer:=0;
             BEGIN
@@ -61,10 +61,10 @@ return new class extends Migration
             END $$;
             CREATE CONSTRAINT TRIGGER opening_balance_final_consistency AFTER INSERT OR UPDATE OR DELETE ON public.opening_balance_operations DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.validate_opening_balance_final_state();
 
-            CREATE FUNCTION public.validate_opening_balance_final_state_for(o public.opening_balance_operations) RETURNS void
+            CREATE OR REPLACE FUNCTION public.validate_opening_balance_final_state_for(o public.opening_balance_operations) RETURNS void
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$ BEGIN RETURN; END $$;
 
-            CREATE FUNCTION public.schedule_opening_balance_validation() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.schedule_opening_balance_validation() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE oid char(26); o public.opening_balance_operations%ROWTYPE;
             BEGIN
@@ -96,7 +96,7 @@ return new class extends Migration
             END $$;
             CREATE CONSTRAINT TRIGGER journal_opening_balance_final_consistency AFTER INSERT OR UPDATE ON public.journal_entries DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.schedule_opening_balance_validation();
 
-            CREATE FUNCTION public.validate_accounting_audit_subject() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.validate_accounting_audit_subject() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE valid boolean:=false;
             BEGIN
@@ -117,7 +117,7 @@ return new class extends Migration
               END IF; RETURN NEW;
             END $$;
             CREATE TRIGGER accounting_audits_subject_guard BEFORE INSERT ON public.accounting_audits FOR EACH ROW EXECUTE FUNCTION public.validate_accounting_audit_subject();
-            CREATE FUNCTION public.prevent_accounting_audit_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$ BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='accounting_audits is immutable'; END $$;
+            CREATE OR REPLACE FUNCTION public.prevent_accounting_audit_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$ BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='accounting_audits is immutable'; END $$;
             CREATE TRIGGER accounting_audits_immutable_update BEFORE UPDATE ON public.accounting_audits FOR EACH ROW EXECUTE FUNCTION public.prevent_accounting_audit_mutation();
             CREATE TRIGGER accounting_audits_immutable_delete BEFORE DELETE ON public.accounting_audits FOR EACH ROW EXECUTE FUNCTION public.prevent_accounting_audit_mutation();
             SQL);
