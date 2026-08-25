@@ -45,6 +45,8 @@ return new class extends Migration
             );
         }
 
+        $this->assertProtectedObjectOwnership($runtimeRole);
+
         $identifier = '"'.str_replace('"', '""', $runtimeRole).'"';
         $tables = implode(',', array_map(
             static fn (string $table): string => 'public.'.$table,
@@ -115,5 +117,77 @@ return new class extends Migration
         if ($schema==='public') { return false; }
         if (app()->environment('testing')) { return true; }
         throw new RuntimeException('Accounting Foundations requires the public PostgreSQL schema.');
+    }
+
+    private function assertProtectedObjectOwnership(string $runtimeRole): void
+    {
+        $ownsSchema=(bool) DB::selectOne(<<<'SQL'
+            SELECT EXISTS(
+              SELECT 1 FROM pg_catalog.pg_namespace
+              WHERE nspname='public' AND pg_catalog.pg_get_userbyid(nspowner)=?
+            ) AS owns
+            SQL,
+            [$runtimeRole],
+        )->owns;
+
+        $ownsTable=(bool) DB::selectOne(<<<'SQL'
+            SELECT EXISTS(
+              SELECT 1
+              FROM pg_catalog.pg_class object
+              JOIN pg_catalog.pg_namespace schema ON schema.oid=object.relnamespace
+              WHERE schema.nspname='public'
+                AND object.relkind IN ('r','p')
+                AND object.relname IN (
+                  'business_number_sequences','accounting_source_types',
+                  'accounting_settings','accounts','accounting_periods',
+                  'journal_entries','journal_lines','opening_balance_operations',
+                  'accounting_audits'
+                )
+                AND pg_catalog.pg_get_userbyid(object.relowner)=?
+            ) AS owns
+            SQL,
+            [$runtimeRole],
+        )->owns;
+
+        $ownsFunction=(bool) DB::selectOne(<<<'SQL'
+            SELECT EXISTS(
+              SELECT 1
+              FROM pg_catalog.pg_proc function
+              JOIN pg_catalog.pg_namespace schema ON schema.oid=function.pronamespace
+              WHERE schema.nspname='public'
+                AND function.proname IN (
+                  'prevent_accounting_source_type_mutation',
+                  'prevent_accounting_settings_mutation',
+                  'enforce_accounting_activation',
+                  'prevent_activated_tenant_currency_change',
+                  'enforce_account_hierarchy',
+                  'enforce_account_lifecycle_and_history',
+                  'prevent_account_delete',
+                  'enforce_accounting_period_nonoverlap',
+                  'enforce_accounting_period_mutation',
+                  'prevent_accounting_period_delete',
+                  'enforce_journal_entry_insert',
+                  'enforce_journal_entry_mutation',
+                  'enforce_journal_entry_delete',
+                  'validate_system_journal_final_state',
+                  'enforce_journal_line_parent_state',
+                  'enforce_opening_balance_mutation',
+                  'validate_opening_balance_operation',
+                  'validate_opening_balance_final_state',
+                  'schedule_opening_balance_validation',
+                  'validate_accounting_audit_subject',
+                  'prevent_accounting_audit_mutation'
+                )
+                AND pg_catalog.pg_get_userbyid(function.proowner)=?
+            ) AS owns
+            SQL,
+            [$runtimeRole],
+        )->owns;
+
+        if ($ownsSchema || $ownsTable || $ownsFunction) {
+            throw new RuntimeException(
+                'Accounting runtime role must not own the public schema, protected tables, or trigger functions.'
+            );
+        }
     }
 };

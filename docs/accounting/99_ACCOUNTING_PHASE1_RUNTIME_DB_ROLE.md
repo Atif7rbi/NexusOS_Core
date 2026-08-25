@@ -44,6 +44,9 @@ runtime role and grants only the required DML surface. In particular:
 
 Because the runtime role is neither object owner nor superuser it cannot
 disable triggers, replace trigger functions, or grant itself missing rights.
+Before applying grants, the migration queries PostgreSQL catalogs and aborts
+if the configured runtime role owns the `public` schema, any protected
+Accounting/number-sequence table, or any Accounting trigger function.
 CI provisions this split-role model and tests source-catalog insertion,
 `TRUNCATE`, trigger disabling, and function replacement as the runtime role.
 
