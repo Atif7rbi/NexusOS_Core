@@ -10,6 +10,7 @@ use App\Modules\Accounting\ValueObjects\Money;
 final readonly class JournalLineData
 {
     public Money $debit;
+
     public Money $credit;
 
     public function __construct(public string $accountId, string|int $debit = '0', string|int $credit = '0', public ?string $memo = null)

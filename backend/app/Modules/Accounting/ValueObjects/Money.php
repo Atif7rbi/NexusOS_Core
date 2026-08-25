@@ -28,10 +28,33 @@ final readonly class Money
         return new self($amount);
     }
 
-    public static function zero(): self { return self::of('0'); }
-    public function plus(self $other): self { return new self($this->amount->plus($other->amount)); }
-    public function isZero(): bool { return $this->amount->isZero(); }
-    public function isPositive(): bool { return $this->amount->isPositive(); }
-    public function equals(self $other): bool { return $this->amount->isEqualTo($other->amount); }
-    public function __toString(): string { return (string) $this->amount; }
+    public static function zero(): self
+    {
+        return self::of('0');
+    }
+
+    public function plus(self $other): self
+    {
+        return new self($this->amount->plus($other->amount));
+    }
+
+    public function isZero(): bool
+    {
+        return $this->amount->isZero();
+    }
+
+    public function isPositive(): bool
+    {
+        return $this->amount->isPositive();
+    }
+
+    public function equals(self $other): bool
+    {
+        return $this->amount->isEqualTo($other->amount);
+    }
+
+    public function __toString(): string
+    {
+        return (string) $this->amount;
+    }
 }

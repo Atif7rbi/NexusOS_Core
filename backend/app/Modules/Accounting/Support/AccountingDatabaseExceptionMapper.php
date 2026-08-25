@@ -16,9 +16,16 @@ final class AccountingDatabaseExceptionMapper
     {
         $state = (string) ($exception->errorInfo[0] ?? '');
         $message = $exception->getMessage();
-        if ($state === '55P03') { return new AccountingLockTimeout('Accounting lock wait timed out.', previous: $exception); }
-        if ($state === '23505') { return new AccountingConflict('Accounting uniqueness conflict.', previous: $exception); }
-        if (in_array($state, ['23503', '23514', '55000'], true)) { return new AccountingValidationFailed('Accounting integrity validation failed.', previous: $exception); }
+        if ($state === '55P03') {
+            return new AccountingLockTimeout('Accounting lock wait timed out.', previous: $exception);
+        }
+        if ($state === '23505') {
+            return new AccountingConflict('Accounting uniqueness conflict.', previous: $exception);
+        }
+        if (in_array($state, ['23503', '23514', '55000'], true)) {
+            return new AccountingValidationFailed('Accounting integrity validation failed.', previous: $exception);
+        }
+
         return new AccountingException('Accounting persistence failed.', previous: $exception);
     }
 }

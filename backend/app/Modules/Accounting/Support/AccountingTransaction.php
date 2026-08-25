@@ -19,6 +19,7 @@ final class AccountingTransaction
             return DB::transaction(function () use ($callback) {
                 DB::statement("SET LOCAL lock_timeout = '5s'");
                 DB::statement("SET LOCAL statement_timeout = '30s'");
+
                 return $callback();
             });
         } catch (QueryException $exception) {
