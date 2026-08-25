@@ -36,6 +36,39 @@ final class AccountingSchemaConcurrencyTest extends TestCase
         $this->assertSame([1,2],$values);
     }
 
+    public function test_activation_and_currency_change_race_cannot_split_currency_truth(): void
+    {
+        $tenant=Tenant::factory()->create(['currency'=>'SAR']);
+        $user=User::factory()->create(['role'=>'accountant','status'=>'active']);
+        TenantUser::factory()->forTenant($tenant)->forUser($user)->active()->create();
+        $results=$this->workers([
+            ['action'=>'activate','id'=>(string) Str::ulid(),'tenant_id'=>(string) $tenant->id,'actor_id'=>(int) $user->id],
+            ['action'=>'currency','tenant_id'=>(string) $tenant->id],
+        ]);
+        $this->assertSame(1,count(array_filter($results,fn ($r)=>$r['ok'])));
+        $active=DB::table('accounting_settings')->where('tenant_id',$tenant->id)->exists();
+        $this->assertSame($active ? 'SAR' : 'USD',DB::table('tenants')->where('id',$tenant->id)->value('currency'));
+    }
+
+    public function test_opening_balance_slot_race_allows_one_draft(): void
+    {
+        [$tenant,$actor]=$this->context();
+        $results=$this->workers(array_map(fn () => ['action'=>'opening','operation_id'=>(string) Str::ulid(),'journal_id'=>(string) Str::ulid(),'tenant_id'=>$tenant,'actor_id'=>$actor],[1,2]));
+        $this->assertSame(1,count(array_filter($results,fn ($r)=>$r['ok'])));
+        $this->assertSame(1,DB::table('opening_balance_operations')->where('tenant_id',$tenant)->count());
+    }
+
+    public function test_opposite_parent_updates_cannot_create_account_cycle(): void
+    {
+        [$tenant,$actor]=$this->context();
+        $first=$this->group($tenant,$actor,'G1'); $second=$this->group($tenant,$actor,'G2');
+        $results=$this->workers([
+            ['action'=>'account_parent','tenant_id'=>$tenant,'actor_id'=>$actor,'id'=>$first,'parent_id'=>$second],
+            ['action'=>'account_parent','tenant_id'=>$tenant,'actor_id'=>$actor,'id'=>$second,'parent_id'=>$first],
+        ]);
+        $this->assertSame(1,count(array_filter($results,fn ($r)=>$r['ok'])));
+    }
+
     /** @return array{string,int} */
     private function context(): array
     {
@@ -44,6 +77,13 @@ final class AccountingSchemaConcurrencyTest extends TestCase
         TenantUser::factory()->forTenant($tenant)->forUser($user)->active()->create();
         DB::table('accounting_settings')->insert(['id'=>(string) Str::ulid(),'tenant_id'=>$tenant->id,'ledger_currency'=>'SAR','activated_by'=>$user->id,'activated_at'=>now()]);
         return [(string) $tenant->id,(int) $user->id];
+    }
+
+    private function group(string $tenant,int $actor,string $code): string
+    {
+        $id=(string) Str::ulid();
+        DB::table('accounts')->insert(['id'=>$id,'tenant_id'=>$tenant,'code'=>$code,'name'=>$code,'kind'=>'group','account_type'=>'asset','status'=>'active','created_by'=>$actor,'updated_by'=>$actor,'created_at'=>now(),'updated_at'=>now()]);
+        return $id;
     }
 
     /** @param array<int,array<string,mixed>> $payloads @return array<int,array<string,mixed>> */

@@ -36,6 +36,17 @@ final class AccountingSchemaIntegrityTest extends TestCase
 
     public function test_activation_is_sar_only_and_freezes_tenant_currency(): void
     {
+        [$usdTenant, $usdActor] = $this->membership('USD');
+        DB::beginTransaction();
+        try {
+            $this->activate($usdTenant, $usdActor);
+            $this->fail('USD Tenant activation was accepted.');
+        } catch (QueryException) {
+            $this->assertTrue(true);
+        } finally {
+            DB::rollBack();
+        }
+
         [$tenant, $actor] = $this->membership('SAR');
         $this->activate($tenant, $actor);
         $this->expectException(QueryException::class);

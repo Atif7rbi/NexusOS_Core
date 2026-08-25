@@ -24,6 +24,15 @@ return new class extends Migration
             CREATE TRIGGER accounting_settings_immutable_update BEFORE UPDATE ON public.accounting_settings FOR EACH ROW EXECUTE FUNCTION public.prevent_accounting_settings_mutation();
             CREATE TRIGGER accounting_settings_immutable_delete BEFORE DELETE ON public.accounting_settings FOR EACH ROW EXECUTE FUNCTION public.prevent_accounting_settings_mutation();
 
+            CREATE OR REPLACE FUNCTION public.enforce_accounting_activation() RETURNS trigger
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$ DECLARE tenant_currency char(3); BEGIN
+              SELECT currency INTO tenant_currency FROM public.tenants WHERE id=NEW.tenant_id FOR UPDATE;
+              IF NOT FOUND OR tenant_currency<>'SAR' OR NEW.ledger_currency<>tenant_currency THEN
+                RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Accounting v1 activation requires a SAR Tenant';
+              END IF; RETURN NEW;
+            END $$;
+            CREATE TRIGGER accounting_settings_activation_guard BEFORE INSERT ON public.accounting_settings FOR EACH ROW EXECUTE FUNCTION public.enforce_accounting_activation();
+
             CREATE OR REPLACE FUNCTION public.prevent_activated_tenant_currency_change() RETURNS trigger
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$ BEGIN
               IF EXISTS(SELECT 1 FROM public.accounting_settings s WHERE s.tenant_id=OLD.id)
@@ -111,6 +120,7 @@ return new class extends Migration
             LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE p public.accounting_periods%ROWTYPE; n integer; min_line integer; max_line integer; deb numeric(19,2); cred numeric(19,2); target public.journal_entries%ROWTYPE;
             BEGIN
+              PERFORM 1 FROM public.accounting_settings WHERE tenant_id=NEW.tenant_id FOR UPDATE;
               IF OLD.status='posted' THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='posted journal is immutable'; END IF;
               IF (NEW.id,NEW.tenant_id,NEW.origin,NEW.source_type,NEW.source_id,NEW.reverses_journal_entry_id) IS DISTINCT FROM (OLD.id,OLD.tenant_id,OLD.origin,OLD.source_type,OLD.source_id,OLD.reverses_journal_entry_id) THEN
                 RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='journal provenance is immutable';
@@ -120,6 +130,7 @@ return new class extends Migration
               IF NOT FOUND OR p.status<>'open' OR NEW.entry_date NOT BETWEEN p.start_date AND p.end_date THEN RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='journal requires containing open period'; END IF;
               SELECT count(*),min(line_number),max(line_number),sum(debit),sum(credit) INTO n,min_line,max_line,deb,cred FROM public.journal_lines WHERE tenant_id=NEW.tenant_id AND journal_entry_id=NEW.id;
               IF n<2 OR min_line<>1 OR max_line<>n OR deb<>cred OR deb<=0 THEN RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='journal lines must be contiguous, balanced and nonzero'; END IF;
+              PERFORM a.id FROM public.journal_lines l JOIN public.accounts a ON a.tenant_id=l.tenant_id AND a.id=l.account_id WHERE l.tenant_id=NEW.tenant_id AND l.journal_entry_id=NEW.id ORDER BY a.id FOR UPDATE OF a;
               IF EXISTS(SELECT 1 FROM public.journal_lines l JOIN public.accounts a ON a.tenant_id=l.tenant_id AND a.id=l.account_id WHERE l.tenant_id=NEW.tenant_id AND l.journal_entry_id=NEW.id AND (a.kind<>'posting' OR (NEW.origin<>'reversal' AND a.status<>'active'))) THEN RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='journal account is not eligible'; END IF;
               IF NEW.origin='reversal' THEN
                 SELECT * INTO target FROM public.journal_entries WHERE tenant_id=NEW.tenant_id AND id=NEW.reverses_journal_entry_id FOR UPDATE;
@@ -169,6 +180,7 @@ return new class extends Migration
             DROP FUNCTION public.enforce_account_hierarchy() CASCADE;
             DROP FUNCTION public.prevent_activated_tenant_currency_change() CASCADE;
             DROP FUNCTION public.prevent_accounting_settings_mutation() CASCADE;
+            DROP FUNCTION public.enforce_accounting_activation() CASCADE;
             DROP FUNCTION public.prevent_accounting_source_type_mutation() CASCADE;
             SQL);
     }
