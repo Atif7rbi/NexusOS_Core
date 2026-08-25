@@ -18,7 +18,7 @@ use Tests\TestCase;
 
 final class AccountingApplicationStructureTest extends TestCase
 {
-    public function test_phase_two_services_resolve_without_an_http_boundary(): void
+    public function test_phase_two_services_remain_resolvable_after_http_boundary_is_added(): void
     {
         foreach ([ActivateAccountingAction::class, ManageAccountAction::class, ManageAccountingPeriodAction::class, ManageManualJournalAction::class, ManageOpeningBalanceAction::class, ReverseJournalAction::class, PostingEngine::class, BusinessPostingRaceResolver::class] as $class) {
             self::assertInstanceOf($class, $this->app->make($class));
@@ -26,9 +26,4 @@ final class AccountingApplicationStructureTest extends TestCase
         self::assertInstanceOf(BusinessPostingService::class, $this->app->make(BusinessPostingServiceInterface::class));
     }
 
-    public function test_phase_two_does_not_add_routes_or_controllers(): void
-    {
-        self::assertDirectoryDoesNotExist(app_path('Modules/Accounting/Controllers'));
-        self::assertDirectoryDoesNotExist(app_path('Modules/Accounting/Http'));
-    }
 }
