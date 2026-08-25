@@ -9,6 +9,7 @@ on:
     branches:
       - 'feat/accounting-foundations-ddl-v1'
       - 'feat/accounting-application-core-v1'
+      - 'feat/accounting-api-v1'
 
 jobs:
   postgresql:
@@ -66,6 +67,8 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
+      - name: Accounting Phase 3 API tests
+        run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
         run: php artisan test --filter='MoneyTest|AccountingApplication'
       - run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
@@ -75,6 +78,25 @@ jobs:
         # cannot participate in Laravel's per-test transaction rollback.
         run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*Accounting(?:Schema|Application)ConcurrencyTest)/'
       - name: Migration rollback safety on empty schema
-        run: php artisan migrate:fresh --force && php artisan migrate:rollback --step=5 --force
+        run: |
+          php artisan migrate:fresh --force
+          php artisan migrate:rollback --step=6 --force
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF to_regclass('public.accounting_source_types') IS NOT NULL
+               OR to_regclass('public.accounting_settings') IS NOT NULL
+               OR to_regclass('public.accounts') IS NOT NULL
+               OR to_regclass('public.accounting_periods') IS NOT NULL
+               OR to_regclass('public.journal_entries') IS NOT NULL
+               OR to_regclass('public.journal_lines') IS NOT NULL
+               OR to_regclass('public.opening_balance_operations') IS NOT NULL
+               OR to_regclass('public.accounting_audits') IS NOT NULL
+               OR to_regprocedure('public.validate_opening_balance_operation(character,character)') IS NOT NULL
+            THEN
+              RAISE EXCEPTION 'Accounting migration stack was not fully rolled back';
+            END IF;
+          END $$;
+          SQL
       - name: Backend formatting
-        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Support/accounting_application_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Support/accounting_application_worker.php

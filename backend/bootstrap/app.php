@@ -5,6 +5,8 @@ use App\Http\Middleware\EnsureModuleEntitled;
 use App\Modules\Collections\Http\Middleware\AuthorizeCollectionScheduleCommand;
 use App\Modules\Collections\Http\Middleware\ResolveCollectionScheduleContract;
 use App\Modules\Collections\Support\CollectionScheduleExceptionResponder;
+use App\Modules\Accounting\Exceptions\AccountingException;
+use App\Modules\Accounting\Http\AccountingExceptionResponder;
 use App\Modules\Leads\Exceptions\UserHasOpenAssignedLeadsException;
 use App\Modules\Leads\Support\LeadExceptionResponder;
 use App\Modules\Shared\Support\ApiErrorResponse;
@@ -37,6 +39,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (AccountingException $exception, Request $request) {
+            if (! $request->is('api/accounting*')) {
+                return null;
+            }
+
+            return app(AccountingExceptionResponder::class)->respond($exception);
+        });
+
         $exceptions->render(function (AuthenticationException $exception, Request $request) {
             if (! $request->is('api/*')) {
                 return null;

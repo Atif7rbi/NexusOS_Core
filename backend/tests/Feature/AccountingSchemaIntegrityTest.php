@@ -221,6 +221,27 @@ final class AccountingSchemaIntegrityTest extends TestCase
         $this->assertFalse((bool) DB::selectOne("SELECT has_table_privilege(?, 'public.accounting_source_types', 'INSERT') allowed",[$role])->allowed);
         $this->assertFalse((bool) DB::selectOne("SELECT has_table_privilege(?, 'public.accounts', 'TRUNCATE') allowed",[$role])->allowed);
         $this->assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.enforce_journal_entry_mutation()', 'EXECUTE') allowed",[$role])->allowed);
+        foreach (['validate_opening_balance_operation(char,char)', 'enforce_opening_balance_mutation()', 'validate_opening_balance_final_state()', 'schedule_opening_balance_validation()'] as $function) {
+            $this->assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.'||?, 'EXECUTE') allowed",[$role,$function])->allowed);
+        }
+
+        $entrypoints=DB::select(<<<'SQL'
+            SELECT function.proname,
+                   function.prosecdef,
+                   pg_catalog.pg_get_userbyid(function.proowner) AS owner,
+                   pg_catalog.array_to_string(function.proconfig, ',') AS config
+            FROM pg_catalog.pg_proc function
+            JOIN pg_catalog.pg_namespace schema ON schema.oid=function.pronamespace
+            WHERE schema.nspname='public'
+              AND function.proname IN ('enforce_opening_balance_mutation','validate_opening_balance_final_state','schedule_opening_balance_validation')
+            ORDER BY function.proname
+            SQL);
+        $this->assertCount(3,$entrypoints);
+        foreach ($entrypoints as $entrypoint) {
+            $this->assertTrue($entrypoint->prosecdef);
+            $this->assertNotSame($role,$entrypoint->owner);
+            $this->assertStringContainsString('search_path=pg_catalog, public',$entrypoint->config);
+        }
 
         DB::statement('SET ROLE "'.$role.'"');
         try {
@@ -235,6 +256,89 @@ final class AccountingSchemaIntegrityTest extends TestCase
                 catch (QueryException) { $this->assertTrue(true); }
                 finally { DB::rollBack(); }
             }
+        } finally {
+            DB::statement('RESET ROLE');
+        }
+    }
+
+    public function test_runtime_role_opening_workflow_uses_security_definer_trigger_entrypoints(): void
+    {
+        [$tenant,$actor]=$this->membership('SAR'); $this->activate($tenant,$actor);
+        $period=$this->period($tenant,$actor,'2026-01-01','2026-12-31');
+        $debit=$this->account($tenant,$actor,'1400');
+        $credit=$this->account($tenant,$actor,'3400','equity','equity');
+        $role=(string) getenv('ACCOUNTING_RUNTIME_DB_ROLE');
+        $identifier='"'.str_replace('"','""',$role).'"';
+
+        DB::unprepared("SET ROLE {$identifier}");
+        try {
+            foreach ([
+                "SELECT public.validate_opening_balance_operation('{$tenant}', '".(string) Str::ulid()."')",
+                'SELECT public.enforce_opening_balance_mutation()',
+                'SELECT public.validate_opening_balance_final_state()',
+                'SELECT public.schedule_opening_balance_validation()',
+            ] as $sql) {
+                DB::beginTransaction();
+                try {
+                    DB::unprepared($sql);
+                    $this->fail('Runtime role directly executed a protected Accounting function.');
+                } catch (QueryException) {
+                    $this->assertTrue(true);
+                } finally {
+                    DB::rollBack();
+                }
+            }
+
+            [$operation,$root]=$this->postedOpening($tenant,$actor,$period,$debit,$credit,'2026-01-01',40);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            $neutralizer=$this->postExactReversal($tenant,$actor,$period,$root,'2026-02-01',41);
+            $this->projectOpening($operation,$neutralizer,'neutralized',$actor);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            $reactivator=$this->postExactReversal($tenant,$actor,$period,$neutralizer,'2026-02-01',42);
+            $this->projectOpening($operation,$reactivator,'effective',$actor);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            $this->assertSame($reactivator,DB::table('opening_balance_operations')->where('id',$operation)->value('latest_effect_journal_entry_id'));
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            try {
+                DB::transaction(function () use ($tenant,$actor,$period,$reactivator): void {
+                    $this->postExactReversal($tenant,$actor,$period,$reactivator,'2026-02-15',43);
+                    DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+                });
+                $this->fail('Runtime role committed a stale Opening projection.');
+            } catch (QueryException) {
+                $this->assertTrue(true);
+            }
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            $firstNeutralizer=$this->postExactReversal($tenant,$actor,$period,$reactivator,'2026-03-01',43);
+            $this->projectOpening($operation,$firstNeutralizer,'neutralized',$actor);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            [$secondOperation,$secondRoot]=$this->postedOpening($tenant,$actor,$period,$debit,$credit,'2026-03-01',44);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+            $secondNeutralizer=$this->postExactReversal($tenant,$actor,$period,$secondRoot,'2026-04-01',45);
+            $this->projectOpening($secondOperation,$secondNeutralizer,'neutralized',$actor);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            try {
+                DB::transaction(function () use ($tenant,$actor,$period,$operation,$firstNeutralizer): void {
+                    $backdated=$this->postExactReversal($tenant,$actor,$period,$firstNeutralizer,'2026-03-15',46);
+                    $this->projectOpening($operation,$backdated,'effective',$actor);
+                    DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+                });
+                $this->fail('Runtime role committed a backdated Opening reactivation.');
+            } catch (QueryException) {
+                $this->assertTrue(true);
+            }
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
         } finally {
             DB::statement('RESET ROLE');
         }

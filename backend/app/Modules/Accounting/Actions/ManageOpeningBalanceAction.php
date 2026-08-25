@@ -69,6 +69,7 @@ final class ManageOpeningBalanceAction
             $at = now();
             $this->audit->write($tenantId, 'opening_balance.draft_deleted', 'opening_balance_operation', $operationId, (int) $actor->id, [], $at);
             DB::table('opening_balance_operations')->where('tenant_id', $tenantId)->where('id', $operationId)->delete();
+            DB::table('journal_lines')->where('tenant_id', $tenantId)->where('journal_entry_id', $op->journal_entry_id)->delete();
             DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $op->journal_entry_id)->delete();
         });
     }

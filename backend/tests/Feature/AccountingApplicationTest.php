@@ -127,6 +127,34 @@ final class AccountingApplicationTest extends TestCase
         self::assertSame('opening', $lines[0]->memo);
     }
 
+    public function test_runtime_role_uses_deferred_triggers_for_opening_reversal_without_function_execute(): void
+    {
+        [$tenant,$actor] = $this->ready();
+        $asset = $this->createAccount($tenant, $actor, '1350', 'asset', 'current_asset');
+        $equity = $this->createAccount($tenant, $actor, '3350', 'equity', 'equity');
+        $operation = app(ManageOpeningBalanceAction::class)->create((string) $tenant->id, $actor, '2026-01-01', [new JournalLineData($asset, '50', '0'), new JournalLineData($equity, '0', '50')]);
+        $root = app(ManageOpeningBalanceAction::class)->post((string) $tenant->id, $operation, $actor);
+        $runtimeRole = (string) getenv('ACCOUNTING_RUNTIME_DB_ROLE');
+        $runtimeIdentifier = '"'.str_replace('"', '""', $runtimeRole).'"';
+
+        self::assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.validate_opening_balance_operation(char,char)', 'EXECUTE') allowed", [$runtimeRole])->allowed);
+
+        $neutralizer = app(ReverseJournalAction::class)->execute((string) $tenant->id, $root->journalEntryId, $actor, '2026-02-01', 'Runtime correction');
+        $reactivator = app(ReverseJournalAction::class)->execute((string) $tenant->id, $neutralizer->journalEntryId, $actor, '2026-02-01', 'Runtime reactivation');
+        self::assertStringNotContainsString('validate_opening_balance_operation', (string) file_get_contents(app_path('Modules/Accounting/Actions/ReverseJournalAction.php')));
+
+        DB::unprepared("SET ROLE {$runtimeIdentifier}");
+        try {
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+
+            self::assertSame('effective', DB::table('opening_balance_operations')->where('id', $operation)->value('effect_state'));
+            self::assertSame($reactivator->journalEntryId, DB::table('opening_balance_operations')->where('id', $operation)->value('latest_effect_journal_entry_id'));
+        } finally {
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+            DB::statement('RESET ROLE');
+        }
+    }
+
     private function actor(): array
     {
         $tenant = Tenant::factory()->create(['currency' => 'SAR']);
