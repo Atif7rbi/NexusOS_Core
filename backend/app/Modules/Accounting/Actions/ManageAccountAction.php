@@ -63,7 +63,7 @@ final class ManageAccountAction
             DB::table('accounts')->where('tenant_id', $tenantId)->where('id', $accountId)->lockForUpdate()->first() ?? throw new AccountingValidationFailed('Account was not found.');
             $values = $archive ? ['status' => 'archived', 'archived_at' => $at, 'archived_by' => $actor->id, 'restored_at' => null, 'restored_by' => null] : ['status' => 'active', 'archived_at' => null, 'archived_by' => null, 'restored_at' => $at, 'restored_by' => $actor->id];
             DB::table('accounts')->where('tenant_id', $tenantId)->where('id', $accountId)->update(array_merge($values, ['updated_by' => $actor->id, 'updated_at' => $at]));
-            $this->audit->write($tenantId,$archive ? 'account.archived' : 'account.restored','account',$accountId,(int) $actor->id,[],$at);
+            $this->audit->write($tenantId, $archive ? 'account.archived' : 'account.restored', 'account', $accountId, (int) $actor->id, [], $at);
         });
     }
 }

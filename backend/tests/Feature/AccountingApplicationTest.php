@@ -127,13 +127,13 @@ final class AccountingApplicationTest extends TestCase
         return [$tenant, $actor];
     }
 
-    private function account(string $code,string $type,string $class): array
+    private function account(string $code, string $type, string $class): array
     {
         return ['code' => $code, 'name' => 'Account '.$code, 'description' => null, 'kind' => 'posting', 'account_type' => $type, 'classification' => $class, 'parent_id' => null];
     }
 
-    private function createAccount(Tenant $tenant,User $actor,string $code,string $type,string $class): string
+    private function createAccount(Tenant $tenant, User $actor, string $code, string $type, string $class): string
     {
-        return app(ManageAccountAction::class)->create((string) $tenant->id,$actor,$this->account($code,$type,$class));
+        return app(ManageAccountAction::class)->create((string) $tenant->id, $actor, $this->account($code, $type, $class));
     }
 }

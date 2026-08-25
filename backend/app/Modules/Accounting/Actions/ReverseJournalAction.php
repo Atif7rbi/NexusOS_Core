@@ -59,6 +59,6 @@ final class ReverseJournalAction
 
     private function findOpening(string $tenantId, string $journalId): ?object
     {
-        return DB::selectOne('WITH RECURSIVE a AS (SELECT id,reverses_journal_entry_id FROM journal_entries WHERE tenant_id=? AND id=? UNION ALL SELECT j.id,j.reverses_journal_entry_id FROM journal_entries j JOIN a ON a.reverses_journal_entry_id=j.id WHERE j.tenant_id=?) SELECT o.* FROM a JOIN opening_balance_operations o ON o.tenant_id=? AND o.journal_entry_id=a.id LIMIT 1',[$tenantId, $journalId, $tenantId, $tenantId]);
+        return DB::selectOne('WITH RECURSIVE a AS (SELECT id,reverses_journal_entry_id FROM journal_entries WHERE tenant_id=? AND id=? UNION ALL SELECT j.id,j.reverses_journal_entry_id FROM journal_entries j JOIN a ON a.reverses_journal_entry_id=j.id WHERE j.tenant_id=?) SELECT o.* FROM a JOIN opening_balance_operations o ON o.tenant_id=? AND o.journal_entry_id=a.id LIMIT 1', [$tenantId, $journalId, $tenantId, $tenantId]);
     }
 }

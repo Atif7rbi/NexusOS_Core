@@ -70,7 +70,7 @@ final class ManageManualJournalAction
             throw new AccountingValidationFailed('Manual draft was not found.');
         }
 
-return $j;
+        return $j;
     }
 
     private function replaceLines(string $tenantId, string $journalId, array $lines, \DateTimeInterface $at): void

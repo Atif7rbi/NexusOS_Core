@@ -89,7 +89,7 @@ final class ManageOpeningBalanceAction
             throw new AccountingValidationFailed('Opening Balance draft was not found.');
         }
 
-return $op;
+        return $op;
     }
 
     private function replaceLines(string $tenantId, string $journalId, array $lines, \DateTimeInterface $at): void

@@ -63,8 +63,8 @@ final class ManageAccountingPeriodAction
             if ($period->status !== ($close ? 'open' : 'closed')) {
                 throw new AccountingValidationFailed('Invalid period transition.');
             }$values = $close ? ['status' => 'closed', 'closed_at' => $at, 'closed_by' => $actor->id, 'reopened_at' => null, 'reopened_by' => null, 'reopen_reason' => null] : ['status' => 'open', 'closed_at' => null, 'closed_by' => null, 'reopened_at' => $at, 'reopened_by' => $actor->id, 'reopen_reason' => $reason];
-            DB::table('accounting_periods')->where('tenant_id', $tenantId)->where('id', $periodId)->update(array_merge($values,['updated_by' => $actor->id, 'updated_at' => $at]));
-            $this->audit->write($tenantId,$close ? 'period.closed' : 'period.reopened','accounting_period',$periodId,(int) $actor->id,$close ? [] : ['reason' => $reason],$at);
+            DB::table('accounting_periods')->where('tenant_id', $tenantId)->where('id', $periodId)->update(array_merge($values, ['updated_by' => $actor->id, 'updated_at' => $at]));
+            $this->audit->write($tenantId, $close ? 'period.closed' : 'period.reopened', 'accounting_period', $periodId, (int) $actor->id, $close ? [] : ['reason' => $reason], $at);
         });
     }
 }
