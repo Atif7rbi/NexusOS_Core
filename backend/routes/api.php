@@ -16,6 +16,7 @@ use App\Modules\Leads\Controllers\LeadController;
 use App\Modules\Leads\Controllers\LeadFollowUpController;
 use App\Modules\Projects\Controllers\ProjectController;
 use App\Modules\Reservations\Controllers\ReservationController;
+use App\Modules\Receivables\Controllers\ReceivablesController;
 use App\Modules\Units\Controllers\UnitController;
 use App\Modules\Users\Controllers\TenantUserController;
 use Illuminate\Support\Facades\Route;
@@ -60,6 +61,13 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
         Route::patch('/opening-balance/{operation}', [OpeningBalanceController::class, 'update'])->name('opening-balance.update');
         Route::delete('/opening-balance/{operation}', [OpeningBalanceController::class, 'destroy'])->name('opening-balance.destroy');
         Route::post('/opening-balance/{operation}/post', [OpeningBalanceController::class, 'post'])->name('opening-balance.post');
+    });
+
+    Route::prefix('receivables')->name('receivables.')->group(function (): void {
+        Route::get('/', [ReceivablesController::class, 'index'])->name('index');
+        Route::post('/', [ReceivablesController::class, 'store'])->name('store');
+        Route::get('/{receivable}', [ReceivablesController::class, 'show'])->name('show');
+        Route::post('/{receivable}/cancel', [ReceivablesController::class, 'cancel'])->name('cancel');
     });
 
     Route::middleware('module.entitled:projects')->group(function (): void {

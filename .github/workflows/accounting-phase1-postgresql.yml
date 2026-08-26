@@ -11,6 +11,7 @@ on:
       - 'feat/accounting-application-core-v1'
       - 'feat/accounting-api-v1'
       - 'feat/accounting-reporting-readiness-v1'
+      - 'feat/receivables-foundations-v1'
 
 jobs:
   postgresql:
@@ -68,6 +69,8 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
+      - name: Receivables Foundations focused tests
+        run: php artisan test --filter='Receivables'
       - name: Accounting Phase 4 reporting reference tests
         run: php artisan test --filter='AccountingReportingQueriesTest'
       - name: Accounting Phase 3 API tests
@@ -83,11 +86,13 @@ jobs:
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
-          php artisan migrate:rollback --step=6 --force
+          php artisan migrate:rollback --step=7 --force
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
-            IF to_regclass('public.accounting_source_types') IS NOT NULL
+            IF to_regclass('public.receivables') IS NOT NULL
+               OR EXISTS(SELECT 1 FROM pg_constraint WHERE conname IN ('customers_tenant_id_id_unique','collections_tenant_id_id_unique'))
+               OR to_regclass('public.accounting_source_types') IS NOT NULL
                OR to_regclass('public.accounting_settings') IS NOT NULL
                OR to_regclass('public.accounts') IS NOT NULL
                OR to_regclass('public.accounting_periods') IS NOT NULL
@@ -97,9 +102,9 @@ jobs:
                OR to_regclass('public.accounting_audits') IS NOT NULL
                OR to_regprocedure('public.validate_opening_balance_operation(character,character)') IS NOT NULL
             THEN
-              RAISE EXCEPTION 'Accounting migration stack was not fully rolled back';
+              RAISE EXCEPTION 'Receivables and Accounting migration stack was not fully rolled back';
             END IF;
           END $$;
           SQL
       - name: Backend formatting
-        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Support/accounting_application_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/Receivables database/migrations/2026_08_26_000000_create_receivables_table.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php
