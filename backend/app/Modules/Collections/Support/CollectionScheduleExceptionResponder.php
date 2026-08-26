@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Collections\Support;
 
 use App\Modules\Collections\Exceptions\BlankCollectionTitleException;
-use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
 use App\Modules\Collections\Exceptions\CollectionNotFoundException;
+use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
 use App\Modules\Collections\Exceptions\CollectionScheduleChangedSinceLoadedException;
 use App\Modules\Collections\Exceptions\ContractNotEligibleForAmendmentException;
 use App\Modules\Collections\Exceptions\ContractNotEligibleForDraftEditException;
@@ -33,8 +33,7 @@ final class CollectionScheduleExceptionResponder
 {
     public function __construct(
         private readonly ApiErrorResponse $errors,
-    ) {
-    }
+    ) {}
 
     public function from(Throwable $exception): ?JsonResponse
     {

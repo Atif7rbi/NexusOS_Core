@@ -36,8 +36,7 @@ final class ContractController extends Controller
     public function __construct(
         private readonly ResolveActiveMembership $resolveActiveMembership,
         private readonly ContractAuthorization $authorization,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -56,7 +55,7 @@ final class ContractController extends Controller
             'reservation.customer:id,name,status',
         ])->where('tenant_id', $membership->tenant_id)->latest();
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = trim($validated['search']);
             $query->whereHas('reservation', function ($reservation) use ($search): void {
                 $reservation->whereHas('unit', fn ($unit) => $unit->where('unit_number', 'ilike', "%{$search}%"))
@@ -64,7 +63,7 @@ final class ContractController extends Controller
             });
         }
         foreach (['status', 'reservation_id'] as $filter) {
-            if (!empty($validated[$filter])) {
+            if (! empty($validated[$filter])) {
                 $query->where($filter, $validated[$filter]);
             }
         }

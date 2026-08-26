@@ -35,11 +35,10 @@ final class CancelContractAction
     private const SYSTEM_CANCELLATION_REASON = 'إلغاء تلقائي بسبب إلغاء العقد.';
 
     public function __construct(
-        private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver(),
-        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard(),
+        private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
+        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard,
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
-    ) {
-    }
+    ) {}
 
     public function execute(
         string $tenantId,
@@ -57,7 +56,7 @@ final class CancelContractAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (!in_array($contract->status, [ContractStatus::Draft, ContractStatus::Active], true)) {
+            if (! in_array($contract->status, [ContractStatus::Draft, ContractStatus::Active], true)) {
                 throw new ContractCannotBeCancelledException();
             }
 

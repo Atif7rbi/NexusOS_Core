@@ -27,7 +27,7 @@ final class EffectiveReceivableGuard
         // CollectionsConcurrencyTest uses an intentionally isolated schema
         // where the Receivables migrations are explicitly skipped. Production
         // schemas always receive Receivables before this guard can be used.
-        if (app()->environment('testing') && !Schema::hasTable('receivables')) {
+        if (app()->environment('testing') && ! Schema::hasTable('receivables')) {
             return;
         }
 
@@ -36,7 +36,7 @@ final class EffectiveReceivableGuard
             ->whereIn('collection_id', $collectionIds)
             ->where('status', 'recognized')
             ->exists()) {
-            throw new CollectionHasEffectiveReceivableException();
+            throw new CollectionHasEffectiveReceivableException;
         }
     }
 }
