@@ -15,6 +15,7 @@ use App\Modules\Receivables\Actions\CancelReceivableAction;
 use App\Modules\Receivables\Actions\EstablishCollectionReceivable;
 use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -125,9 +126,52 @@ final class CollectionBackedReceivableTest extends TestCase
         self::assertSame('cancelled', DB::table('contracts')->where('id', $contractId)->value('status'));
     }
 
+    public function test_migration_accepts_cancelled_receivable_history_when_its_source_collection_was_later_cancelled(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        [$tenantId, $actor, , , $collection] = $this->context();
+        $id = $this->establish($tenantId, $actor, (string) $collection->id);
+        app(CancelReceivableAction::class)->execute($tenantId, $id, $actor, '2026-08-26T11:00:00+00:00', 'Historical correction');
+        $this->cancelSourceCollection($collection, $actor);
+
+        $migration->up();
+
+        self::assertSame('cancelled', DB::table('receivables')->where('id', $id)->value('status'));
+        self::assertSame('cancelled', DB::table('collections')->where('id', $collection->id)->value('status'));
+    }
+
+    public function test_migration_fails_closed_when_an_effective_receivable_has_an_already_cancelled_source_collection(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        [$tenantId, $actor, , , $collection] = $this->context();
+        $this->establish($tenantId, $actor, (string) $collection->id);
+        $this->cancelSourceCollection($collection, $actor);
+
+        $this->expectException(\RuntimeException::class);
+        $migration->up();
+    }
+
     private function establish(string $tenantId, User $actor, string $collectionId, ?string $operationId = null, string $recognizedAt = '2026-08-26T10:00:00+00:00'): string
     {
         return app(EstablishCollectionReceivable::class)->execute($tenantId, $actor, $collectionId, $operationId ?? (string) Str::ulid(), $recognizedAt);
+    }
+
+    private function migration(): Migration
+    {
+        return require database_path('migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php');
+    }
+
+    private function cancelSourceCollection(Collection $collection, User $actor): void
+    {
+        DB::table('collections')->where('id', $collection->id)->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancelled_by' => $actor->id,
+            'cancellation_reason' => 'Historical source cancellation',
+            'updated_at' => now(),
+        ]);
     }
 
     private function context(string $collectionStatus = 'scheduled'): array

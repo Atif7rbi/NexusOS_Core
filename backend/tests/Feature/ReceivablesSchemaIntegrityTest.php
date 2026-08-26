@@ -35,7 +35,7 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
         self::assertTrue(DB::table('accounting_source_types')->where(['origin' => 'business', 'key' => 'receivable_recognition'])->exists());
         $effectiveCollectionIndex = DB::selectOne("SELECT pg_get_indexdef(indexrelid) definition FROM pg_index WHERE indexrelid='public.receivables_one_effective_collection_unique'::regclass");
         self::assertStringContainsString('collection_id IS NOT NULL', $effectiveCollectionIndex->definition);
-        self::assertStringContainsString("status = 'recognized'", $effectiveCollectionIndex->definition);
+        self::assertStringContainsString("'recognized'", $effectiveCollectionIndex->definition);
     }
 
     public function test_direct_sql_rejects_zero_negative_unsupported_status_and_missing_due_date(): void

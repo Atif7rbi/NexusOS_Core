@@ -10,6 +10,8 @@ Phase 5C is Collection-backed only: `collection_id` is required and Contract-lev
 
 PostgreSQL extends `enforce_receivable_history` for every non-null `collection_id`: tenant, Contract, Customer provenance, scheduled status, amount, due date, and currency must all match the authoritative Collection/Contract chain. A partial unique index permits at most one `recognized` Receivable for a tenant/Collection, while retaining historical cancelled corrections.
 
+Migration preflight preserves the same distinction: provenance and immutable snapshots are validated for all Collection-backed historical rows, while the source Collection must still be `scheduled` only for an effective `recognized` Receivable. A cancelled historical Receivable may therefore retain a source Collection that was legitimately cancelled by a later correction.
+
 The operation identity remains immutable and tenant-unique. The same identity with the same canonical facts replays; the same identity with differing facts conflicts. It is caller-owned outside retry boundaries.
 
 ## Causal correction order and concurrency

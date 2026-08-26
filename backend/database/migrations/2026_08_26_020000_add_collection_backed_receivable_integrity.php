@@ -31,7 +31,10 @@ return new class extends Migration
                   source_collection.id IS NULL
                   OR receivable.contract_id IS DISTINCT FROM source_collection.contract_id
                   OR source_reservation.customer_id IS DISTINCT FROM receivable.customer_id
-                  OR source_collection.status IS DISTINCT FROM 'scheduled'
+                  OR (
+                    receivable.status='recognized'
+                    AND source_collection.status IS DISTINCT FROM 'scheduled'
+                  )
                   OR receivable.recognized_amount IS DISTINCT FROM source_collection.amount
                   OR receivable.due_date IS DISTINCT FROM source_collection.due_date
                   OR receivable.currency IS DISTINCT FROM source_contract.currency
@@ -39,7 +42,7 @@ return new class extends Migration
             ) AS invalid
             SQL);
         if ((bool) $incompatibleHistory->invalid) {
-            throw new RuntimeException('Collection-backed Receivable migration requires existing Collection references to match authoritative scheduled Collection facts.');
+            throw new RuntimeException('Collection-backed Receivable migration requires provenance and immutable snapshots to match; effective recognized Collection Receivables must also retain a scheduled source Collection.');
         }
         $multipleEffective = DB::selectOne(<<<'SQL'
             SELECT EXISTS (
