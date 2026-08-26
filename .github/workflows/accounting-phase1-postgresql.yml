@@ -96,7 +96,7 @@ jobs:
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
-          php artisan migrate:rollback --step=8 --force
+          php artisan migrate:rollback --step=9 --force
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
