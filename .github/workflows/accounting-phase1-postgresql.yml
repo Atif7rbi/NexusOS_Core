@@ -13,6 +13,7 @@ on:
       - 'feat/accounting-reporting-readiness-v1'
       - 'feat/receivables-foundations-v1'
       - 'feat/receivable-accounting-integration-v1'
+      - 'feat/collection-backed-receivable-v1'
 
 jobs:
   postgresql:
