@@ -26,10 +26,10 @@ use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
 use App\Modules\Receivables\Exceptions\RecognitionOperationConflict;
 use App\Modules\Receivables\Support\ReceivablesDatabaseExceptionMapper;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Database\QueryException;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
