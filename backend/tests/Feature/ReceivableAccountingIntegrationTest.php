@@ -22,7 +22,7 @@ use App\Modules\ReceivableAccounting\Services\ReceivableAccountingRecoveryResolv
 use App\Modules\ReceivableAccounting\Services\ReceivableCancellationOrchestrator;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -30,7 +30,7 @@ use Tests\TestCase;
 
 final class ReceivableAccountingIntegrationTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     public function test_test_harness_commits_receivable_and_source_identified_journal_atomically(): void
     {
