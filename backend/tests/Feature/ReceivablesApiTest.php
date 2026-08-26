@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Modules\Collections\Models\Collection;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CreatesDomainIntegrityFixtures;
 
@@ -29,6 +30,32 @@ final class ReceivablesApiTest extends ApiTestCase
             ->assertJsonPath('data.receivable.contract_id', null)
             ->assertJsonPath('data.receivable.collection_id', null);
         $this->assertDatabaseHas('receivables', ['tenant_id' => $tenantId, 'customer_id' => $customerId, 'status' => 'recognized']);
+    }
+
+    public function test_recognition_operation_is_required_idempotent_and_conflicts_on_different_facts(): void
+    {
+        [$actor, , $customerId] = $this->context();
+        [, , $otherCustomerId] = $this->context();
+        Sanctum::actingAs($actor);
+        $input = $this->payload($customerId);
+        $this->postJson('/api/receivables', array_diff_key($input, ['recognition_operation_id' => true]))->assertUnprocessable();
+
+        $first = $this->postJson('/api/receivables', $input)->assertCreated()->json('data.receivable.id');
+        $second = $this->postJson('/api/receivables', $input)->assertCreated()->json('data.receivable.id');
+        self::assertSame($first, $second);
+
+        foreach ([
+            ['recognized_amount' => '101.00'],
+            ['customer_id' => $otherCustomerId],
+            ['due_date' => '2026-10-01'],
+            ['contract_id' => (string) Str::ulid()],
+        ] as $difference) {
+            $this->postJson('/api/receivables', array_merge($input, $difference))->assertConflict();
+        }
+
+        [$otherActor, , $otherTenantCustomer] = $this->context();
+        Sanctum::actingAs($otherActor);
+        $this->postJson('/api/receivables', array_merge($input, ['customer_id' => $otherTenantCustomer]))->assertCreated();
     }
 
     public function test_allowed_non_sar_business_currency_is_preserved_without_accounting_side_effects(): void
@@ -124,7 +151,7 @@ final class ReceivablesApiTest extends ApiTestCase
 
     private function payload(string $customerId, mixed $amount = '100.00'): array
     {
-        return ['customer_id' => $customerId, 'currency' => 'SAR', 'recognized_amount' => $amount, 'due_date' => '2026-09-30', 'recognized_at' => '2026-08-26T10:00:00+00:00'];
+        return ['recognition_operation_id' => (string) Str::ulid(), 'customer_id' => $customerId, 'currency' => 'SAR', 'recognized_amount' => $amount, 'due_date' => '2026-09-30', 'recognized_at' => '2026-08-26T10:00:00+00:00'];
     }
 
     private function context(string $role = User::ROLE_ADMINISTRATOR, bool $withSources = false): array

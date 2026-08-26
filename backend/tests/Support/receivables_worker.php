@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use App\Modules\Receivables\Actions\CancelReceivableAction;
+use App\Modules\Receivables\Actions\RecognizeReceivableAction;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -25,6 +26,16 @@ DB::purge('pgsql');
 
 try {
     $actor = User::query()->findOrFail($payload['actor_id']);
+    if (($payload['action'] ?? 'cancel') === 'recognize') {
+        $id = app(RecognizeReceivableAction::class)->execute(
+            $payload['tenant_id'],
+            $actor,
+            $payload['recognition'],
+        );
+        echo json_encode(['ok' => true, 'receivable_id' => $id], JSON_THROW_ON_ERROR);
+
+        return;
+    }
     app(CancelReceivableAction::class)->execute(
         $payload['tenant_id'],
         $payload['receivable_id'],

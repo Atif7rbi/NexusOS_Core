@@ -10,10 +10,34 @@ use App\Models\User;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class ReceivablesConcurrencyTest extends TestCase
 {
+    public function test_same_recognition_operation_race_returns_one_receivable(): void
+    {
+        $tenant = Tenant::factory()->create(['status' => Tenant::STATUS_ACTIVE]);
+        $actor = User::factory()->create(['role' => User::ROLE_ADMINISTRATOR, 'status' => User::STATUS_ACTIVE]);
+        TenantUser::factory()->active()->create(['tenant_id' => $tenant->id, 'user_id' => $actor->id]);
+        $customer = Customer::query()->create([
+            'tenant_id' => $tenant->id, 'type' => 'individual', 'category' => 'buyer', 'status' => 'customer',
+            'name' => 'Idempotent debtor', 'phone' => '055'.random_int(1000000, 9999999), 'created_by' => $actor->id,
+        ]);
+        $recognition = [
+            'recognition_operation_id' => (string) Str::ulid(), 'customer_id' => (string) $customer->id,
+            'currency' => 'SAR', 'recognized_amount' => '100.00', 'due_date' => '2026-09-30',
+            'recognized_at' => '2026-08-26T10:00:00+00:00',
+        ];
+        $base = ['action' => 'recognize', 'tenant_id' => (string) $tenant->id, 'actor_id' => $actor->id, 'recognition' => $recognition];
+        $results = $this->workers([$base, $base]);
+
+        self::assertTrue($results[0]['ok'], json_encode($results));
+        self::assertTrue($results[1]['ok'], json_encode($results));
+        self::assertSame($results[0]['receivable_id'], $results[1]['receivable_id']);
+        self::assertSame(1, DB::table('receivables')->where('tenant_id', $tenant->id)->where('recognition_operation_id', $recognition['recognition_operation_id'])->count());
+    }
+
     public function test_same_receivable_cancellation_race_has_one_winner_and_one_conflict(): void
     {
         $tenant = Tenant::factory()->create(['status' => Tenant::STATUS_ACTIVE]);
@@ -24,6 +48,7 @@ final class ReceivablesConcurrencyTest extends TestCase
             'name' => 'Concurrency debtor', 'phone' => '056'.random_int(1000000, 9999999), 'created_by' => $actor->id,
         ]);
         $id = app(RecognizeReceivableAction::class)->execute((string) $tenant->id, $actor, [
+            'recognition_operation_id' => (string) Str::ulid(),
             'customer_id' => (string) $customer->id, 'currency' => 'SAR', 'recognized_amount' => '100.00',
             'due_date' => '2026-09-30', 'recognized_at' => '2026-08-26T10:00:00+00:00',
         ]);

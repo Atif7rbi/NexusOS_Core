@@ -44,6 +44,7 @@ final class ReceivablesReadService
     {
         return [
             'id' => $row->id,
+            'recognition_operation_id' => $row->recognition_operation_id,
             'customer_id' => $row->customer_id,
             'contract_id' => $row->contract_id,
             'collection_id' => $row->collection_id,
