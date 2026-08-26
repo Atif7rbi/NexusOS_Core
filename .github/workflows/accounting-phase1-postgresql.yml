@@ -70,6 +70,11 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
+      - name: Diagnose Receivables formatting
+        run: |
+          vendor/bin/pint app/Modules/Receivables/Actions/RecognizeReceivableAction.php
+          git diff -- app/Modules/Receivables/Actions/RecognizeReceivableAction.php
+          git diff --exit-code
       - name: Receivables Foundations focused tests
         run: php artisan test --filter='Receivables'
       - name: Receivable Accounting integration tests
