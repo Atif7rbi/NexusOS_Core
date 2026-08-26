@@ -12,6 +12,7 @@ on:
       - 'feat/accounting-api-v1'
       - 'feat/accounting-reporting-readiness-v1'
       - 'feat/receivables-foundations-v1'
+      - 'feat/receivable-accounting-integration-v1'
 
 jobs:
   postgresql:
