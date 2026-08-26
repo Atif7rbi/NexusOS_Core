@@ -33,6 +33,9 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
         self::assertSame(6, $constraints);
         self::assertSame('NO', DB::selectOne("SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='receivables' AND column_name='recognition_operation_id'")->is_nullable);
         self::assertTrue(DB::table('accounting_source_types')->where(['origin' => 'business', 'key' => 'receivable_recognition'])->exists());
+        $effectiveCollectionIndex = DB::selectOne("SELECT pg_get_indexdef(indexrelid) definition FROM pg_index WHERE indexrelid='public.receivables_one_effective_collection_unique'::regclass");
+        self::assertStringContainsString('collection_id IS NOT NULL', $effectiveCollectionIndex->definition);
+        self::assertStringContainsString("status = 'recognized'", $effectiveCollectionIndex->definition);
     }
 
     public function test_direct_sql_rejects_zero_negative_unsupported_status_and_missing_due_date(): void
@@ -92,8 +95,25 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
             'collection_id' => $collectionId,
         ]));
 
-        $id = $this->insert($tenantId, $actorId, $customerId, overrides: ['collection_id' => $collectionId]);
-        self::assertNull(DB::table('receivables')->where('id', $id)->value('contract_id'));
+        $id = $this->insert($tenantId, $actorId, $customerId, overrides: [
+            'contract_id' => $contractId, 'collection_id' => $collectionId, 'recognized_amount' => '100.00', 'due_date' => '2026-09-01',
+        ]);
+        self::assertSame($contractId, DB::table('receivables')->where('id', $id)->value('contract_id'));
+
+        foreach ([
+            ['recognized_amount' => '99.99'],
+            ['due_date' => '2026-09-02'],
+            ['currency' => 'USD'],
+            ['contract_id' => null],
+        ] as $invalid) {
+            $this->assertRejected(fn () => $this->insert($tenantId, $actorId, $customerId, overrides: [
+                'collection_id' => $collectionId,
+                'contract_id' => $contractId,
+                'recognized_amount' => '100.00',
+                'due_date' => '2026-09-01',
+                ...$invalid,
+            ]));
+        }
     }
 
     public function test_recognized_truth_is_immutable_deletion_is_forbidden_and_cancelled_is_terminal(): void
@@ -189,7 +209,9 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
             'title' => 'Integrity installment',
             'amount' => '100.00',
             'due_date' => '2026-09-01',
-            'status' => 'draft',
+            'status' => 'scheduled',
+            'scheduled_at' => now(),
+            'scheduled_by' => $actorId,
             'created_by' => $actorId,
         ]);
 

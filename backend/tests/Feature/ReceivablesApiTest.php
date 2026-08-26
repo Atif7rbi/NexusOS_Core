@@ -168,7 +168,7 @@ final class ReceivablesApiTest extends ApiTestCase
         $contract = $this->createIntegrityContract($tenantId, (string) $reservation->id, $actor->id);
         $collection = Collection::query()->create([
             'tenant_id' => $tenantId, 'contract_id' => $contract->id, 'sequence' => 1, 'title' => 'Installment',
-            'amount' => '100.00', 'due_date' => '2026-09-30', 'status' => 'draft', 'created_by' => $actor->id,
+            'amount' => '100.00', 'due_date' => '2026-09-30', 'status' => 'scheduled', 'scheduled_at' => now(), 'scheduled_by' => $actor->id, 'created_by' => $actor->id,
         ]);
 
         return [$actor, $tenantId, (string) $customer->id, (string) $contract->id, (string) $collection->id];

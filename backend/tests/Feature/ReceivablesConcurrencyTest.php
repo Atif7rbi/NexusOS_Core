@@ -11,15 +11,19 @@ use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
 use App\Modules\Accounting\DTOs\JournalLineData;
+use App\Modules\Collections\Models\Collection;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\ReceivableAccounting\Services\ReceivableAccountingIntegration;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\CreatesDomainIntegrityFixtures;
 
 final class ReceivablesConcurrencyTest extends TestCase
 {
+    use CreatesDomainIntegrityFixtures;
+
     public function test_same_recognition_operation_race_returns_one_receivable(): void
     {
         $tenant = Tenant::factory()->create(['status' => Tenant::STATUS_ACTIVE]);
@@ -136,6 +140,61 @@ final class ReceivablesConcurrencyTest extends TestCase
         self::assertTrue($results[2]['ok'], 'Cancellation locked the Receivable before transactional actor authorization: '.json_encode($results));
         self::assertSame('recognized', DB::table('receivables')->where('id', $posted['receivable_id'])->value('status'));
         self::assertFalse(DB::table('journal_entries')->where('reverses_journal_entry_id', $posted['journal_entry_id'])->exists());
+    }
+
+    public function test_concurrent_collection_establishment_creates_at_most_one_effective_receivable(): void
+    {
+        [$tenant, $actor, $collection] = $this->scheduledCollectionContext();
+        $base = [
+            'action' => 'establish_collection', 'tenant_id' => (string) $tenant->id, 'actor_id' => $actor->id,
+            'collection_id' => (string) $collection->id, 'recognized_at' => '2026-08-26T10:00:00+00:00',
+        ];
+        $results = $this->workers([
+            $base + ['recognition_operation_id' => (string) Str::ulid()],
+            $base + ['recognition_operation_id' => (string) Str::ulid()],
+        ]);
+
+        self::assertSame(1, count(array_filter($results, static fn (array $result): bool => $result['ok'])), json_encode($results));
+        self::assertSame(1, DB::table('receivables')->where('tenant_id', $tenant->id)->where('collection_id', $collection->id)->where('status', 'recognized')->count());
+    }
+
+    public function test_collection_amendment_and_establishment_have_one_winner_without_deadlock(): void
+    {
+        [$tenant, $actor, $collection] = $this->scheduledCollectionContext();
+        $results = $this->workers([
+            [
+                'action' => 'establish_collection', 'tenant_id' => (string) $tenant->id, 'actor_id' => $actor->id,
+                'collection_id' => (string) $collection->id, 'recognition_operation_id' => (string) Str::ulid(),
+                'recognized_at' => '2026-08-26T10:00:00+00:00',
+            ],
+            [
+                'action' => 'amend_collection', 'tenant_id' => (string) $tenant->id, 'actor_id' => $actor->id,
+                'contract_id' => (string) $collection->contract_id, 'expected_active_collection_ids' => [(string) $collection->id],
+                'cancellation_reason' => 'Concurrent correction',
+                'lines' => [['sequence' => 1, 'title' => 'Replacement', 'amount' => '100.00', 'due_date' => '2026-09-30']],
+            ],
+        ]);
+
+        self::assertSame(1, count(array_filter($results, static fn (array $result): bool => $result['ok'])), json_encode($results));
+    }
+
+    private function scheduledCollectionContext(): array
+    {
+        $tenant = Tenant::factory()->create(['currency' => 'SAR', 'status' => Tenant::STATUS_ACTIVE]);
+        $actor = User::factory()->create(['role' => User::ROLE_ADMINISTRATOR, 'status' => User::STATUS_ACTIVE]);
+        TenantUser::factory()->active()->create(['tenant_id' => $tenant->id, 'user_id' => $actor->id]);
+        $customer = $this->createIntegrityCustomer((string) $tenant->id, $actor->id);
+        $project = $this->createIntegrityProject((string) $tenant->id, $actor->id);
+        $unit = $this->createIntegrityUnit((string) $tenant->id, (string) $project->id, $actor->id, 'sold');
+        $reservation = $this->createIntegrityReservation((string) $tenant->id, (string) $unit->id, (string) $customer->id, $actor->id, 'converted');
+        $contract = $this->createIntegrityContract((string) $tenant->id, (string) $reservation->id, $actor->id, 'active', ['total_amount' => '100.00']);
+        $collection = Collection::query()->create([
+            'tenant_id' => $tenant->id, 'contract_id' => $contract->id, 'sequence' => 1, 'title' => 'Concurrent Collection',
+            'amount' => '100.00', 'due_date' => '2026-09-30', 'status' => 'scheduled', 'scheduled_at' => now(),
+            'scheduled_by' => $actor->id, 'created_by' => $actor->id,
+        ]);
+
+        return [$tenant, $actor, $collection];
     }
 
     private function accountingReady(): array
