@@ -36,7 +36,7 @@ final class CancelContractAction
 
     public function __construct(
         private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
-        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard,
+        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard(),
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
     ) {
     }

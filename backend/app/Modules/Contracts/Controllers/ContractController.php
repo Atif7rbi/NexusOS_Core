@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Contracts\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Contracts\Actions\ActivateContractAction;
 use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
+use App\Modules\Contracts\Actions\ActivateContractAction;
 use App\Modules\Contracts\Actions\CancelContractAction;
 use App\Modules\Contracts\Actions\CompleteContractAction;
 use App\Modules\Contracts\Actions\CreateContractAction;
@@ -55,7 +55,7 @@ final class ContractController extends Controller
             'reservation.customer:id,name,status',
         ])->where('tenant_id', $membership->tenant_id)->latest();
 
-        if (! empty($validated['search'])) {
+        if (!empty($validated['search'])) {
             $search = trim($validated['search']);
             $query->whereHas('reservation', function ($reservation) use ($search): void {
                 $reservation->whereHas('unit', fn ($unit) => $unit->where('unit_number', 'ilike', "%{$search}%"))
@@ -63,7 +63,7 @@ final class ContractController extends Controller
             });
         }
         foreach (['status', 'reservation_id'] as $filter) {
-            if (! empty($validated[$filter])) { $query->where($filter, $validated[$filter]); }
+            if (!empty($validated[$filter])) { $query->where($filter, $validated[$filter]); }
         }
 
         $contracts = $query->paginate((int) ($validated['per_page'] ?? 20));

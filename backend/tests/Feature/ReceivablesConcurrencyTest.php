@@ -17,8 +17,8 @@ use App\Modules\ReceivableAccounting\Services\ReceivableAccountingIntegration;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Tests\TestCase;
 use Tests\Support\CreatesDomainIntegrityFixtures;
+use Tests\TestCase;
 
 final class ReceivablesConcurrencyTest extends TestCase
 {
