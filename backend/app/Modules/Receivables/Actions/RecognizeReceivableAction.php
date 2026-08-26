@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Receivables\Actions;
 
 use App\Models\User;
-use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
+use App\Modules\Receivables\Exceptions\RecognitionOperationConflict;
 use App\Modules\Receivables\Services\ReceivableRecognitionResolver;
 use App\Modules\Receivables\Support\ReceivablesAuthorization;
 use App\Modules\Receivables\Support\ReceivablesTransaction;
@@ -22,23 +22,23 @@ final class RecognizeReceivableAction
     public function execute(string $tenantId, User $actor, array $input): string
     {
         $this->auth->authorize($tenantId, $actor);
-        [$operationId, $facts] = $this->normalize($input);
+        [$operationId, $facts] = $this->canonicalize($input);
 
         try {
             return $this->tx->run(fn (): string => $this->recognizeInTransaction($tenantId, $actor, $operationId, $facts));
-        } catch (ReceivablesConflict $conflict) {
+        } catch (RecognitionOperationConflict) {
             return $this->resolver->resolve($tenantId, $operationId, $facts);
         }
     }
 
     public function executeInTransaction(string $tenantId, User $actor, array $input): string
     {
-        [$operationId, $facts] = $this->normalize($input);
+        [$operationId, $facts] = $this->canonicalize($input);
 
         return $this->recognizeInTransaction($tenantId, $actor, $operationId, $facts);
     }
 
-    private function normalize(array $input): array
+    public function canonicalize(array $input): array
     {
         $amount = RecognizedAmount::of($input['recognized_amount'] ?? '');
         $currency = (string) ($input['currency'] ?? '');

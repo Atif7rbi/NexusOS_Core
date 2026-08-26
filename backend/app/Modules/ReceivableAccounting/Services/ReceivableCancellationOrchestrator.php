@@ -8,19 +8,22 @@ use App\Models\User;
 use App\Modules\Accounting\Actions\ReverseJournalAction;
 use App\Modules\Receivables\Actions\CancelReceivableAction;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
+use App\Modules\Receivables\Support\ReceivablesAuthorization;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
 final class ReceivableCancellationOrchestrator
 {
-    public function __construct(private readonly CancelReceivableAction $cancel, private readonly ReverseJournalAction $reverse) {}
+    public function __construct(private readonly CancelReceivableAction $cancel, private readonly ReverseJournalAction $reverse, private readonly ReceivablesAuthorization $authorization) {}
 
     public function execute(string $tenantId, string $receivableId, User $actor, string $cancelledAt, string $reason, ?string $reversalDate): void
     {
+        $this->authorization->authorize($tenantId, $actor);
         [$at, $reason] = $this->cancel->normalize($cancelledAt, $reason);
         DB::transaction(function () use ($tenantId, $receivableId, $actor, $at, $reason, $reversalDate): void {
             DB::statement("SET LOCAL lock_timeout = '5s'");
             DB::statement("SET LOCAL statement_timeout = '30s'");
+            $this->authorization->authorizeTransactional($tenantId, $actor);
             $receivable = DB::table('receivables')->where('tenant_id', $tenantId)->where('id', $receivableId)->lockForUpdate()->first();
             if ($receivable === null) {
                 throw (new ModelNotFoundException)->setModel('Receivable');

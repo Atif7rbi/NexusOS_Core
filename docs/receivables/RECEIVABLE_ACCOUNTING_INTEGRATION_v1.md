@@ -6,6 +6,8 @@ Status: FROZEN infrastructure contract for Phase 5B. This phase selects no Contr
 
 `recognition_operation_id` is a caller-supplied ULID created outside the retry boundary and unique per Tenant. A caller replay must reuse the same operation ID. Same canonical recognition facts return the same Receivable; different customer, optional typed provenance, currency, exact amount, due date, or normalized recognition timestamp conflict. PostgreSQL uniqueness is the race authority.
 
+Only SQLSTATE `23505` naming `receivables_tenant_recognition_operation_unique` is a recognition replay race. Its outer transaction must finish rollback before canonical resolution begins in a fresh transaction. Lock timeout, exhausted deadlock/serialization retry, and unrelated uniqueness violations preserve their own conflict semantics and are never resolved as recognition replay.
+
 The forward migration maps each pre-Phase-5B Receivable's existing immutable `id` to `recognition_operation_id` as a one-time legacy compatibility identity. New writes have no fallback and require an externally stable operation ULID.
 
 Atomic transaction retry and caller replay after an unknown commit outcome are distinct. Atomicity does not create caller retry identity.
@@ -26,7 +28,7 @@ The integrated path rejects non-SAR before Accounting; Accounting remains an ind
 
 Unknown-commit recovery begins with `(tenant_id, recognition_operation_id)`, then resolves the source-identified Journal and compares canonical Accounting facts. Both absent is retryable; both present and matching is committed. Receivable-only, orphan-Journal, or mismatching facts fail closed. Partial committed state is never repaired asynchronously.
 
-`CancelReceivableAction` remains an Accounting-agnostic internal primitive. The public cancellation controller uses `ReceivableCancellationOrchestrator`: it locks the Receivable, resolves its Accounting source effect, performs exact Accounting reversal when present, then cancels the Receivable in the same outer transaction. Reversal failure rolls back cancellation. No public route invokes the primitive directly.
+`CancelReceivableAction` remains an Accounting-agnostic internal primitive. The public cancellation controller uses `ReceivableCancellationOrchestrator`: it establishes and locks transactional actor authorization first, locks the Receivable second, resolves its Accounting source effect, performs exact Accounting reversal when present, then cancels the Receivable in the same outer transaction. Reversal failure rolls back cancellation. No public route invokes the primitive directly.
 
 ## Deferred business policy
 

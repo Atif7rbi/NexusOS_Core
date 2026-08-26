@@ -7,19 +7,20 @@ namespace App\Modules\ReceivableAccounting\Services;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
 use App\Modules\Accounting\Services\BusinessPostingCanonicalResolver;
 use App\Modules\ReceivableAccounting\Exceptions\ReceivableAccountingIntegrityFault;
+use App\Modules\Receivables\Services\ReceivableRecognitionResolver;
 use Illuminate\Support\Facades\DB;
 
 final class ReceivableAccountingRecoveryResolver
 {
-    public function __construct(private readonly BusinessPostingCanonicalResolver $canonical) {}
+    public function __construct(private readonly BusinessPostingCanonicalResolver $canonical, private readonly ReceivableRecognitionResolver $recognition) {}
 
-    public function resolve(string $tenantId, string $operationId, int $actorId, string $entryDate, string $description, array $orderedLines): array
+    public function resolve(string $tenantId, string $operationId, int $actorId, string $entryDate, string $description, array $orderedLines, ?array $recognitionFacts = null): array
     {
         if (DB::transactionLevel() !== 0) {
             throw new \LogicException('Unknown-commit recovery requires a fresh transaction.');
         }
 
-        return DB::transaction(function () use ($tenantId, $operationId, $actorId, $entryDate, $description, $orderedLines): array {
+        return DB::transaction(function () use ($tenantId, $operationId, $actorId, $entryDate, $description, $orderedLines, $recognitionFacts): array {
             $receivable = DB::table('receivables')->where('tenant_id', $tenantId)->where('recognition_operation_id', $operationId)->first();
             if ($receivable === null) {
                 $orphan = DB::table('journal_entries as journal')
@@ -36,6 +37,9 @@ final class ReceivableAccountingRecoveryResolver
                 }
 
                 return ['status' => 'retryable', 'receivable_id' => null, 'journal_entry_id' => null];
+            }
+            if ($recognitionFacts !== null) {
+                $this->recognition->resolve($tenantId, $operationId, $recognitionFacts);
             }
 
             $journal = DB::table('journal_entries')->where('tenant_id', $tenantId)
