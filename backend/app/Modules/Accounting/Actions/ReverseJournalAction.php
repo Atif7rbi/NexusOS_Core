@@ -19,14 +19,14 @@ final class ReverseJournalAction
 {
     public function __construct(private readonly AccountingTransaction $tx, private readonly AccountingAuthorization $auth, private readonly AccountingAuditWriter $audit, private readonly PostingEngine $posting) {}
 
-    public function execute(string $tenantId, string $targetId, User $actor, string $entryDate, string $reason): PostedJournalResult
+    public function execute(string $tenantId, string $targetId, User $actor, string $entryDate, string $reason, bool $participating = false): PostedJournalResult
     {
         $this->auth->authorize($tenantId, $actor, 'reverse_journal');
         if (trim($reason) === '') {
             throw new AccountingValidationFailed('Reversal reason is required.');
         }
 
-        return $this->tx->run(function () use ($tenantId, $targetId, $actor, $entryDate, $reason): PostedJournalResult {
+        $operation = function () use ($tenantId, $targetId, $actor, $entryDate, $reason): PostedJournalResult {
             $opening = $this->findOpening($tenantId, $targetId);
             $this->auth->authorizeTransactional($tenantId, $actor, 'reverse_journal');
             if ($opening !== null) {
@@ -71,7 +71,9 @@ final class ReverseJournalAction
             }
 
             return $result;
-        });
+        };
+
+        return $participating ? $this->tx->participate($operation) : $this->tx->run($operation);
     }
 
     private function findOpening(string $tenantId, string $journalId): ?object

@@ -32,7 +32,7 @@ final class ReceivableCancellationOrchestrator
                 if ($reversalDate === null) {
                     throw new ReceivablesValidationFailed('reversal_date is required for an accounting-effective Receivable.');
                 }
-                $this->reverse->execute($tenantId, (string) $journal->id, $actor, $reversalDate, $reason);
+                $this->reverse->execute($tenantId, (string) $journal->id, $actor, $reversalDate, $reason, true);
             }
             $this->cancel->cancelInTransaction($tenantId, $receivableId, $actor, $at, $reason);
         });
