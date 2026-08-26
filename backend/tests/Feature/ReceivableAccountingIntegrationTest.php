@@ -178,7 +178,13 @@ final class ReceivableAccountingIntegrationTest extends TestCase
 
     public function test_only_the_recognition_operation_constraint_maps_to_replay_resolution(): void
     {
-        [$tenant, $actor, $customer] = $this->ready();
+        $tenant = Tenant::factory()->create(['currency' => 'SAR', 'status' => Tenant::STATUS_ACTIVE]);
+        $actor = User::factory()->create(['role' => User::ROLE_ADMINISTRATOR, 'status' => User::STATUS_ACTIVE]);
+        TenantUser::factory()->forTenant($tenant)->forUser($actor)->active()->create();
+        $customer = Customer::query()->create([
+            'tenant_id' => $tenant->id, 'type' => 'individual', 'category' => 'buyer', 'status' => 'customer',
+            'name' => 'Constraint debtor', 'phone' => '051'.random_int(1000000, 9999999), 'created_by' => $actor->id,
+        ]);
         $input = $this->recognition((string) $customer->id);
         $id = app(RecognizeReceivableAction::class)->execute((string) $tenant->id, $actor, $input);
         $row = (array) DB::table('receivables')->where('id', $id)->first();
