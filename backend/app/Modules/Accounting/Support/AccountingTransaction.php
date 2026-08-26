@@ -13,6 +13,17 @@ final class AccountingTransaction
 
     public function run(callable $callback): mixed
     {
+        if (DB::transactionLevel() > 0) {
+            try {
+                DB::statement("SET LOCAL lock_timeout = '5s'");
+                DB::statement("SET LOCAL statement_timeout = '30s'");
+
+                return $callback();
+            } catch (QueryException $exception) {
+                throw $this->mapper->map($exception);
+            }
+        }
+
         $attempt = 0;
         beginning:
         try {
