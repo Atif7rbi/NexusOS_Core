@@ -36,7 +36,7 @@ final class EffectiveReceivableGuard
             ->whereIn('collection_id', $collectionIds)
             ->where('status', 'recognized')
             ->exists()) {
-            throw new CollectionHasEffectiveReceivableException;
+            throw new CollectionHasEffectiveReceivableException();
         }
     }
 }
