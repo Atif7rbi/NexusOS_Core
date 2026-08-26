@@ -36,7 +36,8 @@ final class ContractController extends Controller
     public function __construct(
         private readonly ResolveActiveMembership $resolveActiveMembership,
         private readonly ContractAuthorization $authorization,
-    ) {}
+    ) {
+    }
 
     public function index(Request $request): JsonResponse
     {

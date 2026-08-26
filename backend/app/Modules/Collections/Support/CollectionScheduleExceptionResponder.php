@@ -33,7 +33,8 @@ final class CollectionScheduleExceptionResponder
 {
     public function __construct(
         private readonly ApiErrorResponse $errors,
-    ) {}
+    ) {
+    }
 
     public function from(Throwable $exception): ?JsonResponse
     {

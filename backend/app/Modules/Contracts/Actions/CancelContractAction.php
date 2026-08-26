@@ -57,7 +57,7 @@ final class CancelContractAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! in_array($contract->status, [ContractStatus::Draft, ContractStatus::Active], true)) {
+            if (!in_array($contract->status, [ContractStatus::Draft, ContractStatus::Active], true)) {
                 throw new ContractCannotBeCancelledException();
             }
 
