@@ -58,7 +58,7 @@ return new class extends Migration
         DB::statement('CREATE INDEX receivables_tenant_collection_index ON public.receivables(tenant_id,collection_id) WHERE collection_id IS NOT NULL');
 
         DB::unprepared(<<<'SQL'
-            CREATE FUNCTION public.enforce_receivable_history() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.enforce_receivable_history() RETURNS trigger
             LANGUAGE plpgsql
             AS $$
             BEGIN

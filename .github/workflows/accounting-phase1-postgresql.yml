@@ -71,6 +71,12 @@ jobs:
       - run: php artisan migrate:fresh --force
       - name: Receivables Foundations focused tests
         run: php artisan test --filter='Receivables'
+      - name: Collections regressions
+        run: php artisan test --filter='Collection'
+      - name: Contracts regressions
+        run: php artisan test --filter='Contract'
+      - name: Customers regressions
+        run: php artisan test --filter='Customer'
       - name: Accounting Phase 4 reporting reference tests
         run: php artisan test --filter='AccountingReportingQueriesTest'
       - name: Accounting Phase 3 API tests
