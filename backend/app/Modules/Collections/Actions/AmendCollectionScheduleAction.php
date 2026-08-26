@@ -13,6 +13,7 @@ use App\Modules\Collections\Exceptions\InvalidCancellationReasonException;
 use App\Modules\Collections\Models\Collection;
 use App\Modules\Collections\Policies\AmendmentEligibilityPolicy;
 use App\Modules\Collections\Support\DerivedScheduleStateResolver;
+use App\Modules\Collections\Support\EffectiveReceivableGuard;
 use App\Modules\Collections\Support\LogCollectionAuditRecorder;
 use App\Modules\Collections\Validation\CollectionLineValidator;
 use App\Modules\Collections\Validation\CollectionScheduleValidator;
@@ -46,6 +47,7 @@ final class AmendCollectionScheduleAction
         private readonly CollectionLineValidator $lineValidator = new CollectionLineValidator,
         private readonly CollectionScheduleValidator $scheduleValidator = new CollectionScheduleValidator,
         private readonly ExpectedActiveCollectionIdsValidator $expectedIdsValidator = new ExpectedActiveCollectionIdsValidator,
+        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard,
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
     ) {}
 
@@ -107,6 +109,11 @@ final class AmendCollectionScheduleAction
             if ($canonicalExpectedIds !== $canonicalCurrentIds) {
                 throw new CollectionScheduleChangedSinceLoadedException;
             }
+
+            $this->effectiveReceivableGuard->assertNone($tenantId, array_map(
+                static fn (Collection $collection): string => (string) $collection->id,
+                $replacedCollections,
+            ));
 
             $cancelledAt = now();
 

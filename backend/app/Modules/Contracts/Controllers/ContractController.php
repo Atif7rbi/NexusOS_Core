@@ -6,6 +6,7 @@ namespace App\Modules\Contracts\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Contracts\Actions\ActivateContractAction;
+use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
 use App\Modules\Contracts\Actions\CancelContractAction;
 use App\Modules\Contracts\Actions\CompleteContractAction;
 use App\Modules\Contracts\Actions\CreateContractAction;
@@ -198,7 +199,7 @@ final class ContractController extends Controller
         );
         try {
             $record = $action->execute((string) $membership->tenant_id, $contract, $request->user()->id);
-        } catch (ContractCannotBeCancelledException|ContractReservationStateException|ContractUnitStateException $exception) {
+        } catch (ContractCannotBeCancelledException|ContractReservationStateException|ContractUnitStateException|CollectionHasEffectiveReceivableException $exception) {
             $this->throwValidationException('contract', $exception->getMessage());
         }
 

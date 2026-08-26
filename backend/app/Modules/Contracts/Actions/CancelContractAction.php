@@ -8,6 +8,7 @@ use App\Modules\Collections\Contracts\CollectionAuditRecorderInterface;
 use App\Modules\Collections\Enums\CollectionStatus;
 use App\Modules\Collections\Models\Collection;
 use App\Modules\Collections\Support\DerivedScheduleStateResolver;
+use App\Modules\Collections\Support\EffectiveReceivableGuard;
 use App\Modules\Contracts\Enums\ContractStatus;
 use App\Modules\Contracts\Exceptions\ContractCannotBeCancelledException;
 use App\Modules\Contracts\Exceptions\ContractReservationStateException;
@@ -35,6 +36,7 @@ final class CancelContractAction
 
     public function __construct(
         private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
+        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard,
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
     ) {
     }
@@ -132,6 +134,11 @@ final class CancelContractAction
         if ($activeCollections === []) {
             return 0;
         }
+
+        $this->effectiveReceivableGuard->assertNone($tenantId, array_map(
+            static fn (Collection $collection): string => (string) $collection->id,
+            $activeCollections,
+        ));
 
         $cancelledAt = now();
 

@@ -6,6 +6,7 @@ namespace App\Modules\Collections\Support;
 
 use App\Modules\Collections\Exceptions\BlankCollectionTitleException;
 use App\Modules\Collections\Exceptions\CollectionNotFoundException;
+use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
 use App\Modules\Collections\Exceptions\CollectionScheduleChangedSinceLoadedException;
 use App\Modules\Collections\Exceptions\ContractNotEligibleForAmendmentException;
 use App\Modules\Collections\Exceptions\ContractNotEligibleForDraftEditException;
@@ -46,6 +47,7 @@ final class CollectionScheduleExceptionResponder
             $exception instanceof NoActiveScheduleToAmendException => [409, 'no_active_schedule_to_amend'],
             $exception instanceof CollectionScheduleIntegrityViolationException => [409, 'collection_schedule_integrity_violation'],
             $exception instanceof CollectionScheduleChangedSinceLoadedException => [409, 'collection_schedule_changed_since_loaded'],
+            $exception instanceof CollectionHasEffectiveReceivableException => [409, 'collection_has_effective_receivable'],
             $exception instanceof InvalidCollectionSequenceException => [422, 'invalid_collection_sequence'],
             $exception instanceof BlankCollectionTitleException => [422, 'blank_collection_title'],
             $exception instanceof InvalidCollectionAmountException => [422, 'invalid_collection_amount'],

@@ -75,6 +75,21 @@ final class RecognizeReceivableAction
             throw new \LogicException('Receivable recognition requires a caller-owned transaction.');
         }
         $this->auth->authorizeTransactional($tenantId, $actor);
+
+        return $this->recognizeAuthorizedInTransaction($tenantId, $actor, $operationId, $facts);
+    }
+
+    /**
+     * Insert or resolve a Receivable after the owning business operation has
+     * established transactional authorization and acquired its source locks.
+     *
+     * @param  array{customer_id: string, contract_id: ?string, collection_id: ?string, currency: string, recognized_amount: string, due_date: string, recognized_at: CarbonImmutable}  $facts
+     */
+    public function recognizeAuthorizedInTransaction(string $tenantId, User $actor, string $operationId, array $facts): string
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Receivable recognition requires a caller-owned transaction.');
+        }
         if (DB::table('receivables')->where('tenant_id', $tenantId)->where('recognition_operation_id', $operationId)->exists()) {
             return $this->resolver->resolve($tenantId, $operationId, $facts);
         }
