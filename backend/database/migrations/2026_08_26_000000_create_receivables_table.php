@@ -60,7 +60,7 @@ return new class extends Migration
               CONSTRAINT receivables_lifecycle_check CHECK (
                 (status='recognized' AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancellation_reason IS NULL)
                 OR
-                (status='cancelled' AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL AND cancellation_reason IS NOT NULL AND btrim(cancellation_reason)<>'')
+                (status='cancelled' AND cancelled_at IS NOT NULL AND cancelled_at >= recognized_at AND cancelled_by IS NOT NULL AND cancellation_reason IS NOT NULL AND btrim(cancellation_reason)<>'')
               )
             )
             SQL);
@@ -73,10 +73,46 @@ return new class extends Migration
         DB::unprepared(<<<'SQL'
             CREATE OR REPLACE FUNCTION public.enforce_receivable_history() RETURNS trigger
             LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = pg_catalog, public
             AS $$
             BEGIN
               IF TG_OP='DELETE' THEN
                 RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='receivable deletion is forbidden';
+              END IF;
+              IF TG_OP='INSERT' THEN
+                IF NEW.status<>'recognized' THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='receivable must initially be recognized';
+                END IF;
+
+                IF NEW.collection_id IS NOT NULL AND NOT EXISTS (
+                  SELECT 1
+                  FROM public.collections source_collection
+                  JOIN public.contracts source_contract
+                    ON (source_contract.tenant_id,source_contract.id)=(source_collection.tenant_id,source_collection.contract_id)
+                  JOIN public.reservations source_reservation
+                    ON (source_reservation.tenant_id,source_reservation.id)=(source_contract.tenant_id,source_contract.reservation_id)
+                  WHERE (source_collection.tenant_id,source_collection.id)=(NEW.tenant_id,NEW.collection_id)
+                    AND source_reservation.customer_id=NEW.customer_id
+                    AND (NEW.contract_id IS NULL OR NEW.contract_id=source_collection.contract_id)
+                  FOR KEY SHARE OF source_collection,source_contract,source_reservation
+                ) THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='receivable collection provenance is inconsistent';
+                END IF;
+
+                IF NEW.collection_id IS NULL AND NEW.contract_id IS NOT NULL AND NOT EXISTS (
+                  SELECT 1
+                  FROM public.contracts source_contract
+                  JOIN public.reservations source_reservation
+                    ON (source_reservation.tenant_id,source_reservation.id)=(source_contract.tenant_id,source_contract.reservation_id)
+                  WHERE (source_contract.tenant_id,source_contract.id)=(NEW.tenant_id,NEW.contract_id)
+                    AND source_reservation.customer_id=NEW.customer_id
+                  FOR KEY SHARE OF source_contract,source_reservation
+                ) THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='receivable contract provenance is inconsistent';
+                END IF;
+
+                RETURN NEW;
               END IF;
               IF (NEW.id,NEW.tenant_id,NEW.customer_id,NEW.contract_id,NEW.collection_id,NEW.currency,NEW.recognized_amount,NEW.due_date,NEW.recognized_at,NEW.recognized_by,NEW.created_at)
                  IS DISTINCT FROM
@@ -90,7 +126,7 @@ return new class extends Migration
             END;
             $$;
             CREATE TRIGGER receivables_history_guard
-            BEFORE UPDATE OR DELETE ON public.receivables
+            BEFORE INSERT OR UPDATE OR DELETE ON public.receivables
             FOR EACH ROW EXECUTE FUNCTION public.enforce_receivable_history();
             REVOKE EXECUTE ON FUNCTION public.enforce_receivable_history() FROM PUBLIC;
             SQL);

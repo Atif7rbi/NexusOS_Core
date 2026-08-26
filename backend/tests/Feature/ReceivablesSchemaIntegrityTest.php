@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Collections\Models\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,51 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
                 DB::rollBack();
             }
         }
+    }
+
+    public function test_direct_sql_rejects_initial_cancellation_and_cancellation_before_recognition(): void
+    {
+        [$tenantId, $actorId, $customerId] = $this->context();
+
+        $this->assertRejected(fn () => $this->insert($tenantId, $actorId, $customerId, overrides: [
+            'status' => 'cancelled',
+            'cancelled_at' => '2026-08-26T11:00:00+00:00',
+            'cancelled_by' => $actorId,
+            'cancellation_reason' => 'Invalid initial state',
+        ]));
+
+        $id = $this->insert($tenantId, $actorId, $customerId, overrides: [
+            'recognized_at' => '2026-08-26T12:00:00+00:00',
+        ]);
+        $this->assertRejected(fn () => DB::table('receivables')->where('id', $id)->update([
+            'status' => 'cancelled',
+            'cancelled_at' => '2026-08-26T11:59:59+00:00',
+            'cancelled_by' => $actorId,
+            'cancellation_reason' => 'Backdated cancellation',
+            'updated_at' => now(),
+        ]));
+    }
+
+    public function test_direct_sql_enforces_typed_contract_collection_and_customer_provenance(): void
+    {
+        [$tenantId, $actorId, $customerId] = $this->context();
+        $otherCustomer = $this->createIntegrityCustomer($tenantId, $actorId);
+        [$contractId, $collectionId] = $this->sources($tenantId, $actorId, $customerId);
+        [$otherContractId] = $this->sources($tenantId, $actorId, (string) $otherCustomer->id);
+
+        $this->assertRejected(fn () => $this->insert($tenantId, $actorId, (string) $otherCustomer->id, overrides: [
+            'contract_id' => $contractId,
+        ]));
+        $this->assertRejected(fn () => $this->insert($tenantId, $actorId, (string) $otherCustomer->id, overrides: [
+            'collection_id' => $collectionId,
+        ]));
+        $this->assertRejected(fn () => $this->insert($tenantId, $actorId, $customerId, overrides: [
+            'contract_id' => $otherContractId,
+            'collection_id' => $collectionId,
+        ]));
+
+        $id = $this->insert($tenantId, $actorId, $customerId, overrides: ['collection_id' => $collectionId]);
+        self::assertNull(DB::table('receivables')->where('id', $id)->value('contract_id'));
     }
 
     public function test_recognized_truth_is_immutable_deletion_is_forbidden_and_cancelled_is_terminal(): void
@@ -92,11 +138,27 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
         [$tenantId, $actorId, $customerId] = $this->context();
         $role = (string) getenv('ACCOUNTING_RUNTIME_DB_ROLE');
         self::assertFalse((bool) DB::selectOne("SELECT has_function_privilege(?, 'public.enforce_receivable_history()', 'EXECUTE') allowed", [$role])->allowed);
+        $function = DB::selectOne(<<<'SQL'
+            SELECT procedure.prosecdef,
+                   pg_catalog.pg_get_userbyid(procedure.proowner) AS owner,
+                   pg_catalog.array_to_string(procedure.proconfig, ',') AS config
+            FROM pg_catalog.pg_proc procedure
+            WHERE procedure.oid='public.enforce_receivable_history()'::regprocedure
+            SQL);
+        self::assertTrue($function->prosecdef);
+        self::assertNotSame($role, $function->owner);
+        self::assertSame('search_path=pg_catalog, public', $function->config);
 
         DB::statement('SET ROLE "'.$role.'"');
         try {
             $id = $this->insert($tenantId, $actorId, $customerId);
             self::assertSame('recognized', DB::table('receivables')->where('id', $id)->value('status'));
+            $this->assertRejected(fn () => $this->insert($tenantId, $actorId, $customerId, overrides: [
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancelled_by' => $actorId,
+                'cancellation_reason' => 'Runtime invalid initial state',
+            ]));
         } finally {
             DB::statement('RESET ROLE');
         }
@@ -111,15 +173,48 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
         return [$tenantId, $actor->id, (string) $customer->id];
     }
 
-    private function insert(string $tenantId, int $actorId, string $customerId, string $amount = '1.00', string $status = 'recognized', ?string $dueDate = '2026-09-01'): string
+    private function sources(string $tenantId, int $actorId, string $customerId): array
+    {
+        $project = $this->createIntegrityProject($tenantId, $actorId);
+        $unit = $this->createIntegrityUnit($tenantId, (string) $project->id, $actorId, 'reserved');
+        $reservation = $this->createIntegrityReservation($tenantId, (string) $unit->id, $customerId, $actorId);
+        $contract = $this->createIntegrityContract($tenantId, (string) $reservation->id, $actorId);
+        $collection = Collection::query()->create([
+            'tenant_id' => $tenantId,
+            'contract_id' => $contract->id,
+            'sequence' => 1,
+            'title' => 'Integrity installment',
+            'amount' => '100.00',
+            'due_date' => '2026-09-01',
+            'status' => 'draft',
+            'created_by' => $actorId,
+        ]);
+
+        return [(string) $contract->id, (string) $collection->id];
+    }
+
+    private function assertRejected(callable $mutation): void
+    {
+        DB::beginTransaction();
+        try {
+            $mutation();
+            self::fail('Invalid direct-SQL Receivable mutation was accepted.');
+        } catch (QueryException) {
+            self::assertTrue(true);
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    private function insert(string $tenantId, int $actorId, string $customerId, string $amount = '1.00', string $status = 'recognized', ?string $dueDate = '2026-09-01', array $overrides = []): string
     {
         $id = (string) Str::ulid();
-        DB::table('receivables')->insert([
+        DB::table('receivables')->insert(array_merge([
             'id' => $id, 'tenant_id' => $tenantId, 'customer_id' => $customerId,
             'currency' => 'SAR', 'recognized_amount' => $amount, 'due_date' => $dueDate,
             'status' => $status, 'recognized_at' => now(), 'recognized_by' => $actorId,
             'created_at' => now(), 'updated_at' => now(),
-        ]);
+        ], $overrides));
 
         return $id;
     }

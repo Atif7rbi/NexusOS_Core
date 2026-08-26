@@ -23,7 +23,9 @@ Receivables owns obligation truth only. Phase 5A does not create an Accounting J
 
 The only persisted states are `recognized` and `cancelled`. Recognition creates the final immutable obligation directly in `recognized`. Cancellation is the sole transition and requires timestamp, same-tenant actor, and non-blank reason. Cancellation is terminal. Correction is cancel plus an independently recognized replacement; v1 has no replacement or reversal self-FKs.
 
-PostgreSQL enforces positive money, the closed status vocabulary, lifecycle-field consistency, composite tenant FKs, immutable recognized truth, terminal cancellation, and no deletion.
+PostgreSQL enforces positive money, the closed status vocabulary, lifecycle-field consistency, composite tenant FKs, immutable recognized truth, terminal cancellation, and no deletion. Every insert must start in `recognized`, and `cancelled_at` cannot precede `recognized_at`.
+
+Typed provenance is checked against the locked Collection/Contract/Reservation chain. A supplied Contract or Collection must resolve to the Receivable customer, and supplied Collection and Contract references must agree. A Collection reference does not make `contract_id` mandatory on the Receivable.
 
 ## Settlement, invoices, and sources
 
