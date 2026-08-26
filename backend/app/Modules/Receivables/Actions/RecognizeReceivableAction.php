@@ -52,7 +52,7 @@ final class RecognizeReceivableAction
         if ($customerId === '') {
             throw new ReceivablesValidationFailed('customer_id is required.');
         }
-        if (! Str::isUlid($operationId)) {
+        if (!Str::isUlid($operationId)) {
             throw new ReceivablesValidationFailed('recognition_operation_id must be a caller-supplied ULID.');
         }
 
