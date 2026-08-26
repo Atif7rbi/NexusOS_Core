@@ -42,7 +42,7 @@ final class RecognizeReceivableAction
     {
         $amount = RecognizedAmount::of($input['recognized_amount'] ?? '');
         $currency = (string) ($input['currency'] ?? '');
-        if (!in_array($currency, ['SAR', 'USD'], true)) {
+        if (! in_array($currency, ['SAR', 'USD'], true)) {
             throw new ReceivablesValidationFailed('currency must be SAR or USD.');
         }
         $dueDate = $this->date((string) ($input['due_date'] ?? ''));
@@ -52,7 +52,7 @@ final class RecognizeReceivableAction
         if ($customerId === '') {
             throw new ReceivablesValidationFailed('customer_id is required.');
         }
-        if (!Str::isUlid($operationId)) {
+        if (! Str::isUlid($operationId)) {
             throw new ReceivablesValidationFailed('recognition_operation_id must be a caller-supplied ULID.');
         }
 
