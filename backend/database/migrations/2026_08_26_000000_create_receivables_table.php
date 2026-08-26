@@ -12,6 +12,9 @@ return new class extends Migration
         if (DB::getDriverName() !== 'pgsql') {
             throw new RuntimeException('Receivables Foundations requires PostgreSQL.');
         }
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
 
         DB::unprepared(<<<'SQL'
             DO $$
@@ -97,6 +100,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
+
         DB::statement('DROP TRIGGER IF EXISTS receivables_history_guard ON public.receivables');
         DB::statement('DROP FUNCTION IF EXISTS public.enforce_receivable_history()');
         DB::statement('DROP TABLE IF EXISTS public.receivables');
@@ -126,5 +133,18 @@ return new class extends Migration
         DB::unprepared("REVOKE ALL ON TABLE public.receivables FROM {$identifier}");
         DB::unprepared("GRANT SELECT,INSERT,UPDATE ON TABLE public.receivables TO {$identifier}");
         DB::unprepared("REVOKE EXECUTE ON FUNCTION public.enforce_receivable_history() FROM {$identifier}");
+    }
+
+    private function skipIsolatedTestSchema(): bool
+    {
+        $schema = DB::selectOne('SELECT current_schema() AS name')->name;
+        if ($schema === 'public') {
+            return false;
+        }
+        if (app()->environment('testing')) {
+            return true;
+        }
+
+        throw new RuntimeException('Receivables Foundations requires the public PostgreSQL schema.');
     }
 };
