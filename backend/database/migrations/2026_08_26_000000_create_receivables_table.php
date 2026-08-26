@@ -13,8 +13,18 @@ return new class extends Migration
             throw new RuntimeException('Receivables Foundations requires PostgreSQL.');
         }
 
-        DB::statement('ALTER TABLE public.customers ADD CONSTRAINT customers_tenant_id_id_unique UNIQUE (tenant_id,id)');
-        DB::statement('ALTER TABLE public.collections ADD CONSTRAINT collections_tenant_id_id_unique UNIQUE (tenant_id,id)');
+        DB::unprepared(<<<'SQL'
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname='customers_tenant_id_id_unique' AND conrelid='public.customers'::regclass) THEN
+                ALTER TABLE public.customers ADD CONSTRAINT customers_tenant_id_id_unique UNIQUE (tenant_id,id);
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname='collections_tenant_id_id_unique' AND conrelid='public.collections'::regclass) THEN
+                ALTER TABLE public.collections ADD CONSTRAINT collections_tenant_id_id_unique UNIQUE (tenant_id,id);
+              END IF;
+            END
+            $$;
+            SQL);
 
         DB::statement(<<<'SQL'
             CREATE TABLE public.receivables (
