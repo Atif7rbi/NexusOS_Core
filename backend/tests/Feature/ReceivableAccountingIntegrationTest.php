@@ -18,13 +18,18 @@ use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\ReceivableAccounting\Exceptions\ReceivableAccountingIntegrityFault;
 use App\Modules\ReceivableAccounting\Services\ReceivableAccountingIntegration;
+use App\Modules\ReceivableAccounting\Services\ReceivableAccountingRaceResolver;
 use App\Modules\ReceivableAccounting\Services\ReceivableAccountingRecoveryResolver;
 use App\Modules\ReceivableAccounting\Services\ReceivableCancellationOrchestrator;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
+use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
+use App\Modules\Receivables\Exceptions\RecognitionOperationConflict;
+use App\Modules\Receivables\Support\ReceivablesDatabaseExceptionMapper;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Database\QueryException;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -169,6 +174,39 @@ final class ReceivableAccountingIntegrationTest extends TestCase
         $controller = (string) file_get_contents(app_path('Modules/Receivables/Controllers/ReceivablesController.php'));
         self::assertStringContainsString('ReceivableCancellationOrchestrator', $controller);
         self::assertStringNotContainsString('CancelReceivableAction', $controller);
+    }
+
+    public function test_only_the_recognition_operation_constraint_maps_to_replay_resolution(): void
+    {
+        [$tenant, $actor, $customer] = $this->ready();
+        $input = $this->recognition((string) $customer->id);
+        $id = app(RecognizeReceivableAction::class)->execute((string) $tenant->id, $actor, $input);
+        $row = (array) DB::table('receivables')->where('id', $id)->first();
+        $mapper = app(ReceivablesDatabaseExceptionMapper::class);
+
+        try {
+            DB::table('receivables')->insert(array_merge($row, ['id' => (string) Str::ulid()]));
+            self::fail('Recognition operation uniqueness collision was accepted.');
+        } catch (QueryException $exception) {
+            self::assertInstanceOf(RecognitionOperationConflict::class, $mapper->map($exception));
+        }
+
+        try {
+            DB::table('receivables')->insert(array_merge($row, ['recognition_operation_id' => (string) Str::ulid()]));
+            self::fail('Unrelated Receivable uniqueness collision was accepted.');
+        } catch (QueryException $exception) {
+            $mapped = $mapper->map($exception);
+            self::assertInstanceOf(ReceivablesConflict::class, $mapped);
+            self::assertNotInstanceOf(RecognitionOperationConflict::class, $mapped);
+            try {
+                app(ReceivableAccountingRaceResolver::class)->resolveAfterRollback(
+                    $exception, (string) $tenant->id, $input, $actor->id, '2026-09-01', 'Unrelated uniqueness', [],
+                );
+                self::fail('An unrelated uniqueness violation was resolved as recognition replay.');
+            } catch (QueryException $unresolved) {
+                self::assertSame($exception, $unresolved);
+            }
+        }
     }
 
     private function ready(): array
