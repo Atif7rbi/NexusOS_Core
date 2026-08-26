@@ -63,7 +63,9 @@ final class ContractController extends Controller
             });
         }
         foreach (['status', 'reservation_id'] as $filter) {
-            if (!empty($validated[$filter])) { $query->where($filter, $validated[$filter]); }
+            if (!empty($validated[$filter])) {
+                $query->where($filter, $validated[$filter]);
+            }
         }
 
         $contracts = $query->paginate((int) ($validated['per_page'] ?? 20));

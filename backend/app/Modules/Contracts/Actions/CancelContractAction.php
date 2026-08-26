@@ -35,7 +35,7 @@ final class CancelContractAction
     private const SYSTEM_CANCELLATION_REASON = 'إلغاء تلقائي بسبب إلغاء العقد.';
 
     public function __construct(
-        private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
+        private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver(),
         private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard(),
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
     ) {
