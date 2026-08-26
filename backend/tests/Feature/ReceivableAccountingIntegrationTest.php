@@ -213,6 +213,8 @@ final class ReceivableAccountingIntegrationTest extends TestCase
                 self::assertSame($exception, $unresolved);
             }
         }
+
+        Artisan::call('migrate:fresh', ['--force' => true]);
     }
 
     private function ready(): array
