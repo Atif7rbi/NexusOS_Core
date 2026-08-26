@@ -6,7 +6,7 @@ namespace App\Modules\Receivables\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Modules\Receivables\Actions\CancelReceivableAction;
+use App\Modules\ReceivableAccounting\Services\ReceivableCancellationOrchestrator;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
 use App\Modules\Receivables\Requests\CancelReceivableRequest;
 use App\Modules\Receivables\Requests\IndexReceivablesRequest;
@@ -43,10 +43,10 @@ final class ReceivablesController extends Controller
         return response()->json(['data' => ['receivable' => $reads->find($tenantId, $receivable)]]);
     }
 
-    public function cancel(CancelReceivableRequest $request, string $receivable, CancelReceivableAction $action, ReceivablesReadService $reads): JsonResponse
+    public function cancel(CancelReceivableRequest $request, string $receivable, ReceivableCancellationOrchestrator $action, ReceivablesReadService $reads): JsonResponse
     {
         [$tenantId, $actor] = $this->context($request);
-        $action->execute($tenantId, $receivable, $actor, $request->validated('cancelled_at'), $request->validated('cancellation_reason'));
+        $action->execute($tenantId, $receivable, $actor, $request->validated('cancelled_at'), $request->validated('cancellation_reason'), $request->validated('reversal_date'));
 
         return response()->json(['data' => ['receivable' => $reads->find($tenantId, $receivable)]]);
     }

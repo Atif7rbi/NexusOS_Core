@@ -50,7 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (AccountingException $exception, Request $request) {
-            if (! $request->is('api/accounting*')) {
+            if (! $request->is('api/accounting*') && ! $request->is('api/receivables*')) {
                 return null;
             }
 

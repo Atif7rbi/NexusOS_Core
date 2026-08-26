@@ -31,6 +31,8 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
             'receivables_recognized_actor_foreign', 'receivables_cancelled_actor_foreign', 'receivables_lifecycle_check',
         ])->count();
         self::assertSame(6, $constraints);
+        self::assertSame('NO', DB::selectOne("SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='receivables' AND column_name='recognition_operation_id'")->is_nullable);
+        self::assertTrue(DB::table('accounting_source_types')->where(['origin' => 'business', 'key' => 'receivable_recognition'])->exists());
     }
 
     public function test_direct_sql_rejects_zero_negative_unsupported_status_and_missing_due_date(): void
@@ -101,6 +103,7 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
 
         foreach ([
             fn () => DB::table('receivables')->where('id', $id)->update(['recognized_amount' => '2.00']),
+            fn () => DB::table('receivables')->where('id', $id)->update(['recognition_operation_id' => (string) Str::ulid()]),
             fn () => DB::table('receivables')->where('id', $id)->delete(),
         ] as $mutation) {
             DB::beginTransaction();
@@ -211,6 +214,7 @@ final class ReceivablesSchemaIntegrityTest extends TestCase
         $id = (string) Str::ulid();
         DB::table('receivables')->insert(array_merge([
             'id' => $id, 'tenant_id' => $tenantId, 'customer_id' => $customerId,
+            'recognition_operation_id' => (string) Str::ulid(),
             'currency' => 'SAR', 'recognized_amount' => $amount, 'due_date' => $dueDate,
             'status' => $status, 'recognized_at' => now(), 'recognized_by' => $actorId,
             'created_at' => now(), 'updated_at' => now(),

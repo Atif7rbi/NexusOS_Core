@@ -12,6 +12,7 @@ final class RecognizeReceivableRequest extends ReceivablesRequest
     public function rules(): array
     {
         return [
+            'recognition_operation_id' => ['required', 'ulid'],
             'customer_id' => ['required', 'ulid'],
             'contract_id' => ['sometimes', 'nullable', 'ulid'],
             'collection_id' => ['sometimes', 'nullable', 'ulid'],

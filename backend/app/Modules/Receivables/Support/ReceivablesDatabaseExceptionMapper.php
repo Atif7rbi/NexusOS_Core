@@ -7,10 +7,13 @@ namespace App\Modules\Receivables\Support;
 use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use App\Modules\Receivables\Exceptions\ReceivablesException;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
+use App\Modules\Receivables\Exceptions\RecognitionOperationConflict;
 use Illuminate\Database\QueryException;
 
 final class ReceivablesDatabaseExceptionMapper
 {
+    public function __construct(private readonly RecognitionOperationViolation $recognitionOperation) {}
+
     public function map(QueryException $exception): ReceivablesException
     {
         $state = (string) ($exception->errorInfo[0] ?? '');
@@ -18,6 +21,10 @@ final class ReceivablesDatabaseExceptionMapper
             return new ReceivablesConflict('Receivables is busy. Retry the operation.', previous: $exception);
         }
         if ($state === '23505') {
+            if ($this->recognitionOperation->matches($exception)) {
+                return new RecognitionOperationConflict('Receivable recognition operation already exists.', previous: $exception);
+            }
+
             return new ReceivablesConflict('Receivables uniqueness conflict.', previous: $exception);
         }
         if (in_array($state, ['23503', '23514', '55000'], true)) {

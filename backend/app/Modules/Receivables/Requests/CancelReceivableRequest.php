@@ -11,6 +11,8 @@ final class CancelReceivableRequest extends ReceivablesRequest
         return [
             'cancelled_at' => ['required', 'date_format:'.DATE_RFC3339],
             'cancellation_reason' => ['required', 'string', 'max:500', 'regex:/\S/u'],
+            'reversal_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'reversal_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
         ];
     }
 }
