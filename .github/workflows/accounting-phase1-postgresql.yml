@@ -10,6 +10,7 @@ on:
       - 'feat/accounting-foundations-ddl-v1'
       - 'feat/accounting-application-core-v1'
       - 'feat/accounting-api-v1'
+      - 'feat/accounting-reporting-readiness-v1'
 
 jobs:
   postgresql:
@@ -67,6 +68,8 @@ jobs:
           SELECT current_database();
           SQL
       - run: php artisan migrate:fresh --force
+      - name: Accounting Phase 4 reporting reference tests
+        run: php artisan test --filter='AccountingReportingQueriesTest'
       - name: Accounting Phase 3 API tests
         run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
@@ -99,4 +102,4 @@ jobs:
           END $$;
           SQL
       - name: Backend formatting
-        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Support/accounting_application_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Support/accounting_application_worker.php
