@@ -8,6 +8,7 @@ use App\Modules\Collections\Contracts\CollectionAuditRecorderInterface;
 use App\Modules\Collections\Enums\CollectionStatus;
 use App\Modules\Collections\Models\Collection;
 use App\Modules\Collections\Support\DerivedScheduleStateResolver;
+use App\Modules\Collections\Support\EffectiveReceivableGuard;
 use App\Modules\Contracts\Enums\ContractStatus;
 use App\Modules\Contracts\Exceptions\ContractCannotBeCancelledException;
 use App\Modules\Contracts\Exceptions\ContractReservationStateException;
@@ -35,9 +36,9 @@ final class CancelContractAction
 
     public function __construct(
         private readonly DerivedScheduleStateResolver $stateResolver = new DerivedScheduleStateResolver,
+        private readonly EffectiveReceivableGuard $effectiveReceivableGuard = new EffectiveReceivableGuard,
         private readonly ?CollectionAuditRecorderInterface $auditRecorder = null,
-    ) {
-    }
+    ) {}
 
     public function execute(
         string $tenantId,
@@ -56,7 +57,7 @@ final class CancelContractAction
                 ->firstOrFail();
 
             if (! in_array($contract->status, [ContractStatus::Draft, ContractStatus::Active], true)) {
-                throw new ContractCannotBeCancelledException();
+                throw new ContractCannotBeCancelledException;
             }
 
             if ($contract->status === ContractStatus::Active) {
@@ -67,7 +68,7 @@ final class CancelContractAction
                     ->firstOrFail();
 
                 if ($reservation->status !== ReservationStatus::Converted) {
-                    throw new ContractReservationStateException();
+                    throw new ContractReservationStateException;
                 }
 
                 $unit = Unit::query()
@@ -77,7 +78,7 @@ final class CancelContractAction
                     ->firstOrFail();
 
                 if ($unit->status !== UnitStatus::Sold) {
-                    throw new ContractUnitStateException();
+                    throw new ContractUnitStateException;
                 }
 
                 $unit->update([
@@ -132,6 +133,14 @@ final class CancelContractAction
         if ($activeCollections === []) {
             return 0;
         }
+
+        $this->effectiveReceivableGuard->assertNone(
+            $tenantId,
+            array_map(
+                static fn (Collection $collection): string => (string) $collection->id,
+                $activeCollections,
+            ),
+        );
 
         $cancelledAt = now();
 

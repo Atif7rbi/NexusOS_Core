@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Contracts\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
 use App\Modules\Contracts\Actions\ActivateContractAction;
 use App\Modules\Contracts\Actions\CancelContractAction;
 use App\Modules\Contracts\Actions\CompleteContractAction;
@@ -62,7 +63,9 @@ final class ContractController extends Controller
             });
         }
         foreach (['status', 'reservation_id'] as $filter) {
-            if (! empty($validated[$filter])) { $query->where($filter, $validated[$filter]); }
+            if (! empty($validated[$filter])) {
+                $query->where($filter, $validated[$filter]);
+            }
         }
 
         $contracts = $query->paginate((int) ($validated['per_page'] ?? 20));
@@ -198,7 +201,7 @@ final class ContractController extends Controller
         );
         try {
             $record = $action->execute((string) $membership->tenant_id, $contract, $request->user()->id);
-        } catch (ContractCannotBeCancelledException|ContractReservationStateException|ContractUnitStateException $exception) {
+        } catch (ContractCannotBeCancelledException|ContractReservationStateException|ContractUnitStateException|CollectionHasEffectiveReceivableException $exception) {
             $this->throwValidationException('contract', $exception->getMessage());
         }
 

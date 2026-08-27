@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 use App\Models\User;
 use App\Modules\Accounting\DTOs\JournalLineData;
+use App\Modules\Collections\Actions\AmendCollectionScheduleAction;
+use App\Modules\Collections\DTOs\CollectionLineData;
 use App\Modules\ReceivableAccounting\Services\ReceivableAccountingIntegration;
 use App\Modules\ReceivableAccounting\Services\ReceivableAccountingRaceResolver;
 use App\Modules\ReceivableAccounting\Services\ReceivableCancellationOrchestrator;
 use App\Modules\Receivables\Actions\CancelReceivableAction;
+use App\Modules\Receivables\Actions\EstablishCollectionReceivable;
 use App\Modules\Receivables\Actions\RecognizeReceivableAction;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +57,28 @@ try {
         return;
     }
     $actor = User::query()->findOrFail($payload['actor_id']);
+    if (($payload['action'] ?? null) === 'establish_collection') {
+        $id = app(EstablishCollectionReceivable::class)->execute(
+            $payload['tenant_id'], $actor, $payload['collection_id'], $payload['recognition_operation_id'], $payload['recognized_at'],
+        );
+        echo json_encode(['ok' => true, 'receivable_id' => $id], JSON_THROW_ON_ERROR);
+
+        return;
+    }
+    if (($payload['action'] ?? null) === 'amend_collection') {
+        $lines = array_map(
+            static fn (array $line): CollectionLineData => new CollectionLineData(
+                null, $line['sequence'], $line['title'], $line['amount'], CarbonImmutable::parse($line['due_date']), null,
+            ),
+            $payload['lines'],
+        );
+        (new AmendCollectionScheduleAction)->execute(
+            $payload['tenant_id'], $payload['contract_id'], $actor->id, $payload['expected_active_collection_ids'], $lines, $payload['cancellation_reason'],
+        );
+        echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
+        return;
+    }
     if (($payload['action'] ?? null) === 'integrated_recognize') {
         $lines = array_map(
             fn (array $line): JournalLineData => new JournalLineData($line['account_id'], $line['debit'], $line['credit'], $line['memo'] ?? null),
