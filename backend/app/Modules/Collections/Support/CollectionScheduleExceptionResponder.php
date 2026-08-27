@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Collections\Support;
 
 use App\Modules\Collections\Exceptions\BlankCollectionTitleException;
-use App\Modules\Collections\Exceptions\CollectionNotFoundException;
 use App\Modules\Collections\Exceptions\CollectionHasEffectiveReceivableException;
+use App\Modules\Collections\Exceptions\CollectionNotFoundException;
 use App\Modules\Collections\Exceptions\CollectionScheduleChangedSinceLoadedException;
 use App\Modules\Collections\Exceptions\ContractNotEligibleForAmendmentException;
 use App\Modules\Collections\Exceptions\ContractNotEligibleForDraftEditException;
@@ -24,8 +24,8 @@ use App\Modules\Collections\Exceptions\ScheduleTotalMismatchException;
 use App\Modules\Collections\Http\Exceptions\CollectionScheduleIntegrityViolationException;
 use App\Modules\Collections\Http\Exceptions\RoleNotAuthorizedException;
 use App\Modules\Shared\Support\ApiErrorResponse;
-use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 

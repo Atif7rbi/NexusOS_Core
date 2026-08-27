@@ -134,10 +134,13 @@ final class CancelContractAction
             return 0;
         }
 
-        $this->effectiveReceivableGuard->assertNone($tenantId, array_map(
-            static fn (Collection $collection): string => (string) $collection->id,
-            $activeCollections,
-        ));
+        $this->effectiveReceivableGuard->assertNone(
+            $tenantId,
+            array_map(
+                static fn (Collection $collection): string => (string) $collection->id,
+                $activeCollections,
+            ),
+        );
 
         $cancelledAt = now();
 
