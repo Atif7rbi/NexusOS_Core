@@ -57,7 +57,7 @@ final class CancelContractAction
                 ->firstOrFail();
 
             if (! in_array($contract->status, [ContractStatus::Draft, ContractStatus::Active], true)) {
-                throw new ContractCannotBeCancelledException();
+                throw new ContractCannotBeCancelledException;
             }
 
             if ($contract->status === ContractStatus::Active) {
@@ -68,7 +68,7 @@ final class CancelContractAction
                     ->firstOrFail();
 
                 if ($reservation->status !== ReservationStatus::Converted) {
-                    throw new ContractReservationStateException();
+                    throw new ContractReservationStateException;
                 }
 
                 $unit = Unit::query()
@@ -78,7 +78,7 @@ final class CancelContractAction
                     ->firstOrFail();
 
                 if ($unit->status !== UnitStatus::Sold) {
-                    throw new ContractUnitStateException();
+                    throw new ContractUnitStateException;
                 }
 
                 $unit->update([
