@@ -9,6 +9,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
+
         if (DB::getDriverName() !== 'pgsql') {
             throw new RuntimeException('Payments and Payment Allocations require PostgreSQL.');
         }
@@ -142,6 +146,10 @@ return new class extends Migration
     }
     public function down(): void
     {
+        if ($this->skipIsolatedTestSchema()) {
+            return;
+        }
+
         DB::unprepared('DROP TABLE IF EXISTS public.payment_allocation_audits; DROP TABLE IF EXISTS public.payment_allocations; DROP TABLE IF EXISTS public.payments; DROP FUNCTION IF EXISTS public.enforce_payment_allocation_history(); DROP FUNCTION IF EXISTS public.enforce_payment_history();');
     }
 
@@ -169,5 +177,18 @@ return new class extends Migration
         DB::unprepared("GRANT SELECT, INSERT ON TABLE public.payment_allocation_audits TO {$identifier}");
         DB::unprepared("REVOKE EXECUTE ON FUNCTION public.enforce_payment_history() FROM {$identifier}");
         DB::unprepared("REVOKE EXECUTE ON FUNCTION public.enforce_payment_allocation_history() FROM {$identifier}");
+    }
+
+    private function skipIsolatedTestSchema(): bool
+    {
+        $schema = DB::selectOne('SELECT current_schema() AS name')->name;
+        if ($schema === 'public') {
+            return false;
+        }
+        if (app()->environment('testing')) {
+            return true;
+        }
+
+        throw new RuntimeException('Payments and Allocations requires the public PostgreSQL schema.');
     }
 };
