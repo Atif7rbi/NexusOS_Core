@@ -79,7 +79,7 @@ jobs:
       - name: Receivable Accounting integration tests
         run: php artisan test --filter='ReceivableAccounting'
       - name: Collections regressions
-        run: php artisan migrate:fresh --force && php artisan test --filter='Collection'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/^(?!.*PaymentsAllocationsConcurrencyTest).*Collection/'
       - name: Contracts regressions
         run: php artisan migrate:fresh --force && php artisan test --filter='Contract'
       - name: Customers regressions

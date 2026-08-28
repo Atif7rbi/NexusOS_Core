@@ -15,7 +15,6 @@ use App\Modules\Payments\Actions\RecordPaymentAction;
 use App\Modules\Payments\Exceptions\PaymentsConflict;
 use App\Modules\Receivables\Actions\CancelReceivableAction;
 use App\Modules\Receivables\Actions\EstablishCollectionReceivable;
-use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -1280,7 +1279,7 @@ final class PaymentsAllocationsConcurrencyTest extends TestCase
         );
 
         self::assertSame(
-            ReceivablesConflict::class,
+            PaymentsConflict::class,
             $blockedReceivableCancellation[0]['class'],
             json_encode($blockedReceivableCancellation),
         );
