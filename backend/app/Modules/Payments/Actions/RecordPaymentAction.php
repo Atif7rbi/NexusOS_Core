@@ -49,11 +49,11 @@ final class RecordPaymentAction
     {
         $amount = (string) PaymentAmount::of($input['amount'] ?? '');
         $operation = (string) ($input['payment_operation_id'] ?? '');
-        if (!Str::isUlid($operation)) {
+        if (! Str::isUlid($operation)) {
             throw new PaymentsValidationFailed('payment_operation_id must be a caller-supplied ULID.');
         }
         $currency = (string) ($input['currency'] ?? '');
-        if (!in_array($currency, ['SAR', 'USD'], true)) {
+        if (! in_array($currency, ['SAR', 'USD'], true)) {
             throw new PaymentsValidationFailed('currency must be SAR or USD.');
         }
         $receivedOn = (string) ($input['received_on'] ?? '');

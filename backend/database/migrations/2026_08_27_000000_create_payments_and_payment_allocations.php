@@ -161,7 +161,7 @@ return new class extends Migration
         }
 
         $runtimeRole = getenv('ACCOUNTING_RUNTIME_DB_ROLE');
-        if (!is_string($runtimeRole) || !preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $runtimeRole)) {
+        if (! is_string($runtimeRole) || ! preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $runtimeRole)) {
             throw new RuntimeException('ACCOUNTING_RUNTIME_DB_ROLE must name the pre-provisioned runtime PostgreSQL role.');
         }
         $role = DB::selectOne('SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname=?', [$runtimeRole]);
