@@ -92,7 +92,7 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<'SQL'
-            CREATE FUNCTION public.enforce_payment_history() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.enforce_payment_history() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
               IF TG_OP='DELETE' THEN RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='payment deletion is forbidden'; END IF;
@@ -112,7 +112,7 @@ return new class extends Migration
               RETURN NEW;
             END; $$;
             CREATE TRIGGER payments_history_guard BEFORE INSERT OR UPDATE OR DELETE ON public.payments FOR EACH ROW EXECUTE FUNCTION public.enforce_payment_history();
-            CREATE FUNCTION public.enforce_payment_allocation_history() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.enforce_payment_allocation_history() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             DECLARE payment_row public.payments%ROWTYPE; receivable_row public.receivables%ROWTYPE; payment_used numeric(19,2); receivable_used numeric(19,2);
             BEGIN
