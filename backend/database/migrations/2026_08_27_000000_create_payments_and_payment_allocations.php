@@ -78,7 +78,7 @@ return new class extends Migration
               id char(26) PRIMARY KEY,
               tenant_id char(26) NOT NULL,
               event varchar(64) NOT NULL,
-              subject_type varchar(16) NOT NULL,
+              subject_type varchar(32) NOT NULL,
               subject_id char(26) NOT NULL,
               actor_id bigint NOT NULL,
               context jsonb NOT NULL,
