@@ -14,6 +14,7 @@ on:
       - 'feat/receivables-foundations-v1'
       - 'feat/receivable-accounting-integration-v1'
       - 'feat/collection-backed-receivable-v1'
+      - 'feat/payments-allocations-v1'
 
 jobs:
   postgresql:
@@ -73,6 +74,8 @@ jobs:
       - run: php artisan migrate:fresh --force
       - name: Receivables Foundations focused tests
         run: php artisan test --filter='Receivables|CollectionBackedReceivable'
+      - name: Payments and Allocations focused tests
+        run: php artisan test --filter='PaymentsAllocations'
       - name: Receivable Accounting integration tests
         run: php artisan test --filter='ReceivableAccounting'
       - name: Collections regressions
@@ -97,7 +100,7 @@ jobs:
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
-          php artisan migrate:rollback --step=9 --force
+          php artisan migrate:rollback --step=10 --force
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
@@ -111,7 +114,12 @@ jobs:
                OR to_regclass('public.journal_lines') IS NOT NULL
                OR to_regclass('public.opening_balance_operations') IS NOT NULL
                OR to_regclass('public.accounting_audits') IS NOT NULL
+               OR to_regclass('public.payments') IS NOT NULL
+               OR to_regclass('public.payment_allocations') IS NOT NULL
+               OR to_regclass('public.payment_allocation_audits') IS NOT NULL
                OR to_regprocedure('public.validate_opening_balance_operation(character,character)') IS NOT NULL
+               OR to_regprocedure('public.enforce_payment_history()') IS NOT NULL
+               OR to_regprocedure('public.enforce_payment_allocation_history()') IS NOT NULL
             THEN
               RAISE EXCEPTION 'Receivables and Accounting migration stack was not fully rolled back';
             END IF;
@@ -120,4 +128,4 @@ jobs:
       - name: Backend formatting
         env:
           COLUMNS: 300
-        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/Receivables app/Modules/ReceivableAccounting app/Modules/Collections/Actions/AmendCollectionScheduleAction.php app/Modules/Collections/Exceptions/CollectionHasEffectiveReceivableException.php app/Modules/Collections/Support/CollectionScheduleExceptionResponder.php app/Modules/Collections/Support/EffectiveReceivableGuard.php app/Modules/Contracts/Actions/CancelContractAction.php app/Modules/Contracts/Controllers/ContractController.php database/migrations/2026_08_26_000000_create_receivables_table.php database/migrations/2026_08_26_010000_add_receivable_accounting_integration.php database/migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingPeriodsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/CollectionBackedReceivableTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Feature/ReceivableAccountingIntegrationTest.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/Payments app/Modules/Receivables app/Modules/ReceivableAccounting app/Modules/Collections/Actions/AmendCollectionScheduleAction.php app/Modules/Collections/Exceptions/CollectionHasEffectiveReceivableException.php app/Modules/Collections/Support/CollectionScheduleExceptionResponder.php app/Modules/Collections/Support/EffectiveReceivableGuard.php app/Modules/Contracts/Actions/CancelContractAction.php app/Modules/Contracts/Controllers/ContractController.php database/migrations/2026_08_26_000000_create_receivables_table.php database/migrations/2026_08_26_010000_add_receivable_accounting_integration.php database/migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php database/migrations/2026_08_27_000000_create_payments_and_payment_allocations.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/CollectionBackedReceivableTest.php tests/Feature/PaymentsAllocationsTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Feature/ReceivableAccountingIntegrationTest.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php
