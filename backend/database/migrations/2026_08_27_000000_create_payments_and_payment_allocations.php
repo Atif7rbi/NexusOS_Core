@@ -138,8 +138,32 @@ return new class extends Migration
               RETURN NEW;
             END; $$;
             CREATE TRIGGER payment_allocations_history_guard BEFORE INSERT OR UPDATE OR DELETE ON public.payment_allocations FOR EACH ROW EXECUTE FUNCTION public.enforce_payment_allocation_history();
+
+            CREATE OR REPLACE FUNCTION public.enforce_receivable_payment_allocation_guard() RETURNS trigger
+            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+            BEGIN
+              IF OLD.status='recognized'
+                 AND NEW.status='cancelled'
+                 AND EXISTS (
+                   SELECT 1
+                   FROM public.payment_allocations
+                   WHERE tenant_id=OLD.tenant_id
+                     AND receivable_id=OLD.id
+                     AND status='effective'
+                 )
+              THEN
+                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='receivable with effective allocations cannot be cancelled';
+              END IF;
+              RETURN NEW;
+            END; $$;
+
+            CREATE TRIGGER receivables_payment_allocation_guard
+            BEFORE UPDATE ON public.receivables
+            FOR EACH ROW EXECUTE FUNCTION public.enforce_receivable_payment_allocation_guard();
+
             REVOKE EXECUTE ON FUNCTION public.enforce_payment_history() FROM PUBLIC;
             REVOKE EXECUTE ON FUNCTION public.enforce_payment_allocation_history() FROM PUBLIC;
+            REVOKE EXECUTE ON FUNCTION public.enforce_receivable_payment_allocation_guard() FROM PUBLIC;
             SQL);
 
         $this->grantRuntimePrivileges();
@@ -151,7 +175,7 @@ return new class extends Migration
             return;
         }
 
-        DB::unprepared('DROP TABLE IF EXISTS public.payment_allocation_audits; DROP TABLE IF EXISTS public.payment_allocations; DROP TABLE IF EXISTS public.payments; DROP FUNCTION IF EXISTS public.enforce_payment_allocation_history(); DROP FUNCTION IF EXISTS public.enforce_payment_history();');
+        DB::unprepared('DROP TRIGGER IF EXISTS receivables_payment_allocation_guard ON public.receivables; DROP FUNCTION IF EXISTS public.enforce_receivable_payment_allocation_guard(); DROP TABLE IF EXISTS public.payment_allocation_audits; DROP TABLE IF EXISTS public.payment_allocations; DROP TABLE IF EXISTS public.payments; DROP FUNCTION IF EXISTS public.enforce_payment_allocation_history(); DROP FUNCTION IF EXISTS public.enforce_payment_history();');
     }
 
     private function grantRuntimePrivileges(): void
@@ -178,6 +202,7 @@ return new class extends Migration
         DB::unprepared("GRANT SELECT, INSERT ON TABLE public.payment_allocation_audits TO {$identifier}");
         DB::unprepared("REVOKE EXECUTE ON FUNCTION public.enforce_payment_history() FROM {$identifier}");
         DB::unprepared("REVOKE EXECUTE ON FUNCTION public.enforce_payment_allocation_history() FROM {$identifier}");
+        DB::unprepared("REVOKE EXECUTE ON FUNCTION public.enforce_receivable_payment_allocation_guard() FROM {$identifier}");
     }
 
     private function skipIsolatedTestSchema(): bool

@@ -264,8 +264,13 @@ try {
                 'hold_allocation' => ['payment_allocations', 'id', $payload['allocation_id']],
             };
 
-            DB::table($table)
-                ->where('tenant_id', $payload['tenant_id'])
+            $query = DB::table($table);
+
+            if ($action !== 'hold_tenant') {
+                $query->where('tenant_id', $payload['tenant_id']);
+            }
+
+            $query
                 ->where($idColumn, $id)
                 ->lockForUpdate()
                 ->firstOrFail();

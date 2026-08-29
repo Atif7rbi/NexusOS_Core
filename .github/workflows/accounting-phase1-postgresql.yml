@@ -122,6 +122,7 @@ jobs:
                OR to_regprocedure('public.validate_opening_balance_operation(character,character)') IS NOT NULL
                OR to_regprocedure('public.enforce_payment_history()') IS NOT NULL
                OR to_regprocedure('public.enforce_payment_allocation_history()') IS NOT NULL
+               OR to_regprocedure('public.enforce_receivable_payment_allocation_guard()') IS NOT NULL
             THEN
               RAISE EXCEPTION 'Receivables and Accounting migration stack was not fully rolled back';
             END IF;
