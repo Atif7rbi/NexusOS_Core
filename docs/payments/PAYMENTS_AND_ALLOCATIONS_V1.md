@@ -10,4 +10,6 @@ The only authoritative allocation order is actor/authorization, Payment lock, Re
 
 Cancelling a Payment or Receivable first locks that parent, then performs a plain MVCC effective-allocation read. That read deliberately has no `FOR UPDATE` or `FOR SHARE`: the already-held parent lock is the concurrency barrier. An effective Allocation must be explicitly cancelled before either parent can be cancelled.
 
+Payment and PaymentAllocation cancellation are terminal transitions with deterministic retry semantics. If the target is already cancelled and the canonical `cancellation_reason` matches the requested reason, the call is a successful replay: no row is rewritten and no duplicate audit event is emitted. Replaying an already-cancelled target with a different reason conflicts. Actor identity remains authorization and audit evidence from the original successful transition; it is not rewritten by a replay.
+
 No paid, outstanding, balance, accounting status, journal, payment allocation accounting, invoice, FX, or revenue policy is persisted by this phase. Reporting derives totals from effective Allocation rows. The credit-side accounting policy remains deferred.

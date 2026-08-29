@@ -36,6 +36,13 @@ final class CancelPaymentAction
             if ($payment === null) {
                 throw (new ModelNotFoundException)->setModel('Payment');
             }
+            if ($payment->status === 'cancelled') {
+                if ((string) $payment->cancellation_reason !== $reason) {
+                    throw new PaymentsConflict('Payment cancellation was replayed with different facts.');
+                }
+
+                return;
+            }
             if ($payment->status !== 'received') {
                 throw new PaymentsConflict('Only a received Payment can be cancelled.');
             }

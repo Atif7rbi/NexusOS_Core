@@ -57,6 +57,233 @@ final class PaymentsAllocationsTest extends TestCase
         self::assertSame('cancelled', DB::table('payments')->where('id', $paymentId)->value('status'));
     }
 
+    public function test_payment_cancellation_replay_is_idempotent_for_same_reason_and_conflicts_for_different_reason(): void
+    {
+        [$tenantId, $actor, $customerId] = $this->context();
+
+        $paymentId = app(RecordPaymentAction::class)->execute(
+            $tenantId,
+            $actor,
+            [
+                'payment_operation_id' => (string) Str::ulid(),
+                'customer_id' => $customerId,
+                'amount' => '25.00',
+                'currency' => 'SAR',
+                'received_on' => now()->toDateString(),
+            ],
+        );
+
+        $action = app(CancelPaymentAction::class);
+
+        $action->execute(
+            $tenantId,
+            $paymentId,
+            $actor,
+            'Duplicate receipt correction',
+        );
+
+        $first = DB::table('payments')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $paymentId)
+            ->firstOrFail();
+
+        self::assertSame('cancelled', $first->status);
+        self::assertSame(
+            'Duplicate receipt correction',
+            $first->cancellation_reason,
+        );
+
+        $auditCountAfterFirstCancellation = DB::table(
+            'payment_allocation_audits',
+        )
+            ->where('tenant_id', $tenantId)
+            ->where('event', 'payment.cancelled')
+            ->where('subject_type', 'payment')
+            ->where('subject_id', $paymentId)
+            ->count();
+
+        self::assertSame(1, $auditCountAfterFirstCancellation);
+
+        $action->execute(
+            $tenantId,
+            $paymentId,
+            $actor,
+            'Duplicate receipt correction',
+        );
+
+        $replayed = DB::table('payments')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $paymentId)
+            ->firstOrFail();
+
+        self::assertSame($first->cancelled_at, $replayed->cancelled_at);
+        self::assertSame($first->cancelled_by, $replayed->cancelled_by);
+        self::assertSame(
+            'Duplicate receipt correction',
+            $replayed->cancellation_reason,
+        );
+
+        self::assertSame(
+            1,
+            DB::table('payment_allocation_audits')
+                ->where('tenant_id', $tenantId)
+                ->where('event', 'payment.cancelled')
+                ->where('subject_type', 'payment')
+                ->where('subject_id', $paymentId)
+                ->count(),
+        );
+
+        try {
+            $action->execute(
+                $tenantId,
+                $paymentId,
+                $actor,
+                'Different cancellation fact',
+            );
+
+            self::fail(
+                'Payment cancellation replay accepted different facts.',
+            );
+        } catch (PaymentsConflict $exception) {
+            self::assertSame(
+                'Payment cancellation was replayed with different facts.',
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertSame(
+            1,
+            DB::table('payment_allocation_audits')
+                ->where('tenant_id', $tenantId)
+                ->where('event', 'payment.cancelled')
+                ->where('subject_type', 'payment')
+                ->where('subject_id', $paymentId)
+                ->count(),
+        );
+    }
+
+    public function test_allocation_cancellation_replay_is_idempotent_for_same_reason_and_conflicts_for_different_reason(): void
+    {
+        [$tenantId, $actor, $customerId] = $this->context();
+
+        $receivableId = $this->recognizedReceivable(
+            $tenantId,
+            $actor->id,
+            $customerId,
+            '25.00',
+        );
+
+        $paymentId = app(RecordPaymentAction::class)->execute(
+            $tenantId,
+            $actor,
+            [
+                'payment_operation_id' => (string) Str::ulid(),
+                'customer_id' => $customerId,
+                'amount' => '25.00',
+                'currency' => 'SAR',
+                'received_on' => now()->toDateString(),
+            ],
+        );
+
+        $allocationId = app(AllocatePaymentAction::class)->execute(
+            $tenantId,
+            $actor,
+            [
+                'payment_id' => $paymentId,
+                'receivable_id' => $receivableId,
+                'allocation_operation_id' => (string) Str::ulid(),
+                'amount' => '25.00',
+            ],
+        );
+
+        $action = app(CancelPaymentAllocationAction::class);
+
+        $action->execute(
+            $tenantId,
+            $allocationId,
+            $actor,
+            'Allocation correction',
+        );
+
+        $first = DB::table('payment_allocations')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $allocationId)
+            ->firstOrFail();
+
+        self::assertSame('cancelled', $first->status);
+        self::assertSame(
+            'Allocation correction',
+            $first->cancellation_reason,
+        );
+
+        self::assertSame(
+            1,
+            DB::table('payment_allocation_audits')
+                ->where('tenant_id', $tenantId)
+                ->where('event', 'payment_allocation.cancelled')
+                ->where('subject_type', 'payment_allocation')
+                ->where('subject_id', $allocationId)
+                ->count(),
+        );
+
+        $action->execute(
+            $tenantId,
+            $allocationId,
+            $actor,
+            'Allocation correction',
+        );
+
+        $replayed = DB::table('payment_allocations')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $allocationId)
+            ->firstOrFail();
+
+        self::assertSame($first->cancelled_at, $replayed->cancelled_at);
+        self::assertSame($first->cancelled_by, $replayed->cancelled_by);
+        self::assertSame(
+            'Allocation correction',
+            $replayed->cancellation_reason,
+        );
+
+        self::assertSame(
+            1,
+            DB::table('payment_allocation_audits')
+                ->where('tenant_id', $tenantId)
+                ->where('event', 'payment_allocation.cancelled')
+                ->where('subject_type', 'payment_allocation')
+                ->where('subject_id', $allocationId)
+                ->count(),
+        );
+
+        try {
+            $action->execute(
+                $tenantId,
+                $allocationId,
+                $actor,
+                'Different cancellation fact',
+            );
+
+            self::fail(
+                'Payment Allocation cancellation replay accepted different facts.',
+            );
+        } catch (PaymentsConflict $exception) {
+            self::assertSame(
+                'Payment Allocation cancellation was replayed with different facts.',
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertSame(
+            1,
+            DB::table('payment_allocation_audits')
+                ->where('tenant_id', $tenantId)
+                ->where('event', 'payment_allocation.cancelled')
+                ->where('subject_type', 'payment_allocation')
+                ->where('subject_id', $allocationId)
+                ->count(),
+        );
+    }
+
     public function test_database_trigger_rejects_direct_sql_over_allocation(): void
     {
         [$tenantId, $actor, $customerId] = $this->context();

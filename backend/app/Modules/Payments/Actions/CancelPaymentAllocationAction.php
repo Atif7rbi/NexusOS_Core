@@ -30,6 +30,13 @@ final class CancelPaymentAllocationAction
             if ($allocation === null) {
                 throw (new ModelNotFoundException)->setModel('PaymentAllocation');
             }
+            if ($allocation->status === 'cancelled') {
+                if ((string) $allocation->cancellation_reason !== $reason) {
+                    throw new PaymentsConflict('Payment Allocation cancellation was replayed with different facts.');
+                }
+
+                return;
+            }
             if ($allocation->status !== 'effective') {
                 throw new PaymentsConflict('Only an effective Payment Allocation can be cancelled.');
             }
