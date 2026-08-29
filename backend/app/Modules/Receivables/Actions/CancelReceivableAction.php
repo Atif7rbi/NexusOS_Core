@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Receivables\Actions;
 
 use App\Models\User;
+use App\Modules\Payments\Support\EffectivePaymentAllocationGuard;
 use App\Modules\Receivables\Exceptions\ReceivablesConflict;
 use App\Modules\Receivables\Exceptions\ReceivablesValidationFailed;
 use App\Modules\Receivables\Support\ReceivablesAuthorization;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 final class CancelReceivableAction
 {
-    public function __construct(private readonly ReceivablesTransaction $tx, private readonly ReceivablesAuthorization $auth) {}
+    public function __construct(private readonly ReceivablesTransaction $tx, private readonly ReceivablesAuthorization $auth, private readonly ?EffectivePaymentAllocationGuard $allocationGuard = null) {}
 
     public function execute(string $tenantId, string $receivableId, User $actor, string $cancelledAt, string $reason): void
     {
@@ -38,6 +39,7 @@ final class CancelReceivableAction
         if ($receivable->status !== 'recognized') {
             throw new ReceivablesConflict('Only a recognized Receivable can be cancelled.');
         }
+        $this->allocationGuard()->assertNoneForReceivable($tenantId, $receivableId);
         DB::table('receivables')->where('tenant_id', $tenantId)->where('id', $receivableId)->update([
             'status' => 'cancelled',
             'cancelled_at' => $at,
@@ -45,6 +47,11 @@ final class CancelReceivableAction
             'cancellation_reason' => $reason,
             'updated_at' => now(),
         ]);
+    }
+
+    private function allocationGuard(): EffectivePaymentAllocationGuard
+    {
+        return $this->allocationGuard ?? app(EffectivePaymentAllocationGuard::class);
     }
 
     public function normalize(string $cancelledAt, string $reason): array

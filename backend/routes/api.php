@@ -14,6 +14,7 @@ use App\Modules\Customers\Controllers\CustomerController;
 use App\Modules\Leads\Controllers\LeadActivityController;
 use App\Modules\Leads\Controllers\LeadController;
 use App\Modules\Leads\Controllers\LeadFollowUpController;
+use App\Modules\Payments\Controllers\PaymentsController;
 use App\Modules\Projects\Controllers\ProjectController;
 use App\Modules\Reservations\Controllers\ReservationController;
 use App\Modules\Receivables\Controllers\ReceivablesController;
@@ -68,6 +69,13 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
         Route::post('/', [ReceivablesController::class, 'store'])->name('store');
         Route::get('/{receivable}', [ReceivablesController::class, 'show'])->name('show');
         Route::post('/{receivable}/cancel', [ReceivablesController::class, 'cancel'])->name('cancel');
+    });
+
+    Route::prefix('payments')->name('payments.')->group(function (): void {
+        Route::post('/', [PaymentsController::class, 'store'])->name('store');
+        Route::post('/allocations', [PaymentsController::class, 'allocate'])->name('allocations.store');
+        Route::post('/{payment}/cancel', [PaymentsController::class, 'cancel'])->name('cancel');
+        Route::post('/allocations/{allocation}/cancel', [PaymentsController::class, 'cancelAllocation'])->name('allocations.cancel');
     });
 
     Route::middleware('module.entitled:projects')->group(function (): void {

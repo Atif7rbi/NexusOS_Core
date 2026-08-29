@@ -9,6 +9,8 @@ use App\Modules\Accounting\Exceptions\AccountingException;
 use App\Modules\Accounting\Http\AccountingExceptionResponder;
 use App\Modules\Leads\Exceptions\UserHasOpenAssignedLeadsException;
 use App\Modules\Leads\Support\LeadExceptionResponder;
+use App\Modules\Payments\Exceptions\PaymentsException;
+use App\Modules\Payments\Http\PaymentsExceptionResponder;
 use App\Modules\Receivables\Exceptions\ReceivablesException;
 use App\Modules\Receivables\Http\ReceivablesExceptionResponder;
 use App\Modules\Shared\Support\ApiErrorResponse;
@@ -41,6 +43,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (PaymentsException $exception, Request $request) {
+            if (! $request->is('api/payments*')) {
+                return null;
+            }
+
+            return app(PaymentsExceptionResponder::class)->respond($exception);
+        });
+
         $exceptions->render(function (ReceivablesException $exception, Request $request) {
             if (! $request->is('api/receivables*')) {
                 return null;
