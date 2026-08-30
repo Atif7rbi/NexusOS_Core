@@ -12,7 +12,6 @@ use App\Modules\Payments\Exceptions\PaymentsConflict;
 use App\Modules\ReceiptEvidence\Actions\ApproveReceivingAccount;
 use App\Modules\ReceiptEvidence\Actions\AssociateReceiptWithPayment;
 use App\Modules\ReceiptEvidence\Actions\CancelReceiptPaymentAssociation;
-use App\Modules\ReceiptEvidence\Actions\InvalidateBankReceipt;
 use App\Modules\ReceiptEvidence\Actions\RetireReceivingAccount;
 use App\Modules\ReceiptEvidence\Actions\VerifyBankReceipt;
 use App\Modules\ReceiptEvidence\Exceptions\ReceiptEvidenceConflict;

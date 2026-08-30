@@ -27,11 +27,15 @@ if (isset($payload['pid_file']) && is_string($payload['pid_file']) && $payload['
 
 function receiptBarrier(?string $path, int $timeoutMs = 15000): void
 {
-    if ($path === null || $path === '') return;
+    if ($path === null || $path === '') {
+        return;
+    }
     $started = hrtime(true);
     while (! is_file($path)) {
         usleep(10_000);
-        if ((hrtime(true) - $started) / 1_000_000 > $timeoutMs) throw new RuntimeException("Timed out waiting for barrier: {$path}");
+        if ((hrtime(true) - $started) / 1_000_000 > $timeoutMs) {
+            throw new RuntimeException("Timed out waiting for barrier: {$path}");
+        }
     }
 }
 

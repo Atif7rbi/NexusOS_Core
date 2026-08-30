@@ -24,13 +24,19 @@ final class InvalidateBankReceipt
         $this->tx->run(function () use ($tenantId, $receiptId, $actor, $facts): void {
             $this->auth->authorizeTransactional($tenantId, $actor);
             $receipt = DB::table('bank_receipt_evidence')->where('tenant_id', $tenantId)->where('id', $receiptId)->lockForUpdate()->first();
-            if ($receipt === null) throw (new ModelNotFoundException)->setModel('BankReceiptEvidence');
+            if ($receipt === null) {
+                throw (new ModelNotFoundException)->setModel('BankReceiptEvidence');
+            }
             if ($receipt->status === 'invalidated') {
-                if ($receipt->invalidation_operation_id === $facts['invalidation_operation_id'] && $receipt->invalidation_reason === $facts['invalidation_reason']) return;
+                if ($receipt->invalidation_operation_id === $facts['invalidation_operation_id'] && $receipt->invalidation_reason === $facts['invalidation_reason']) {
+                    return;
+                }
                 throw new ReceiptEvidenceConflict('Receipt is already invalidated by a different terminal operation.');
             }
             $operation = DB::table('bank_receipt_evidence')->where('tenant_id', $tenantId)->where('invalidation_operation_id', $facts['invalidation_operation_id'])->lockForUpdate()->first();
-            if ($operation !== null) throw new ReceiptEvidenceConflict('Invalidation operation identity was reused with different facts.');
+            if ($operation !== null) {
+                throw new ReceiptEvidenceConflict('Invalidation operation identity was reused with different facts.');
+            }
             $this->guard->assertNoneForReceipt($tenantId, $receiptId);
             $now = now();
             DB::table('bank_receipt_evidence')->where('tenant_id', $tenantId)->where('id', $receiptId)->update([...$facts, 'status' => 'invalidated', 'invalidated_by' => $actor->id, 'invalidated_at' => $now, 'updated_at' => $now]);

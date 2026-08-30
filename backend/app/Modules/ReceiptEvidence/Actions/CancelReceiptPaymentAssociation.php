@@ -23,13 +23,19 @@ final class CancelReceiptPaymentAssociation
         $this->tx->run(function () use ($tenantId, $associationId, $actor, $facts): void {
             $this->auth->authorizeTransactional($tenantId, $actor);
             $association = DB::table('receipt_payment_associations')->where('tenant_id', $tenantId)->where('id', $associationId)->lockForUpdate()->first();
-            if ($association === null) throw (new ModelNotFoundException)->setModel('ReceiptPaymentAssociation');
+            if ($association === null) {
+                throw (new ModelNotFoundException)->setModel('ReceiptPaymentAssociation');
+            }
             if ($association->status === 'cancelled') {
-                if ($association->cancellation_operation_id === $facts['cancellation_operation_id'] && $association->cancellation_reason === $facts['cancellation_reason']) return;
+                if ($association->cancellation_operation_id === $facts['cancellation_operation_id'] && $association->cancellation_reason === $facts['cancellation_reason']) {
+                    return;
+                }
                 throw new ReceiptEvidenceConflict('Receipt Payment association is already cancelled by a different terminal operation.');
             }
             $operation = DB::table('receipt_payment_associations')->where('tenant_id', $tenantId)->where('cancellation_operation_id', $facts['cancellation_operation_id'])->lockForUpdate()->first();
-            if ($operation !== null) throw new ReceiptEvidenceConflict('Association cancellation operation identity was reused with different facts.');
+            if ($operation !== null) {
+                throw new ReceiptEvidenceConflict('Association cancellation operation identity was reused with different facts.');
+            }
             $now = now();
             DB::table('receipt_payment_associations')->where('tenant_id', $tenantId)->where('id', $associationId)->update([...$facts, 'status' => 'cancelled', 'cancelled_by' => $actor->id, 'cancelled_at' => $now, 'updated_at' => $now]);
         });
