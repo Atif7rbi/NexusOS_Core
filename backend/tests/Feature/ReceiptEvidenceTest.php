@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\TenantUser;
+use App\Models\User;
 use App\Modules\Payments\Actions\CancelPaymentAction;
 use App\Modules\Payments\Actions\RecordPaymentAction;
 use App\Modules\Payments\Exceptions\PaymentsConflict;
@@ -19,11 +21,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
+use Tests\Support\CreatesDomainIntegrityFixtures;
 use Tests\TestCase;
 
 final class ReceiptEvidenceTest extends TestCase
 {
     use CreatesActiveMembership;
+    use CreatesDomainIntegrityFixtures;
     use RefreshDatabase;
 
     public function test_receipt_is_independent_from_payment_and_exact_association_blocks_payment_cancellation(): void
@@ -107,5 +111,14 @@ final class ReceiptEvidenceTest extends TestCase
     private function payment(string $tenantId, object $actor, string $customerId, string $amount): string
     {
         return app(RecordPaymentAction::class)->execute($tenantId, $actor, ['payment_operation_id' => (string) Str::ulid(), 'customer_id' => $customerId, 'amount' => $amount, 'currency' => 'SAR', 'received_on' => now()->toDateString()]);
+    }
+
+    private function context(): array
+    {
+        $actor = $this->createActiveUser(['role' => User::ROLE_ADMINISTRATOR]);
+        $tenantId = (string) TenantUser::query()->where('user_id', $actor->id)->value('tenant_id');
+        $customer = $this->createIntegrityCustomer($tenantId, $actor->id);
+
+        return [$tenantId, $actor, (string) $customer->id];
     }
 }
