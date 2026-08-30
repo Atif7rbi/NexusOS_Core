@@ -79,6 +79,8 @@ jobs:
         run: php artisan test --filter='PaymentsAllocationsTest'
       - name: Receipt Evidence focused tests
         run: php artisan test --filter='ReceiptEvidenceTest'
+      - name: Receipt Evidence schema integrity tests
+        run: php artisan test --filter='ReceiptEvidenceSchemaIntegrityTest'
       - name: Receivable Accounting integration tests
         run: php artisan test --filter='ReceivableAccounting'
       - name: Collections regressions
@@ -96,12 +98,14 @@ jobs:
       - run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
       - name: Payments and Allocations concurrency tests
         run: php artisan migrate:fresh --force && php artisan test --filter='PaymentsAllocationsConcurrencyTest'
+      - name: Receipt Evidence concurrency tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='ReceiptEvidenceConcurrencyTest'
       - name: Core feature regressions
-        # Accounting, Receivables, and Payments concurrency tests are executed
+        # Accounting, Receivables, Payments, and Receipt Evidence concurrency tests are executed
         # in dedicated PostgreSQL steps. Their committed multi-process fixtures
         # intentionally cannot participate in Laravel's per-test transaction
         # rollback.
-        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:Accounting(?:Schema|Application)|Receivables|PaymentsAllocations)ConcurrencyTest)/'
+        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:Accounting(?:Schema|Application)|Receivables|PaymentsAllocations|ReceiptEvidence)ConcurrencyTest)/'
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
@@ -141,4 +145,4 @@ jobs:
       - name: Backend formatting
         env:
           COLUMNS: 300
-        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/Payments app/Modules/ReceiptEvidence app/Modules/Receivables app/Modules/ReceivableAccounting app/Modules/Collections/Actions/AmendCollectionScheduleAction.php app/Modules/Collections/Exceptions/CollectionHasEffectiveReceivableException.php app/Modules/Collections/Support/CollectionScheduleExceptionResponder.php app/Modules/Collections/Support/EffectiveReceivableGuard.php app/Modules/Contracts/Actions/CancelContractAction.php app/Modules/Contracts/Controllers/ContractController.php database/migrations/2026_08_26_000000_create_receivables_table.php database/migrations/2026_08_26_010000_add_receivable_accounting_integration.php database/migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php database/migrations/2026_08_27_000000_create_payments_and_payment_allocations.php database/migrations/2026_08_28_000000_create_receipt_evidence.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/CollectionBackedReceivableTest.php tests/Feature/PaymentsAllocationsTest.php tests/Feature/PaymentsAllocationsConcurrencyTest.php tests/Feature/ReceiptEvidenceTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Feature/ReceivableAccountingIntegrationTest.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php tests/Support/payments_allocations_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/Payments app/Modules/ReceiptEvidence app/Modules/Receivables app/Modules/ReceivableAccounting app/Modules/Collections/Actions/AmendCollectionScheduleAction.php app/Modules/Collections/Exceptions/CollectionHasEffectiveReceivableException.php app/Modules/Collections/Support/CollectionScheduleExceptionResponder.php app/Modules/Collections/Support/EffectiveReceivableGuard.php app/Modules/Contracts/Actions/CancelContractAction.php app/Modules/Contracts/Controllers/ContractController.php database/migrations/2026_08_26_000000_create_receivables_table.php database/migrations/2026_08_26_010000_add_receivable_accounting_integration.php database/migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php database/migrations/2026_08_27_000000_create_payments_and_payment_allocations.php database/migrations/2026_08_28_000000_create_receipt_evidence.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/CollectionBackedReceivableTest.php tests/Feature/PaymentsAllocationsTest.php tests/Feature/PaymentsAllocationsConcurrencyTest.php tests/Feature/ReceiptEvidenceTest.php tests/Feature/ReceiptEvidenceSchemaIntegrityTest.php tests/Feature/ReceiptEvidenceConcurrencyTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Feature/ReceivableAccountingIntegrationTest.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php tests/Support/payments_allocations_worker.php tests/Support/receipt_evidence_worker.php

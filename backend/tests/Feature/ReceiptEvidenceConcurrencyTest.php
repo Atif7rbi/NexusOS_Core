@@ -10,6 +10,7 @@ use App\Modules\Payments\Actions\RecordPaymentAction;
 use App\Modules\ReceiptEvidence\Actions\ApproveReceivingAccount;
 use App\Modules\ReceiptEvidence\Actions\AssociateReceiptWithPayment;
 use App\Modules\ReceiptEvidence\Actions\VerifyBankReceipt;
+use App\Modules\ReceiptEvidence\Exceptions\ReceiptEvidenceConflict;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -41,14 +42,14 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
         self::assertSame(1, DB::table('bank_receipt_evidence')->where('tenant_id', $t)->where('receipt_operation_id', $f['receipt_operation_id'])->count());
     }
 
-    public function test_c2_same_receipt_operation_different_facts_conflicts(): void
+    public function test_c2_unseen_receipt_operation_across_different_accounts_returns_domain_conflict(): void
     {
         [$t,$a] = $this->context();
-        $f = $this->receiptFacts($this->account($t, $a), 'c2');
-        $g = $f;
-        $g['amount'] = '11.00';
+        $operation = (string) Str::ulid();
+        $f = $this->receiptFacts($this->account($t, $a), 'c2a', ['receipt_operation_id' => $operation]);
+        $g = $this->receiptFacts($this->account($t, $a), 'c2b', ['receipt_operation_id' => $operation]);
         $r = $this->race($t, [$this->verify($t, $a, $f), $this->verify($t, $a, $g)]);
-        self::assertSame(1, $this->successes($r), json_encode($r));
+        $this->assertOneDomainConflict($r);
     }
 
     public function test_c3_same_source_different_operations_has_one_effective_receipt(): void
@@ -81,16 +82,16 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
         self::assertSame(1, DB::table('receipt_payment_associations')->where('tenant_id', $t)->where('association_operation_id', $f['association_operation_id'])->count());
     }
 
-    public function test_c6_same_association_operation_different_payment_conflicts(): void
+    public function test_c6_unseen_association_operation_across_different_pairs_returns_domain_conflict(): void
     {
         [$t,$a,$c] = $this->context();
-        [$receipt,$payment] = $this->pair($t, $a, $c, 'c6');
-        $other = $this->payment($t, $a, $c, '10.00');
-        $f = $this->associationFacts($receipt, $payment);
-        $g = $f;
-        $g['payment_id'] = $other;
+        [$receipt,$payment] = $this->pair($t, $a, $c, 'c6a');
+        [$otherReceipt,$otherPayment] = $this->pair($t, $a, $c, 'c6b');
+        $operation = (string) Str::ulid();
+        $f = $this->associationFacts($receipt, $payment, ['association_operation_id' => $operation]);
+        $g = $this->associationFacts($otherReceipt, $otherPayment, ['association_operation_id' => $operation]);
         $r = $this->race($t, [$this->associate($t, $a, $f), $this->associate($t, $a, $g)]);
-        self::assertSame(1, $this->successes($r), json_encode($r));
+        $this->assertOneDomainConflict($r);
     }
 
     public function test_c7_same_receipt_two_payments_has_one_effective_association(): void
@@ -167,31 +168,33 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
         self::assertSame(1, DB::table('bank_receipt_evidence')->where('source_identity', 'fingerprint-c19')->where('status', 'effective')->count(), json_encode($r));
     }
 
-    public function test_c21_retirement_same_operation_replays_and_different_target_conflicts_concurrently(): void
+    public function test_c21_retirement_operation_replays_and_unseen_cross_account_race_returns_domain_conflict(): void
     {
         [$t,$a] = $this->context();
         $account = $this->account($t, $a);
         $f = ['retirement_operation_id' => (string) Str::ulid(), 'retired_from' => now()->addDay()->toDateString(), 'retirement_reason' => 'C21'];
         $r = $this->race($t, [$this->retire($t, $a, $account, $f['retired_from'], $f), $this->retire($t, $a, $account, $f['retired_from'], $f)]);
         self::assertSame(2, $this->successes($r), json_encode($r));
-        $r = $this->race($t, [$this->retire($t, $a, $this->account($t, $a), $f['retired_from'], $f), $this->retire($t, $a, $this->account($t, $a), $f['retired_from'], $f)]);
-        self::assertSame(0, $this->successes($r), json_encode($r));
+        $g = ['retirement_operation_id' => (string) Str::ulid(), 'retired_from' => now()->addDay()->toDateString(), 'retirement_reason' => 'C21'];
+        $r = $this->race($t, [$this->retire($t, $a, $this->account($t, $a), $g['retired_from'], $g), $this->retire($t, $a, $this->account($t, $a), $g['retired_from'], $g)]);
+        $this->assertOneDomainConflict($r);
     }
 
-    public function test_c22_invalidation_same_operation_replays_and_different_facts_conflict_concurrently(): void
+    public function test_c22_invalidation_operation_replays_and_unseen_cross_receipt_race_returns_domain_conflict(): void
     {
         [$t,$a] = $this->context();
         $receipt = $this->receipt($t, $a, $this->account($t, $a), '10.00', 'c22');
         $f = ['invalidation_operation_id' => (string) Str::ulid(), 'invalidation_reason' => 'C22'];
         $r = $this->race($t, [$this->invalidate($t, $a, $receipt, $f), $this->invalidate($t, $a, $receipt, $f)]);
         self::assertSame(2, $this->successes($r), json_encode($r));
-        $g = $f;
-        $g['invalidation_reason'] = 'Different';
-        $r = $this->race($t, [$this->invalidate($t, $a, $receipt, $g), $this->invalidate($t, $a, $receipt, $g)]);
-        self::assertSame(0, $this->successes($r), json_encode($r));
+        $g = ['invalidation_operation_id' => (string) Str::ulid(), 'invalidation_reason' => 'C22'];
+        $first = $this->receipt($t, $a, $this->account($t, $a), '10.00', 'c22a');
+        $second = $this->receipt($t, $a, $this->account($t, $a), '10.00', 'c22b');
+        $r = $this->race($t, [$this->invalidate($t, $a, $first, $g), $this->invalidate($t, $a, $second, $g)]);
+        $this->assertOneDomainConflict($r);
     }
 
-    public function test_c23_association_cancellation_same_operation_replays_and_different_facts_conflict_concurrently(): void
+    public function test_c23_cancellation_operation_replays_and_unseen_cross_association_race_returns_domain_conflict(): void
     {
         [$t,$a,$c] = $this->context();
         [$receipt,$payment] = $this->pair($t, $a, $c, 'c23');
@@ -199,10 +202,13 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
         $f = ['cancellation_operation_id' => (string) Str::ulid(), 'cancellation_reason' => 'C23'];
         $r = $this->race($t, [$this->cancelAssociation($t, $a, $association, $f), $this->cancelAssociation($t, $a, $association, $f)]);
         self::assertSame(2, $this->successes($r), json_encode($r));
-        $g = $f;
-        $g['cancellation_reason'] = 'Different';
-        $r = $this->race($t, [$this->cancelAssociation($t, $a, $association, $g), $this->cancelAssociation($t, $a, $association, $g)]);
-        self::assertSame(0, $this->successes($r), json_encode($r));
+        [$freshReceipt,$freshPayment] = $this->pair($t, $a, $c, 'c23a');
+        $freshAssociation = app(AssociateReceiptWithPayment::class)->execute($t, $a, $this->associationFacts($freshReceipt, $freshPayment));
+        [$otherReceipt,$otherPayment] = $this->pair($t, $a, $c, 'c23b');
+        $otherAssociation = app(AssociateReceiptWithPayment::class)->execute($t, $a, $this->associationFacts($otherReceipt, $otherPayment));
+        $g = ['cancellation_operation_id' => (string) Str::ulid(), 'cancellation_reason' => 'C23'];
+        $r = $this->race($t, [$this->cancelAssociation($t, $a, $freshAssociation, $g), $this->cancelAssociation($t, $a, $otherAssociation, $g)]);
+        $this->assertOneDomainConflict($r);
     }
 
     private function context(): array
@@ -276,6 +282,13 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
     private function successes(array $r): int
     {
         return count(array_filter($r, fn ($x) => $x['ok']));
+    }
+
+    private function assertOneDomainConflict(array $results): void
+    {
+        self::assertSame(1, $this->successes($results), json_encode($results));
+        $loser = array_values(array_filter($results, fn ($result) => ! $result['ok']))[0];
+        self::assertSame(ReceiptEvidenceConflict::class, $loser['class'], json_encode($results));
     }
 
     private function file(string $p): string

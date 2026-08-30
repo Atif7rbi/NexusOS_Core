@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\ReceiptEvidence\Support;
 
+use App\Modules\ReceiptEvidence\Exceptions\ReceiptEvidenceConflict;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +27,13 @@ final class ReceiptEvidenceTransaction
                 usleep(random_int(10_000, 40_000) * $attempt);
 
                 goto beginning;
+            }
+
+            if ($state === '23505') {
+                throw new ReceiptEvidenceConflict(
+                    'Receipt Evidence operation identity was concurrently reused with different facts.',
+                    previous: $exception,
+                );
             }
 
             throw $exception;
