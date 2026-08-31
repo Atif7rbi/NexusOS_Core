@@ -337,7 +337,7 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
     {
         $end = microtime(true) + 15;
         while (true) {
-            $waiting = DB::table('pg_stat_activity')->whereIn('pid',$pids)->where('wait_event_type','Lock')->count();
+            $waiting = DB::table('pg_stat_activity')->whereIn('pid', $pids)->where('wait_event_type', 'Lock')->count();
             if ($waiting === count($pids)) {
                 return;
             } if (microtime(true) > $end) {
@@ -346,7 +346,7 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
         }
     }
 
-    private function race(string $t,array $payloads): array
+    private function race(string $t, array $payloads): array
     {
         $ready = $this->file('receipt-holder-ready-');
         $release = $this->file('receipt-holder-release-');
@@ -360,9 +360,9 @@ final class ReceiptEvidenceConcurrencyTest extends TestCase
             $workers[] = $this->start($p + ['start_barrier' => $start, 'barrier_timeout_ms' => 15000, 'pid_file' => $pidFiles[$i]]);
         } $this->wait($pidFiles);
         touch($start);
-        $this->waitLocks(array_map(fn ($f) => (int) trim((string) file_get_contents($f)),$pidFiles));
+        $this->waitLocks(array_map(fn ($f) => (int) trim((string) file_get_contents($f)), $pidFiles));
         touch($release);
-        $results = array_map(fn ($w) => $this->finish($w),$workers);
+        $results = array_map(fn ($w) => $this->finish($w), $workers);
         $this->finish($holder);
 
         return $results;
