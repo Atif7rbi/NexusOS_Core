@@ -10,6 +10,7 @@ use App\Modules\Payments\Exceptions\PaymentsValidationFailed;
 use App\Modules\Payments\Support\EffectivePaymentAllocationGuard;
 use App\Modules\Payments\Support\PaymentAllocationAuditWriter;
 use App\Modules\Payments\Support\PaymentsTransaction;
+use App\Modules\ReceiptEvidence\Support\EffectiveReceiptPaymentAssociationGuard;
 use App\Modules\Receivables\Support\ReceivablesAuthorization;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ final class CancelPaymentAction
         private readonly PaymentsTransaction $tx,
         private readonly ReceivablesAuthorization $auth,
         private readonly EffectivePaymentAllocationGuard $guard,
+        private readonly EffectiveReceiptPaymentAssociationGuard $receiptAssociationGuard,
         private readonly PaymentAllocationAuditWriter $audit,
     ) {}
 
@@ -47,6 +49,7 @@ final class CancelPaymentAction
                 throw new PaymentsConflict('Only a received Payment can be cancelled.');
             }
             $this->guard->assertNoneForPayment($tenantId, $paymentId);
+            $this->receiptAssociationGuard->assertNoneForPayment($tenantId, $paymentId);
             $now = now();
             DB::table('payments')->where('tenant_id', $tenantId)->where('id', $paymentId)->update(['status' => 'cancelled', 'cancelled_at' => $now, 'cancelled_by' => $actor->id, 'cancellation_reason' => $reason, 'updated_at' => $now]);
             $this->audit->write($tenantId, 'payment.cancelled', 'payment', $paymentId, $actor->id, ['reason' => $reason]);
