@@ -2,9 +2,9 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Modules\Accounting\Controllers\AccountController;
 use App\Modules\Accounting\Controllers\AccountingPeriodController;
 use App\Modules\Accounting\Controllers\AccountingSettingsController;
-use App\Modules\Accounting\Controllers\AccountController;
 use App\Modules\Accounting\Controllers\JournalController;
 use App\Modules\Accounting\Controllers\OpeningBalanceController;
 use App\Modules\Collections\Controllers\CollectionScheduleController;
@@ -16,8 +16,9 @@ use App\Modules\Leads\Controllers\LeadController;
 use App\Modules\Leads\Controllers\LeadFollowUpController;
 use App\Modules\Payments\Controllers\PaymentsController;
 use App\Modules\Projects\Controllers\ProjectController;
-use App\Modules\Reservations\Controllers\ReservationController;
+use App\Modules\ReceiptEvidence\Controllers\ReceiptEvidenceController;
 use App\Modules\Receivables\Controllers\ReceivablesController;
+use App\Modules\Reservations\Controllers\ReservationController;
 use App\Modules\Units\Controllers\UnitController;
 use App\Modules\Users\Controllers\TenantUserController;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +77,22 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
         Route::post('/allocations', [PaymentsController::class, 'allocate'])->name('allocations.store');
         Route::post('/{payment}/cancel', [PaymentsController::class, 'cancel'])->name('cancel');
         Route::post('/allocations/{allocation}/cancel', [PaymentsController::class, 'cancelAllocation'])->name('allocations.cancel');
+    });
+
+    Route::prefix('receipt-evidence')->name('receipt-evidence.')->group(function (): void {
+        Route::get('/receiving-accounts', [ReceiptEvidenceController::class, 'accounts'])->name('receiving-accounts.index');
+        Route::post('/receiving-accounts', [ReceiptEvidenceController::class, 'approve'])->name('receiving-accounts.store');
+        Route::get('/receiving-accounts/{account}', [ReceiptEvidenceController::class, 'account'])->name('receiving-accounts.show');
+        Route::post('/receiving-accounts/{account}/retire', [ReceiptEvidenceController::class, 'retire'])->name('receiving-accounts.retire');
+        Route::get('/receipts', [ReceiptEvidenceController::class, 'receipts'])->name('receipts.index');
+        Route::post('/receipts', [ReceiptEvidenceController::class, 'verify'])->name('receipts.store');
+        Route::get('/receipts/{receipt}', [ReceiptEvidenceController::class, 'receipt'])->name('receipts.show');
+        Route::post('/receipts/{receipt}/invalidate', [ReceiptEvidenceController::class, 'invalidate'])->name('receipts.invalidate');
+        Route::post('/receipts/{receipt}/replace', [ReceiptEvidenceController::class, 'replace'])->name('receipts.replace');
+        Route::get('/associations', [ReceiptEvidenceController::class, 'associations'])->name('associations.index');
+        Route::post('/associations', [ReceiptEvidenceController::class, 'associate'])->name('associations.store');
+        Route::get('/associations/{association}', [ReceiptEvidenceController::class, 'association'])->name('associations.show');
+        Route::post('/associations/{association}/cancel', [ReceiptEvidenceController::class, 'cancel'])->name('associations.cancel');
     });
 
     Route::middleware('module.entitled:projects')->group(function (): void {
