@@ -84,11 +84,17 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
         Route::post('/receiving-accounts', [ReceiptEvidenceController::class, 'approve'])->name('receiving-accounts.store');
         Route::get('/receiving-accounts/{account}', [ReceiptEvidenceController::class, 'account'])->name('receiving-accounts.show');
         Route::post('/receiving-accounts/{account}/retire', [ReceiptEvidenceController::class, 'retire'])->name('receiving-accounts.retire');
+        Route::post('/receiving-accounts/{account}/cash-mappings', [ReceiptEvidenceController::class, 'configureCashMapping'])->name('cash-mappings.store');
+        Route::post('/cash-mappings/{mapping}/supersede', [ReceiptEvidenceController::class, 'supersedeCashMapping'])->name('cash-mappings.supersede');
+        Route::post('/cash-clearing-policies', [ReceiptEvidenceController::class, 'configureCashClearingPolicy'])->name('cash-clearing-policies.store');
+        Route::post('/cash-clearing-policies/{policy}/supersede', [ReceiptEvidenceController::class, 'supersedeCashClearingPolicy'])->name('cash-clearing-policies.supersede');
         Route::get('/receipts', [ReceiptEvidenceController::class, 'receipts'])->name('receipts.index');
         Route::post('/receipts', [ReceiptEvidenceController::class, 'verify'])->name('receipts.store');
         Route::get('/receipts/{receipt}', [ReceiptEvidenceController::class, 'receipt'])->name('receipts.show');
         Route::post('/receipts/{receipt}/invalidate', [ReceiptEvidenceController::class, 'invalidate'])->name('receipts.invalidate');
         Route::post('/receipts/{receipt}/replace', [ReceiptEvidenceController::class, 'replace'])->name('receipts.replace');
+        Route::post('/receipts/{receipt}/cash-postings', [ReceiptEvidenceController::class, 'postCash'])->name('cash-postings.store');
+        Route::post('/receipts/{receipt}/cash-postings/{posting}/reverse-and-invalidate', [ReceiptEvidenceController::class, 'reverseCashAndInvalidate'])->name('cash-postings.reverse-and-invalidate');
         Route::get('/associations', [ReceiptEvidenceController::class, 'associations'])->name('associations.index');
         Route::post('/associations', [ReceiptEvidenceController::class, 'associate'])->name('associations.store');
         Route::get('/associations/{association}', [ReceiptEvidenceController::class, 'association'])->name('associations.show');

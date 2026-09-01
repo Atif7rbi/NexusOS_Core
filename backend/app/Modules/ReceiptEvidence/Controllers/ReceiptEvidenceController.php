@@ -9,19 +9,31 @@ use App\Models\User;
 use App\Modules\ReceiptEvidence\Actions\ApproveReceivingAccount;
 use App\Modules\ReceiptEvidence\Actions\AssociateReceiptWithPayment;
 use App\Modules\ReceiptEvidence\Actions\CancelReceiptPaymentAssociation;
+use App\Modules\ReceiptEvidence\Actions\ConfigureBankReceiptCashClearingPolicy;
+use App\Modules\ReceiptEvidence\Actions\ConfigureReceivingAccountCashMapping;
 use App\Modules\ReceiptEvidence\Actions\InvalidateBankReceipt;
+use App\Modules\ReceiptEvidence\Actions\PostVerifiedBankReceiptCash;
 use App\Modules\ReceiptEvidence\Actions\ReplaceInvalidatedBankReceipt;
 use App\Modules\ReceiptEvidence\Actions\RetireReceivingAccount;
+use App\Modules\ReceiptEvidence\Actions\ReversePostedBankReceiptCashAndInvalidate;
+use App\Modules\ReceiptEvidence\Actions\SupersedeBankReceiptCashClearingPolicy;
+use App\Modules\ReceiptEvidence\Actions\SupersedeReceivingAccountCashMapping;
 use App\Modules\ReceiptEvidence\Actions\VerifyBankReceipt;
 use App\Modules\ReceiptEvidence\Http\ReceiptEvidenceExceptionResponder;
 use App\Modules\ReceiptEvidence\Requests\ApproveReceivingAccountRequest;
 use App\Modules\ReceiptEvidence\Requests\AssociateReceiptWithPaymentRequest;
 use App\Modules\ReceiptEvidence\Requests\CancelReceiptPaymentAssociationRequest;
+use App\Modules\ReceiptEvidence\Requests\ConfigureBankReceiptCashClearingPolicyRequest;
+use App\Modules\ReceiptEvidence\Requests\ConfigureReceivingAccountCashMappingRequest;
 use App\Modules\ReceiptEvidence\Requests\IndexBankReceiptEvidenceRequest;
 use App\Modules\ReceiptEvidence\Requests\IndexReceiptPaymentAssociationsRequest;
 use App\Modules\ReceiptEvidence\Requests\IndexReceivingAccountsRequest;
 use App\Modules\ReceiptEvidence\Requests\InvalidateBankReceiptRequest;
+use App\Modules\ReceiptEvidence\Requests\PostVerifiedBankReceiptCashRequest;
 use App\Modules\ReceiptEvidence\Requests\RetireReceivingAccountRequest;
+use App\Modules\ReceiptEvidence\Requests\ReversePostedBankReceiptCashAndInvalidateRequest;
+use App\Modules\ReceiptEvidence\Requests\SupersedeBankReceiptCashClearingPolicyRequest;
+use App\Modules\ReceiptEvidence\Requests\SupersedeReceivingAccountCashMappingRequest;
 use App\Modules\ReceiptEvidence\Requests\VerifyBankReceiptRequest;
 use App\Modules\ReceiptEvidence\Services\ReceiptEvidenceReadService;
 use App\Modules\Receivables\Support\ReceivablesAuthorization;
@@ -68,6 +80,34 @@ final class ReceiptEvidenceController extends Controller
         });
     }
 
+    public function configureCashMapping(ConfigureReceivingAccountCashMappingRequest $request, string $account, ConfigureReceivingAccountCashMapping $action): JsonResponse
+    {
+        [$tenantId, $actor] = $this->mutationContext($request);
+
+        return $this->respond(fn (): array => ['cash_mapping_id' => $action->execute($tenantId, $account, $actor, $request->validated())]);
+    }
+
+    public function supersedeCashMapping(SupersedeReceivingAccountCashMappingRequest $request, string $mapping, SupersedeReceivingAccountCashMapping $action): JsonResponse
+    {
+        [$tenantId, $actor] = $this->mutationContext($request);
+
+        return $this->respond(fn (): array => ['cash_mapping_id' => $action->execute($tenantId, $mapping, $actor, $request->validated())]);
+    }
+
+    public function configureCashClearingPolicy(ConfigureBankReceiptCashClearingPolicyRequest $request, ConfigureBankReceiptCashClearingPolicy $action): JsonResponse
+    {
+        [$tenantId, $actor] = $this->mutationContext($request);
+
+        return $this->respond(fn (): array => ['cash_policy_id' => $action->execute($tenantId, $actor, $request->validated())]);
+    }
+
+    public function supersedeCashClearingPolicy(SupersedeBankReceiptCashClearingPolicyRequest $request, string $policy, SupersedeBankReceiptCashClearingPolicy $action): JsonResponse
+    {
+        [$tenantId, $actor] = $this->mutationContext($request);
+
+        return $this->respond(fn (): array => ['cash_policy_id' => $action->execute($tenantId, $policy, $actor, $request->validated())]);
+    }
+
     public function receipts(IndexBankReceiptEvidenceRequest $request, ReceiptEvidenceReadService $reads): JsonResponse
     {
         [$tenantId] = $this->readContext($request);
@@ -105,6 +145,20 @@ final class ReceiptEvidenceController extends Controller
         [$tenantId, $actor] = $this->mutationContext($request);
 
         return $this->respond(fn (): array => ['receipt' => $reads->receipt($tenantId, $action->execute($tenantId, $receipt, $actor, $request->validated()))]);
+    }
+
+    public function postCash(PostVerifiedBankReceiptCashRequest $request, string $receipt, PostVerifiedBankReceiptCash $action): JsonResponse
+    {
+        [$tenantId, $actor] = $this->mutationContext($request);
+
+        return $this->respond(fn (): array => ['cash_posting' => $action->execute($tenantId, $receipt, $actor, $request->validated())]);
+    }
+
+    public function reverseCashAndInvalidate(ReversePostedBankReceiptCashAndInvalidateRequest $request, string $receipt, string $posting, ReversePostedBankReceiptCashAndInvalidate $action): JsonResponse
+    {
+        [$tenantId, $actor] = $this->mutationContext($request);
+
+        return $this->respond(fn (): array => ['cash_posting' => $action->execute($tenantId, $receipt, $posting, $actor, $request->validated())]);
     }
 
     public function associations(IndexReceiptPaymentAssociationsRequest $request, ReceiptEvidenceReadService $reads): JsonResponse
