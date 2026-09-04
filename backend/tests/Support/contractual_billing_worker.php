@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Modules\ContractualBilling\Actions\ActivateContractualBillingEntitlement;
 use App\Modules\ContractualBilling\Actions\CorrectFinalizedContractualBillingSchedule;
+use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use App\Modules\ContractualBilling\Actions\SupersedeFinalizedContractualBillingSchedule;
+use App\Modules\Receivables\Actions\CancelReceivableAction;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +79,30 @@ try {
 
             DB::table('tenants')
                 ->where('id', $payload['tenant_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            billingSignal($payload['ready_file'] ?? null);
+
+            billingAwait(
+                $payload['release_file'] ?? null,
+                (int) ($payload['barrier_timeout_ms'] ?? 15000),
+            );
+        });
+
+        echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
+        return;
+    }
+
+    if ($action === 'hold_membership') {
+        DB::transaction(function () use ($payload): void {
+            DB::statement("SET LOCAL lock_timeout = '5s'");
+            DB::statement("SET LOCAL statement_timeout = '30s'");
+
+            DB::table('tenant_users')
+                ->where('tenant_id', $payload['tenant_id'])
+                ->where('user_id', $payload['actor_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -169,6 +195,42 @@ try {
             ['ok' => true, 'id' => $id],
             JSON_THROW_ON_ERROR,
         );
+
+        return;
+    }
+
+    if ($action === 'establish_entitlement_receivable_action') {
+        $actor = User::query()->findOrFail($payload['actor_id']);
+
+        $id = app(EstablishEntitlementReceivable::class)->execute(
+            $payload['tenant_id'],
+            $payload['entitlement_id'],
+            $actor,
+            [
+                'receivable_establishment_operation_id' => $payload['operation_id'],
+            ],
+        );
+
+        echo json_encode(
+            ['ok' => true, 'id' => $id],
+            JSON_THROW_ON_ERROR,
+        );
+
+        return;
+    }
+
+    if ($action === 'ordinary_cancel_receivable_action') {
+        $actor = User::query()->findOrFail($payload['actor_id']);
+
+        app(CancelReceivableAction::class)->execute(
+            $payload['tenant_id'],
+            $payload['receivable_id'],
+            $actor,
+            $payload['cancelled_at'],
+            $payload['reason'],
+        );
+
+        echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
 
         return;
     }
