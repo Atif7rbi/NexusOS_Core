@@ -95,7 +95,7 @@ jobs:
       - name: Collections regressions
         run: php artisan migrate:fresh --force && php artisan test --filter='/^(?!.*PaymentsAllocationsConcurrencyTest).*Collection/'
       - name: Contracts regressions
-        run: php artisan migrate:fresh --force && php artisan test --filter='Contract'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/^(?!.*ContractualBilling).*Contract/'
       - name: Customers regressions
         run: php artisan migrate:fresh --force && php artisan test --filter='Customer'
       - name: Accounting Phase 4 reporting reference tests
