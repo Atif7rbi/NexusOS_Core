@@ -83,7 +83,7 @@ final class ContractualBillingEntitlementReceivableAllocationGuardTest extends T
                 'customer_id' => $customerId,
                 'amount' => '1000.00',
                 'currency' => 'SAR',
-                'received_on' => '2026-09-05',
+                'received_on' => '2026-09-01',
             ],
         );
 
