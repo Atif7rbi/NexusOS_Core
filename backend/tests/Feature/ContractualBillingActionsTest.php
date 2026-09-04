@@ -12,6 +12,7 @@ use App\Modules\ContractualBilling\Actions\RemoveDraftContractualBillingObligati
 use App\Modules\ContractualBilling\Actions\SaveDraftContractualBillingObligation;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingAccessDenied;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -22,6 +23,7 @@ final class ContractualBillingActionsTest extends TestCase
 {
     use CreatesActiveMembership;
     use CreatesDomainIntegrityFixtures;
+    use RefreshDatabase;
 
     public function test_schedule_creation_same_operation_same_facts_replays(): void
     {

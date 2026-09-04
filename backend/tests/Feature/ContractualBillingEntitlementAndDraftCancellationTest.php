@@ -11,6 +11,7 @@ use App\Modules\ContractualBilling\Actions\CreateContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\FinalizeContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\SaveDraftContractualBillingObligation;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -21,6 +22,7 @@ final class ContractualBillingEntitlementAndDraftCancellationTest extends TestCa
 {
     use CreatesActiveMembership;
     use CreatesDomainIntegrityFixtures;
+    use RefreshDatabase;
 
     public function test_entitlement_activation_derives_canonical_facts_and_replays(): void
     {

@@ -12,6 +12,7 @@ use App\Modules\ContractualBilling\Actions\FinalizeContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\SaveDraftContractualBillingObligation;
 use App\Modules\ContractualBilling\Actions\SupersedeFinalizedContractualBillingSchedule;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -22,6 +23,7 @@ final class ContractualBillingSuccessorCorrectionTest extends TestCase
 {
     use CreatesActiveMembership;
     use CreatesDomainIntegrityFixtures;
+    use RefreshDatabase;
 
     public function test_successor_correction_atomically_supersedes_source_reverses_entitlement_and_finalizes_successor(): void
     {

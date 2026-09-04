@@ -11,6 +11,7 @@ use App\Modules\ContractualBilling\Actions\CreateContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\FinalizeContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\SaveDraftContractualBillingObligation;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -21,6 +22,7 @@ final class ContractualBillingSourceCorrectionTest extends TestCase
 {
     use CreatesActiveMembership;
     use CreatesDomainIntegrityFixtures;
+    use RefreshDatabase;
 
     public function test_finalized_source_cancellation_reverses_exact_entitlement_set_atomically(): void
     {
