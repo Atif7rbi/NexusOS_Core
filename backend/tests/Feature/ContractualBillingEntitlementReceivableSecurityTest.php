@@ -34,6 +34,7 @@ final class ContractualBillingEntitlementReceivableSecurityTest extends TestCase
             'public.guard_linked_entitlement_reversal()',
             'public.validate_entitlement_receivable_link_state(text,text,text)',
             'public.check_entitlement_receivable_link_final_state()',
+            'public.receivable_has_entitlement_link(text,text)',
         ] as $function) {
             self::assertFalse((bool) DB::selectOne(
                 'SELECT has_function_privilege(?, ?, ?) allowed',
