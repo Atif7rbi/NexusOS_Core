@@ -43,7 +43,7 @@ function billingAwait(?string $path, int $timeoutMs = 15000): void
         return;
     }
     $started = hrtime(true);
-    while (! is_file($path)) {
+    while (!is_file($path)) {
         usleep(10_000);
         if ((hrtime(true) - $started) / 1_000_000 > $timeoutMs) {
             throw new RuntimeException("Timed out waiting for Contractual Billing barrier: {$path}");
