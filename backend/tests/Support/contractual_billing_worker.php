@@ -72,6 +72,7 @@ try {
             billingAwait($payload['release_file'] ?? null, (int) ($payload['barrier_timeout_ms'] ?? 15000));
         });
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -94,6 +95,7 @@ try {
             );
             DB::rollBack();
             echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
             return;
         } catch (Throwable $exception) {
             if (DB::transactionLevel() > 0) {
@@ -118,12 +120,14 @@ try {
             ]);
         });
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
         return;
     }
 
     if ($action === 'probe_schedule_nowait') {
         DB::transaction(fn () => DB::table('contractual_billing_schedules')->where('tenant_id', $payload['tenant_id'])->where('id', $payload['schedule_id'])->lock('FOR UPDATE NOWAIT')->firstOrFail());
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -134,6 +138,7 @@ try {
             DB::table('contracts')->where('tenant_id', $payload['tenant_id'])->where('id', $payload['contract_id'])->update(['total_amount' => $payload['total_amount'], 'updated_at' => now()]);
         });
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -141,6 +146,7 @@ try {
         $actor = User::query()->findOrFail($payload['actor_id']);
         $id = app(ActivateContractualBillingEntitlement::class)->execute($payload['tenant_id'], $payload['obligation_id'], $actor, ['billing_entitlement_operation_id' => $payload['operation_id']]);
         echo json_encode(['ok' => true, 'id' => $id], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -148,6 +154,7 @@ try {
         $actor = User::query()->findOrFail($payload['actor_id']);
         $id = app(EstablishEntitlementReceivable::class)->execute($payload['tenant_id'], $payload['entitlement_id'], $actor, ['receivable_establishment_operation_id' => $payload['operation_id']]);
         echo json_encode(['ok' => true, 'id' => $id], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -155,6 +162,7 @@ try {
         $actor = User::query()->findOrFail($payload['actor_id']);
         app(CancelReceivableAction::class)->execute($payload['tenant_id'], $payload['receivable_id'], $actor, $payload['cancelled_at'], $payload['reason']);
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -167,6 +175,7 @@ try {
             'entitlement_reversals' => $payload['entitlement_reversals'],
         ]);
         echo json_encode(['ok' => true, 'id' => $id], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -180,6 +189,7 @@ try {
             'entitlement_reversals' => $payload['entitlement_reversals'],
         ]);
         echo json_encode(['ok' => true, 'id' => $id], JSON_THROW_ON_ERROR);
+
         return;
     }
 
@@ -191,6 +201,7 @@ try {
             'effective_at' => now(), 'status' => 'effective', 'recognized_by' => $payload['actor_id'], 'recognized_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
         return;
     }
 
