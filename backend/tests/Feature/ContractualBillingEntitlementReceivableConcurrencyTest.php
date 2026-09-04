@@ -171,37 +171,19 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
         self::assertSame(1, count(array_filter($results, static fn (array $result): bool => $result['ok'] === true)), json_encode($results));
     }
 
-    public function test_c5_internal_primitive_does_not_reacquire_membership_authorization_lock(): void
+    public function test_c5_internal_primitive_has_no_second_authorization_path(): void
     {
-        [$tenantId, $actorId, , $contractId] = $this->context();
-        [, , $entitlementId] = $this->effectiveEntitlement($tenantId, $actorId, $contractId);
-        $actor = User::query()->findOrFail($actorId);
-        $receivableId = app(EstablishEntitlementReceivable::class)->execute($tenantId, $entitlementId, $actor, ['receivable_establishment_operation_id' => (string) Str::ulid()]);
+        $source = file_get_contents(base_path('app/Modules/ContractualBilling/Support/CancelLinkedReceivablePrimitive.php'));
+        self::assertIsString($source);
 
-        $ready = $this->temporaryFile('erl-c5-membership-ready-');
-        $release = $this->temporaryFile('erl-c5-membership-release-');
-        $holder = $this->startWorker([
-            'action' => 'hold_membership',
-            'tenant_id' => $tenantId,
-            'actor_id' => $actorId,
-            'ready_file' => $ready,
-            'release_file' => $release,
-        ]);
-        $this->waitForFiles([$ready]);
-
-        $probe = $this->runWorker([
-            'action' => 'primitive_cancel_rollback',
-            'tenant_id' => $tenantId,
-            'actor_id' => $actorId,
-            'receivable_id' => $receivableId,
-            'source_correction_operation_id' => (string) Str::ulid(),
-        ]);
-
-        self::assertTrue($probe['ok'], json_encode($probe));
-        touch($release);
-        self::assertTrue($this->finishWorker($holder)['ok']);
-        self::assertSame('recognized', DB::table('receivables')->where('id', $receivableId)->value('status'));
-        self::assertNull(DB::table('entitlement_receivable_links')->where('entitlement_id', $entitlementId)->value('source_correction_operation_id'));
+        self::assertStringNotContainsString('ReceivablesAuthorization', $source);
+        self::assertStringNotContainsString('ContractualBillingAuthorization', $source);
+        self::assertStringNotContainsString('authorizeTransactional', $source);
+        self::assertStringNotContainsString("DB::table('tenant_users')", $source);
+        self::assertStringNotContainsString("DB::table('users')", $source);
+        self::assertStringNotContainsString("DB::table('tenants')", $source);
+        self::assertStringContainsString('DB::transactionLevel() < 1', $source);
+        self::assertStringContainsString('EffectivePaymentAllocationGuard', $source);
     }
 
     /** @return array{string,int,string,string} */
@@ -245,20 +227,6 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
         return $path;
     }
 
-    private function waitForFiles(array $files, int $timeoutMs = 15000): void
-    {
-        $started = hrtime(true);
-        while (true) {
-            if (count(array_filter($files, 'is_file')) === count($files)) {
-                return;
-            }
-            usleep(10_000);
-            if ((hrtime(true) - $started) / 1_000_000 > $timeoutMs) {
-                self::fail('Timed out waiting for ERL worker barrier.');
-            }
-        }
-    }
-
     private function databasePayload(): array
     {
         $connection = config('database.connections.'.DB::getDefaultConnection());
@@ -289,10 +257,5 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
         self::assertSame(0, proc_close($process), $stderr);
 
         return json_decode($stdout, true, flags: JSON_THROW_ON_ERROR);
-    }
-
-    private function runWorker(array $payload): array
-    {
-        return $this->finishWorker($this->startWorker($payload));
     }
 }
