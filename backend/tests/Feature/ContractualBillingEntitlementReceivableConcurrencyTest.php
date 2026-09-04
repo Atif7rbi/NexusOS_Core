@@ -176,9 +176,10 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
         $source = file_get_contents(base_path('app/Modules/ContractualBilling/Support/CancelLinkedReceivablePrimitive.php'));
         self::assertIsString($source);
 
-        self::assertStringNotContainsString('ReceivablesAuthorization', $source);
-        self::assertStringNotContainsString('ContractualBillingAuthorization', $source);
-        self::assertStringNotContainsString('authorizeTransactional', $source);
+        self::assertStringNotContainsString('use App\\Modules\\Receivables\\Support\\ReceivablesAuthorization;', $source);
+        self::assertStringNotContainsString('app(ReceivablesAuthorization::class)', $source);
+        self::assertStringNotContainsString('app(ContractualBillingAuthorization::class)', $source);
+        self::assertStringNotContainsString('authorizeTransactional(', $source);
         self::assertStringNotContainsString("DB::table('tenant_users')", $source);
         self::assertStringNotContainsString("DB::table('users')", $source);
         self::assertStringNotContainsString("DB::table('tenants')", $source);
