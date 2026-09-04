@@ -189,25 +189,27 @@ return new class extends Migration
                   MESSAGE = 'entitlement receivable link provenance is immutable';
               END IF;
 
-              IF OLD.source_correction_operation_id IS NOT NULL
-                 AND NEW.source_correction_operation_id
-                      IS DISTINCT FROM OLD.source_correction_operation_id THEN
-                RAISE EXCEPTION USING
-                  ERRCODE = '55000',
-                  MESSAGE = 'entitlement receivable link correction evidence is immutable';
+              IF OLD.source_correction_operation_id IS NOT NULL THEN
+                IF NEW IS DISTINCT FROM OLD THEN
+                  RAISE EXCEPTION USING
+                    ERRCODE = '55000',
+                    MESSAGE = 'corrected entitlement receivable link is immutable';
+                END IF;
+
+                RETURN NEW;
               END IF;
 
-              IF OLD.source_correction_operation_id IS NULL
-                 AND NEW.source_correction_operation_id IS NULL
-                 AND NEW.updated_at IS DISTINCT FROM OLD.updated_at THEN
-                RAISE EXCEPTION USING
-                  ERRCODE = '55000',
-                  MESSAGE = 'uncorrected entitlement receivable link cannot be edited';
+              IF NEW.source_correction_operation_id IS NULL THEN
+                IF NEW IS DISTINCT FROM OLD THEN
+                  RAISE EXCEPTION USING
+                    ERRCODE = '55000',
+                    MESSAGE = 'uncorrected entitlement receivable link cannot be edited';
+                END IF;
+
+                RETURN NEW;
               END IF;
 
-              IF OLD.source_correction_operation_id IS NULL
-                 AND NEW.source_correction_operation_id IS NOT NULL
-                 AND NEW.updated_at < OLD.updated_at THEN
+              IF NEW.updated_at < OLD.updated_at THEN
                 RAISE EXCEPTION USING
                   ERRCODE = '23514',
                   MESSAGE = 'entitlement receivable link correction timestamp is invalid';
@@ -317,9 +319,9 @@ return new class extends Migration
 
 
             CREATE OR REPLACE FUNCTION public.validate_entitlement_receivable_link_state(
-              p_tenant_id char(26),
-              p_entitlement_id char(26),
-              p_receivable_id char(26)
+              p_tenant_id text,
+              p_entitlement_id text,
+              p_receivable_id text
             ) RETURNS void
             LANGUAGE plpgsql
             SECURITY DEFINER
@@ -375,10 +377,12 @@ return new class extends Migration
 
               IF entitlement_row.status = 'effective' THEN
                 IF receivable_row.status <> 'recognized'
-                   OR link_row.source_correction_operation_id IS NOT NULL THEN
+                   OR link_row.source_correction_operation_id IS NOT NULL
+                   OR schedule_row.status <> 'finalized'
+                   OR schedule_row.source_correction_operation_id IS NOT NULL THEN
                   RAISE EXCEPTION USING
                     ERRCODE = '23514',
-                    MESSAGE = 'effective linked Entitlement requires recognized Receivable';
+                    MESSAGE = 'effective linked Entitlement requires coherent recognized Receivable state';
                 END IF;
 
                 RETURN;
@@ -420,9 +424,9 @@ return new class extends Migration
             BEGIN
               IF TG_TABLE_NAME = 'entitlement_receivable_links' THEN
                 PERFORM public.validate_entitlement_receivable_link_state(
-                  COALESCE(NEW.tenant_id, OLD.tenant_id),
-                  COALESCE(NEW.entitlement_id, OLD.entitlement_id),
-                  COALESCE(NEW.receivable_id, OLD.receivable_id)
+                  NEW.tenant_id,
+                  NEW.entitlement_id,
+                  NEW.receivable_id
                 );
 
                 RETURN NULL;
@@ -432,8 +436,8 @@ return new class extends Migration
                 FOR link_row IN
                   SELECT *
                   FROM public.entitlement_receivable_links
-                  WHERE tenant_id = COALESCE(NEW.tenant_id, OLD.tenant_id)
-                    AND entitlement_id = COALESCE(NEW.id, OLD.id)
+                  WHERE tenant_id = NEW.tenant_id
+                    AND entitlement_id = NEW.id
                 LOOP
                   PERFORM public.validate_entitlement_receivable_link_state(
                     link_row.tenant_id,
@@ -449,8 +453,8 @@ return new class extends Migration
                 FOR link_row IN
                   SELECT *
                   FROM public.entitlement_receivable_links
-                  WHERE tenant_id = COALESCE(NEW.tenant_id, OLD.tenant_id)
-                    AND receivable_id = COALESCE(NEW.id, OLD.id)
+                  WHERE tenant_id = NEW.tenant_id
+                    AND receivable_id = NEW.id
                 LOOP
                   PERFORM public.validate_entitlement_receivable_link_state(
                     link_row.tenant_id,
@@ -469,10 +473,8 @@ return new class extends Migration
                   JOIN public.contractual_billing_entitlements entitlement
                     ON (entitlement.tenant_id,entitlement.id)
                      = (link.tenant_id,link.entitlement_id)
-                  WHERE entitlement.tenant_id
-                          = COALESCE(NEW.tenant_id, OLD.tenant_id)
-                    AND entitlement.schedule_id
-                          = COALESCE(NEW.id, OLD.id)
+                  WHERE entitlement.tenant_id = NEW.tenant_id
+                    AND entitlement.schedule_id = NEW.id
                   ORDER BY link.entitlement_id, link.id
                 LOOP
                   PERFORM public.validate_entitlement_receivable_link_state(
@@ -520,7 +522,7 @@ return new class extends Migration
             REVOKE EXECUTE ON FUNCTION public.enforce_entitlement_receivable_link_history() FROM PUBLIC;
             REVOKE EXECUTE ON FUNCTION public.guard_entitlement_linked_receivable_cancellation() FROM PUBLIC;
             REVOKE EXECUTE ON FUNCTION public.guard_linked_entitlement_reversal() FROM PUBLIC;
-            REVOKE EXECUTE ON FUNCTION public.validate_entitlement_receivable_link_state(char(26),char(26),char(26)) FROM PUBLIC;
+            REVOKE EXECUTE ON FUNCTION public.validate_entitlement_receivable_link_state(text,text,text) FROM PUBLIC;
             REVOKE EXECUTE ON FUNCTION public.check_entitlement_receivable_link_final_state() FROM PUBLIC;
             SQL);
 
@@ -550,7 +552,7 @@ return new class extends Migration
               ON public.entitlement_receivable_links;
 
             DROP FUNCTION IF EXISTS public.check_entitlement_receivable_link_final_state();
-            DROP FUNCTION IF EXISTS public.validate_entitlement_receivable_link_state(char(26),char(26),char(26));
+            DROP FUNCTION IF EXISTS public.validate_entitlement_receivable_link_state(text,text,text);
             DROP FUNCTION IF EXISTS public.guard_linked_entitlement_reversal();
             DROP FUNCTION IF EXISTS public.guard_entitlement_linked_receivable_cancellation();
             DROP FUNCTION IF EXISTS public.enforce_entitlement_receivable_link_history();
@@ -617,7 +619,7 @@ return new class extends Migration
             'public.enforce_entitlement_receivable_link_history()',
             'public.guard_entitlement_linked_receivable_cancellation()',
             'public.guard_linked_entitlement_reversal()',
-            'public.validate_entitlement_receivable_link_state(char(26),char(26),char(26))',
+            'public.validate_entitlement_receivable_link_state(text,text,text)',
             'public.check_entitlement_receivable_link_final_state()',
         ] as $function) {
             DB::unprepared(
