@@ -18,6 +18,7 @@ on:
       - 'feat/receipt-evidence-v1'
       - 'feat/verified-bank-receipt-cash-posting-v1'
       - 'feat/contractual-billing-source-v1'
+      - 'feat/entitlement-receivable-link-v1'
 
 jobs:
   postgresql:
@@ -105,14 +106,14 @@ jobs:
         run: php artisan test --filter='MoneyTest|AccountingApplication'
       - run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='AccountingSchema|BusinessNumber|ProjectsApiTest|PostgreSqlConnectionTest'
       - name: Contractual Billing Source focused tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='/ContractualBilling(?:Actions|EntitlementAndDraftCancellation|SchemaIntegrity|SourceCorrection|SuccessorCorrection)Test/'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/ContractualBilling(?:Actions|EntitlementAndDraftCancellation|SchemaIntegrity|SourceCorrection|SuccessorCorrection|EntitlementReceivable|EntitlementReceivableIntegrity)Test/'
 
       - name: Contractual Billing Source recovery tests
         # Unknown-outcome resolution must run outside Laravel's per-test transaction.
-        run: php artisan migrate:fresh --force && php artisan test --filter='ContractualBillingRecoveryTest'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/ContractualBilling(?:Recovery|EntitlementReceivableRecovery)Test/'
 
       - name: Contractual Billing Source concurrency tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='ContractualBillingConcurrencyTest'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/ContractualBilling(?:Concurrency|EntitlementReceivableConcurrency)Test/'
 
       - name: Payments and Allocations concurrency tests
         run: php artisan migrate:fresh --force && php artisan test --filter='PaymentsAllocationsConcurrencyTest'
@@ -125,11 +126,11 @@ jobs:
         # are executed in dedicated PostgreSQL steps. Contractual Billing recovery is also dedicated
         # because unknown-outcome resolution requires transaction level zero.
         # These tests intentionally cannot participate in Laravel's per-test transaction rollback.
-        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:(?:Accounting(?:Schema|Application)|Receivables|PaymentsAllocations|ReceiptEvidence|VerifiedBankReceiptCashPosting|ContractualBilling)ConcurrencyTest|ContractualBillingRecoveryTest))/'
+        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:(?:Accounting(?:Schema|Application)|Receivables|PaymentsAllocations|ReceiptEvidence|VerifiedBankReceiptCashPosting|ContractualBilling.*)ConcurrencyTest|ContractualBilling.*RecoveryTest))/'
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
-          php artisan migrate:rollback --step=15 --force
+          php artisan migrate:rollback --step=16 --force
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
@@ -155,6 +156,7 @@ jobs:
                OR to_regclass('public.contractual_billing_schedules') IS NOT NULL
                OR to_regclass('public.contractual_billing_obligations') IS NOT NULL
                OR to_regclass('public.contractual_billing_entitlements') IS NOT NULL
+               OR to_regclass('public.entitlement_receivable_links') IS NOT NULL
                OR to_regprocedure('public.validate_opening_balance_operation(character,character)') IS NOT NULL
                OR to_regprocedure('public.enforce_payment_history()') IS NOT NULL
                OR to_regprocedure('public.enforce_payment_allocation_history()') IS NOT NULL
@@ -166,6 +168,11 @@ jobs:
                OR to_regprocedure('public.enforce_receiving_account_cash_mapping_history()') IS NOT NULL
                OR to_regprocedure('public.enforce_cash_clearing_policy_history()') IS NOT NULL
                OR to_regprocedure('public.enforce_bank_receipt_cash_posting_history()') IS NOT NULL
+               OR to_regprocedure('public.enforce_entitlement_receivable_link_history()') IS NOT NULL
+               OR to_regprocedure('public.guard_entitlement_linked_receivable_cancellation()') IS NOT NULL
+               OR to_regprocedure('public.guard_linked_entitlement_reversal()') IS NOT NULL
+               OR to_regprocedure('public.validate_entitlement_receivable_link_state(text,text,text)') IS NOT NULL
+               OR to_regprocedure('public.check_entitlement_receivable_link_final_state()') IS NOT NULL
             THEN
               RAISE EXCEPTION 'Receivables and Accounting migration stack was not fully rolled back';
             END IF;
@@ -174,4 +181,4 @@ jobs:
       - name: Backend formatting
         env:
           COLUMNS: 300
-        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/ContractualBilling app/Modules/Payments app/Modules/ReceiptEvidence app/Modules/Receivables app/Modules/ReceivableAccounting app/Modules/Collections/Actions/AmendCollectionScheduleAction.php app/Modules/Collections/Exceptions/CollectionHasEffectiveReceivableException.php app/Modules/Collections/Support/CollectionScheduleExceptionResponder.php app/Modules/Collections/Support/EffectiveReceivableGuard.php app/Modules/Contracts/Actions/CancelContractAction.php app/Modules/Contracts/Controllers/ContractController.php database/migrations/2026_08_26_000000_create_receivables_table.php database/migrations/2026_08_26_010000_add_receivable_accounting_integration.php database/migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php database/migrations/2026_08_27_000000_create_payments_and_payment_allocations.php database/migrations/2026_08_28_000000_create_receipt_evidence.php database/migrations/2026_08_31_000000_create_verified_bank_receipt_cash_postings.php database/migrations/2026_09_02_000000_create_contractual_billing_schedules_and_obligations.php database/migrations/2026_09_02_010000_create_contractual_billing_entitlements.php database/migrations/2026_09_02_020000_install_contractual_billing_integrity.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/CollectionBackedReceivableTest.php tests/Feature/PaymentsAllocationsTest.php tests/Feature/PaymentsAllocationsConcurrencyTest.php tests/Feature/ReceiptEvidenceTest.php tests/Feature/ReceiptEvidenceSchemaIntegrityTest.php tests/Feature/ReceiptEvidenceConcurrencyTest.php tests/Feature/ReceiptEvidenceApiTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Feature/ReceivableAccountingIntegrationTest.php tests/Feature/VerifiedBankReceiptCashPostingTest.php tests/Feature/VerifiedBankReceiptCashPostingSchemaIntegrityTest.php tests/Feature/VerifiedBankReceiptCashPostingConcurrencyTest.php tests/Feature/ContractualBillingActionsTest.php tests/Feature/ContractualBillingConcurrencyTest.php tests/Feature/ContractualBillingEntitlementAndDraftCancellationTest.php tests/Feature/ContractualBillingRecoveryTest.php tests/Feature/ContractualBillingSchemaIntegrityTest.php tests/Feature/ContractualBillingSourceCorrectionTest.php tests/Feature/ContractualBillingSuccessorCorrectionTest.php tests/Support/contractual_billing_worker.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php tests/Support/payments_allocations_worker.php tests/Support/receipt_evidence_worker.php tests/Support/verified_bank_receipt_cash_posting_worker.php
+        run: vendor/bin/pint --test app/Modules/Accounting app/Modules/ContractualBilling app/Modules/Payments app/Modules/ReceiptEvidence app/Modules/Receivables app/Modules/ReceivableAccounting app/Modules/Collections/Actions/AmendCollectionScheduleAction.php app/Modules/Collections/Exceptions/CollectionHasEffectiveReceivableException.php app/Modules/Collections/Support/CollectionScheduleExceptionResponder.php app/Modules/Collections/Support/EffectiveReceivableGuard.php app/Modules/Contracts/Actions/CancelContractAction.php app/Modules/Contracts/Controllers/ContractController.php database/migrations/2026_08_26_000000_create_receivables_table.php database/migrations/2026_08_26_010000_add_receivable_accounting_integration.php database/migrations/2026_08_26_020000_add_collection_backed_receivable_integrity.php database/migrations/2026_08_27_000000_create_payments_and_payment_allocations.php database/migrations/2026_08_28_000000_create_receipt_evidence.php database/migrations/2026_08_31_000000_create_verified_bank_receipt_cash_postings.php database/migrations/2026_09_02_000000_create_contractual_billing_schedules_and_obligations.php database/migrations/2026_09_02_010000_create_contractual_billing_entitlements.php database/migrations/2026_09_02_020000_install_contractual_billing_integrity.php database/migrations/2026_09_05_000000_create_entitlement_receivable_links.php tests/Unit/Accounting tests/Feature/AccountingApplicationTest.php tests/Feature/AccountingApplicationStructureTest.php tests/Feature/AccountingApplicationConcurrencyTest.php tests/Feature/AccountingApiTestCase.php tests/Feature/AccountingSettingsAndAccountsApiTest.php tests/Feature/AccountingJournalsApiTest.php tests/Feature/AccountingOpeningBalanceApiTest.php tests/Feature/AccountingApiBoundaryTest.php tests/Feature/AccountingReportingQueriesTest.php tests/Feature/CollectionBackedReceivableTest.php tests/Feature/PaymentsAllocationsTest.php tests/Feature/PaymentsAllocationsConcurrencyTest.php tests/Feature/ReceiptEvidenceTest.php tests/Feature/ReceiptEvidenceSchemaIntegrityTest.php tests/Feature/ReceiptEvidenceConcurrencyTest.php tests/Feature/ReceiptEvidenceApiTest.php tests/Feature/ReceivablesApiTest.php tests/Feature/ReceivablesSchemaIntegrityTest.php tests/Feature/ReceivablesConcurrencyTest.php tests/Feature/ReceivableAccountingIntegrationTest.php tests/Feature/VerifiedBankReceiptCashPostingTest.php tests/Feature/VerifiedBankReceiptCashPostingSchemaIntegrityTest.php tests/Feature/VerifiedBankReceiptCashPostingConcurrencyTest.php tests/Feature/ContractualBillingActionsTest.php tests/Feature/ContractualBillingConcurrencyTest.php tests/Feature/ContractualBillingEntitlementAndDraftCancellationTest.php tests/Feature/ContractualBillingRecoveryTest.php tests/Feature/ContractualBillingSchemaIntegrityTest.php tests/Feature/ContractualBillingSourceCorrectionTest.php tests/Feature/ContractualBillingSuccessorCorrectionTest.php tests/Feature/ContractualBillingEntitlementReceivableTest.php tests/Feature/ContractualBillingEntitlementReceivableIntegrityTest.php tests/Feature/ContractualBillingEntitlementReceivableRecoveryTest.php tests/Feature/ContractualBillingEntitlementReceivableConcurrencyTest.php tests/Support/contractual_billing_worker.php tests/Support/accounting_application_worker.php tests/Support/receivables_worker.php tests/Support/payments_allocations_worker.php tests/Support/receipt_evidence_worker.php tests/Support/verified_bank_receipt_cash_posting_worker.php
