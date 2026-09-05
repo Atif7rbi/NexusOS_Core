@@ -8,6 +8,7 @@ use App\Modules\ContractualBilling\Actions\CorrectFinalizedContractualBillingSch
 use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use App\Modules\ContractualBilling\Actions\SupersedeFinalizedContractualBillingSchedule;
 use App\Modules\ContractualBilling\Support\CancelLinkedReceivablePrimitive;
+use App\Modules\Payments\Actions\AllocatePaymentAction;
 use App\Modules\Receivables\Actions\CancelReceivableAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
@@ -29,6 +30,14 @@ config([
     'database.connections.pgsql.password' => $payload['database']['password'],
 ]);
 DB::purge('pgsql');
+
+if (isset($payload['application_name'])) {
+    $applicationName = (string) $payload['application_name'];
+    if (! preg_match('/^[a-z0-9_]{1,63}$/', $applicationName)) {
+        throw new InvalidArgumentException('Invalid worker application_name.');
+    }
+    DB::statement("SET application_name = '{$applicationName}'");
+}
 
 function billingSignal(?string $path): void
 {
@@ -55,7 +64,7 @@ try {
     billingAwait($payload['start_barrier'] ?? null, (int) ($payload['barrier_timeout_ms'] ?? 15000));
     $action = (string) ($payload['action'] ?? '');
 
-    if (in_array($action, ['hold_tenant', 'hold_membership', 'hold_receivable'], true)) {
+    if (in_array($action, ['hold_tenant', 'hold_membership', 'hold_receivable', 'hold_link'], true)) {
         DB::transaction(function () use ($payload, $action): void {
             DB::statement("SET LOCAL lock_timeout = '5s'");
             DB::statement("SET LOCAL statement_timeout = '30s'");
@@ -64,6 +73,8 @@ try {
                 DB::table('tenants')->where('id', $payload['tenant_id'])->lockForUpdate()->firstOrFail();
             } elseif ($action === 'hold_membership') {
                 DB::table('tenant_users')->where('tenant_id', $payload['tenant_id'])->where('user_id', $payload['actor_id'])->lockForUpdate()->firstOrFail();
+            } elseif ($action === 'hold_link') {
+                DB::table('entitlement_receivable_links')->where('tenant_id', $payload['tenant_id'])->where('receivable_id', $payload['receivable_id'])->lockForUpdate()->firstOrFail();
             } else {
                 DB::table('receivables')->where('tenant_id', $payload['tenant_id'])->where('id', $payload['receivable_id'])->lockForUpdate()->firstOrFail();
             }
@@ -71,6 +82,63 @@ try {
             billingSignal($payload['ready_file'] ?? null);
             billingAwait($payload['release_file'] ?? null, (int) ($payload['barrier_timeout_ms'] ?? 15000));
         });
+        echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
+        return;
+    }
+
+    if ($action === 'hold_authorization_rows_no_key_update') {
+        DB::transaction(function () use ($payload): void {
+            DB::statement("SET LOCAL lock_timeout = '5s'");
+            DB::statement("SET LOCAL statement_timeout = '30s'");
+            DB::table('tenant_users')
+                ->where('tenant_id', $payload['tenant_id'])
+                ->where('user_id', $payload['actor_id'])
+                ->lock('FOR NO KEY UPDATE')
+                ->firstOrFail();
+            DB::table('users')
+                ->where('id', $payload['actor_id'])
+                ->lock('FOR NO KEY UPDATE')
+                ->firstOrFail();
+            DB::table('tenants')
+                ->where('id', $payload['tenant_id'])
+                ->lock('FOR NO KEY UPDATE')
+                ->firstOrFail();
+            billingSignal($payload['ready_file'] ?? null);
+            billingAwait($payload['release_file'] ?? null, (int) ($payload['barrier_timeout_ms'] ?? 15000));
+        });
+        echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
+        return;
+    }
+
+    if ($action === 'mutate_membership_status') {
+        DB::transaction(function () use ($payload): void {
+            DB::statement("SET LOCAL lock_timeout = '5s'");
+            DB::statement("SET LOCAL statement_timeout = '30s'");
+            DB::table('tenant_users')
+                ->where('tenant_id', $payload['tenant_id'])
+                ->where('user_id', $payload['actor_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+            billingSignal($payload['ready_file'] ?? null);
+            billingAwait($payload['release_file'] ?? null, (int) ($payload['barrier_timeout_ms'] ?? 15000));
+            DB::table('tenant_users')
+                ->where('tenant_id', $payload['tenant_id'])
+                ->where('user_id', $payload['actor_id'])
+                ->update(['status' => $payload['status'], 'updated_at' => now()]);
+        });
+        echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+
+        return;
+    }
+
+    if ($action === 'probe_receivable_nowait') {
+        DB::transaction(fn () => DB::table('receivables')
+            ->where('tenant_id', $payload['tenant_id'])
+            ->where('id', $payload['receivable_id'])
+            ->lock('FOR UPDATE NOWAIT')
+            ->firstOrFail());
         echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
 
         return;
@@ -153,6 +221,19 @@ try {
     if ($action === 'establish_entitlement_receivable_action') {
         $actor = User::query()->findOrFail($payload['actor_id']);
         $id = app(EstablishEntitlementReceivable::class)->execute($payload['tenant_id'], $payload['entitlement_id'], $actor, ['receivable_establishment_operation_id' => $payload['operation_id']]);
+        echo json_encode(['ok' => true, 'id' => $id], JSON_THROW_ON_ERROR);
+
+        return;
+    }
+
+    if ($action === 'allocate_payment_action') {
+        $actor = User::query()->findOrFail($payload['actor_id']);
+        $id = app(AllocatePaymentAction::class)->execute($payload['tenant_id'], $actor, [
+            'payment_id' => $payload['payment_id'],
+            'receivable_id' => $payload['receivable_id'],
+            'allocation_operation_id' => $payload['allocation_operation_id'],
+            'amount' => $payload['amount'],
+        ]);
         echo json_encode(['ok' => true, 'id' => $id], JSON_THROW_ON_ERROR);
 
         return;
