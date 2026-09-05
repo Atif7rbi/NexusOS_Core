@@ -115,7 +115,11 @@ return new class extends Migration
             $$;
 
             CREATE CONSTRAINT TRIGGER receivables_entitlement_final_state
-            AFTER UPDATE
+            AFTER UPDATE OF
+              status,
+              cancelled_at,
+              cancelled_by,
+              cancellation_reason
             ON public.receivables
             DEFERRABLE INITIALLY DEFERRED
             FOR EACH ROW
