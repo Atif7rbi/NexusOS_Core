@@ -144,41 +144,13 @@ return new class extends Migration
             DROP TRIGGER IF EXISTS receivables_entitlement_final_state
               ON public.receivables;
 
-            CREATE OR REPLACE FUNCTION public.receivable_has_entitlement_link(
-              p_tenant_id text,
-              p_receivable_id text
-            ) RETURNS boolean
-            LANGUAGE sql
-            STABLE
-            SECURITY DEFINER
-            SET search_path = pg_catalog, public
-            AS $$
-              SELECT EXISTS (
-                SELECT 1
-                FROM public.entitlement_receivable_links link
-                WHERE link.tenant_id = p_tenant_id
-                  AND link.receivable_id = p_receivable_id
-              )
-            $$;
-
             CREATE CONSTRAINT TRIGGER receivables_entitlement_final_state
             AFTER UPDATE
             ON public.receivables
             DEFERRABLE INITIALLY DEFERRED
             FOR EACH ROW
-            WHEN (
-              public.receivable_has_entitlement_link(
-                NEW.tenant_id,
-                NEW.id
-              )
-            )
             EXECUTE FUNCTION public.check_entitlement_receivable_link_final_state();
-
-            REVOKE EXECUTE ON FUNCTION public.receivable_has_entitlement_link(text,text)
-              FROM PUBLIC;
             SQL);
-
-        $this->revokeRuntimeHelperExecution('public.receivable_has_entitlement_link(text,text)');
     }
 
     private function revokeRuntimeHelperExecution(
