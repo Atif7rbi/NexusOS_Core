@@ -10,6 +10,8 @@ use App\Modules\ContractualBilling\Exceptions\ContractualBillingValidationFailed
 use App\Modules\ContractualBilling\Support\ContractualBillingAuthorization;
 use App\Modules\ContractualBilling\Support\ContractualBillingFacts;
 use App\Modules\ContractualBilling\Support\ContractualBillingTransaction;
+use App\Modules\ContractualBilling\Support\EntitlementReceivableSourceCorrection;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,6 +21,7 @@ final class CorrectFinalizedContractualBillingSchedule
     public function __construct(
         private readonly ContractualBillingTransaction $tx,
         private readonly ContractualBillingAuthorization $auth,
+        private readonly EntitlementReceivableSourceCorrection $receivableCorrection,
     ) {}
 
     public function execute(
@@ -60,12 +63,8 @@ final class CorrectFinalizedContractualBillingSchedule
 
             /*
              * Frozen correction lock order:
-             *
-             * authorization
-             * -> Contract
-             * -> source Schedule
-             * -> source Obligations ordered by ULID
-             * -> effective Entitlements ordered by ULID
+             * authorization -> Contract -> Schedule -> Obligations ->
+             * Entitlements -> existing Links -> linked Receivables.
              */
             $contract = DB::table('contracts')
                 ->where('tenant_id', $tenantId)
@@ -100,11 +99,6 @@ final class CorrectFinalizedContractualBillingSchedule
                 ->lockForUpdate()
                 ->get();
 
-            /*
-             * Replay of a finalized-source cancellation must be checked
-             * against the entire historical mapping, not merely effective
-             * rows, because successful correction already reversed them.
-             */
             if (
                 $schedule->status === 'cancelled'
                 && $schedule->finalization_operation_id !== null
@@ -176,7 +170,19 @@ final class CorrectFinalizedContractualBillingSchedule
                 );
             }
 
-            $now = now();
+            $downstream = $this->receivableCorrection
+                ->lockForFirstCorrection($tenantId, $entitlements);
+
+            $now = CarbonImmutable::now('UTC');
+
+            $this->receivableCorrection->cancelLinkedReceivables(
+                $tenantId,
+                $downstream,
+                $actor,
+                $facts['source_correction_operation_id'],
+                $now,
+                $facts['source_correction_reason'],
+            );
 
             foreach ($entitlements as $entitlement) {
                 $entitlementId = (string) $entitlement->id;
@@ -341,6 +347,12 @@ final class CorrectFinalizedContractualBillingSchedule
                 'Source correction replay used a different Entitlement reversal mapping.',
             );
         }
+
+        $this->receivableCorrection->assertReplayCoherent(
+            $tenantId,
+            $entitlements,
+            $facts['source_correction_operation_id'],
+        );
 
         return (string) $schedule->id;
     }
