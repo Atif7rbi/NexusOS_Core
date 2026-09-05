@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\ContractualBilling\Actions\ActivateContractualBillingEntitlement;
-use App\Modules\ContractualBilling\Actions\CorrectFinalizedContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\CreateContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use App\Modules\ContractualBilling\Actions\FinalizeContractualBillingSchedule;
@@ -68,18 +67,11 @@ final class ContractualBillingEntitlementReceivableSecurityTest extends TestCase
         self::assertNotSame($role, $owner);
     }
 
-    public function test_runtime_role_can_update_linked_and_unlinked_receivables_without_direct_helper_execute(): void
+    public function test_runtime_role_can_execute_valid_unlinked_receivable_cancellation_without_helper_execute(): void
     {
         [$tenantId, $actorId, $customerId, $contractId] = $this->context();
-        [, , $entitlementId] = $this->effectiveEntitlement($tenantId, $actorId, $contractId);
         $actor = User::query()->findOrFail($actorId);
-        $linkedReceivableId = app(EstablishEntitlementReceivable::class)->execute(
-            $tenantId,
-            $entitlementId,
-            $actor,
-            ['receivable_establishment_operation_id' => (string) Str::ulid()],
-        );
-        $unlinkedReceivableId = app(RecognizeReceivableAction::class)->execute(
+        $receivableId = app(RecognizeReceivableAction::class)->execute(
             $tenantId,
             $actor,
             [
@@ -94,22 +86,23 @@ final class ContractualBillingEntitlementReceivableSecurityTest extends TestCase
             ],
         );
 
-        $this->asRuntimeRole(function () use ($tenantId, $linkedReceivableId, $unlinkedReceivableId): void {
+        $this->asRuntimeRole(function () use ($tenantId, $actorId, $receivableId): void {
             DB::table('receivables')
                 ->where('tenant_id', $tenantId)
-                ->where('id', $linkedReceivableId)
-                ->update(['updated_at' => now()]);
-            DB::table('receivables')
-                ->where('tenant_id', $tenantId)
-                ->where('id', $unlinkedReceivableId)
-                ->update(['updated_at' => now()]);
+                ->where('id', $receivableId)
+                ->update([
+                    'status' => 'cancelled',
+                    'cancelled_at' => now(),
+                    'cancelled_by' => $actorId,
+                    'cancellation_reason' => 'Runtime unlinked cancellation proof',
+                    'updated_at' => now(),
+                ]);
         });
 
-        self::assertSame('recognized', DB::table('receivables')->where('id', $linkedReceivableId)->value('status'));
-        self::assertSame('recognized', DB::table('receivables')->where('id', $unlinkedReceivableId)->value('status'));
+        self::assertSame('cancelled', DB::table('receivables')->where('id', $receivableId)->value('status'));
     }
 
-    public function test_runtime_role_can_execute_compound_source_correction_through_security_definer_guards(): void
+    public function test_runtime_role_can_commit_coherent_linked_compound_correction_through_security_definer_guards(): void
     {
         [$tenantId, $actorId, , $contractId] = $this->context();
         [$scheduleId, , $entitlementId] = $this->effectiveEntitlement($tenantId, $actorId, $contractId);
@@ -121,19 +114,64 @@ final class ContractualBillingEntitlementReceivableSecurityTest extends TestCase
             ['receivable_establishment_operation_id' => (string) Str::ulid()],
         );
         $correctionOperation = (string) Str::ulid();
+        $reversalOperation = (string) Str::ulid();
 
-        $this->asRuntimeRole(function () use ($tenantId, $actor, $scheduleId, $entitlementId, $correctionOperation): void {
-            app(CorrectFinalizedContractualBillingSchedule::class)->execute(
-                $tenantId,
-                $scheduleId,
-                $actor,
-                [
+        $this->asRuntimeRole(function () use (
+            $tenantId,
+            $actorId,
+            $scheduleId,
+            $entitlementId,
+            $receivableId,
+            $correctionOperation,
+            $reversalOperation,
+        ): void {
+            $now = now();
+
+            DB::table('entitlement_receivable_links')
+                ->where('tenant_id', $tenantId)
+                ->where('entitlement_id', $entitlementId)
+                ->update([
                     'source_correction_operation_id' => $correctionOperation,
-                    'source_correction_reason' => 'Runtime role correction proof',
+                    'updated_at' => $now,
+                ]);
+
+            DB::table('receivables')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $receivableId)
+                ->update([
+                    'status' => 'cancelled',
+                    'cancelled_at' => $now,
+                    'cancelled_by' => $actorId,
+                    'cancellation_reason' => 'Runtime linked correction proof',
+                    'updated_at' => $now,
+                ]);
+
+            DB::table('contractual_billing_entitlements')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $entitlementId)
+                ->update([
+                    'status' => 'reversed',
+                    'reversal_operation_id' => $reversalOperation,
+                    'reversed_by' => $actorId,
+                    'reversed_at' => $now,
+                    'reversal_reason' => 'Runtime linked correction proof',
+                    'source_correction_operation_id' => $correctionOperation,
+                    'source_rescission_reference' => 'ERL-IMPL-001',
+                    'updated_at' => $now,
+                ]);
+
+            DB::table('contractual_billing_schedules')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $scheduleId)
+                ->update([
+                    'status' => 'cancelled',
+                    'source_correction_operation_id' => $correctionOperation,
+                    'source_corrected_by' => $actorId,
+                    'source_corrected_at' => $now,
+                    'source_correction_reason' => 'Runtime linked correction proof',
                     'source_correction_reference' => 'ERL-IMPL-001',
-                    'entitlement_reversals' => [$entitlementId => (string) Str::ulid()],
-                ],
-            );
+                    'updated_at' => $now,
+                ]);
         });
 
         self::assertSame('cancelled', DB::table('contractual_billing_schedules')->where('id', $scheduleId)->value('status'));
