@@ -196,8 +196,20 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
         $actor = User::query()->findOrFail($actorId);
         $receivableId = app(EstablishEntitlementReceivable::class)->execute($tenantId, $entitlementId, $actor, ['receivable_establishment_operation_id' => (string) Str::ulid()]);
         $paymentId = $this->payment($tenantId, $actor, $customerId);
-        $barrier = $this->temporaryFile('erl-c6-start-');
+        $ready = $this->temporaryFile('erl-c6-ready-');
+        $release = $this->temporaryFile('erl-c6-release-');
+        $allocationOperation = (string) Str::ulid();
         $correctionOperation = (string) Str::ulid();
+
+        $holder = $this->startWorker([
+            'action' => 'hold_receivable',
+            'tenant_id' => $tenantId,
+            'receivable_id' => $receivableId,
+            'ready_file' => $ready,
+            'release_file' => $release,
+            'application_name' => 'erl_c6_receivable_holder',
+        ]);
+        $this->waitForFile($ready);
 
         $allocation = $this->startWorker([
             'action' => 'allocate_payment_action',
@@ -205,10 +217,12 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
             'actor_id' => $actorId,
             'payment_id' => $paymentId,
             'receivable_id' => $receivableId,
-            'allocation_operation_id' => (string) Str::ulid(),
+            'allocation_operation_id' => $allocationOperation,
             'amount' => '100.00',
-            'start_barrier' => $barrier,
+            'application_name' => 'erl_c6_allocation',
         ]);
+        $this->waitForWorkerBlockedBy('erl_c6_allocation', 'erl_c6_receivable_holder');
+
         $correction = $this->startWorker([
             'action' => 'cancel_finalized_source_action',
             'tenant_id' => $tenantId,
@@ -218,27 +232,23 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
             'source_correction_reason' => 'Allocation race',
             'source_correction_reference' => 'ERL-C6',
             'entitlement_reversals' => [$entitlementId => (string) Str::ulid()],
-            'start_barrier' => $barrier,
+            'application_name' => 'erl_c6_correction',
         ]);
+        $this->waitForWorkerBlockedBy('erl_c6_correction', 'erl_c6_allocation');
 
-        touch($barrier);
-        $results = [$this->finishWorker($allocation), $this->finishWorker($correction)];
-        $effectiveAllocation = DB::table('payment_allocations')->where('tenant_id', $tenantId)->where('receivable_id', $receivableId)->where('status', 'effective')->exists();
-        $entitlementStatus = (string) DB::table('contractual_billing_entitlements')->where('id', $entitlementId)->value('status');
+        touch($release);
+        $holderResult = $this->finishWorker($holder);
+        $allocationResult = $this->finishWorker($allocation);
+        $correctionResult = $this->finishWorker($correction);
 
-        self::assertSame(1, count(array_filter($results, static fn (array $result): bool => $result['ok'] === true)), json_encode($results));
-        self::assertFalse($effectiveAllocation && $entitlementStatus === 'reversed', json_encode($results));
-
-        if ($effectiveAllocation) {
-            self::assertSame('effective', $entitlementStatus);
-            self::assertSame('finalized', DB::table('contractual_billing_schedules')->where('id', $scheduleId)->value('status'));
-            self::assertSame('recognized', DB::table('receivables')->where('id', $receivableId)->value('status'));
-            self::assertNull(DB::table('entitlement_receivable_links')->where('entitlement_id', $entitlementId)->value('source_correction_operation_id'));
-        } else {
-            self::assertSame('reversed', $entitlementStatus);
-            self::assertSame('cancelled', DB::table('receivables')->where('id', $receivableId)->value('status'));
-            self::assertSame($correctionOperation, DB::table('entitlement_receivable_links')->where('entitlement_id', $entitlementId)->value('source_correction_operation_id'));
-        }
+        self::assertTrue($holderResult['ok'], json_encode($holderResult));
+        self::assertTrue($allocationResult['ok'], json_encode($allocationResult));
+        self::assertFalse($correctionResult['ok'], json_encode($correctionResult));
+        self::assertSame(1, DB::table('payment_allocations')->where('tenant_id', $tenantId)->where('receivable_id', $receivableId)->where('allocation_operation_id', $allocationOperation)->where('status', 'effective')->count());
+        self::assertSame('effective', DB::table('contractual_billing_entitlements')->where('id', $entitlementId)->value('status'));
+        self::assertSame('finalized', DB::table('contractual_billing_schedules')->where('id', $scheduleId)->value('status'));
+        self::assertSame('recognized', DB::table('receivables')->where('id', $receivableId)->value('status'));
+        self::assertNull(DB::table('entitlement_receivable_links')->where('entitlement_id', $entitlementId)->value('source_correction_operation_id'));
     }
 
     public function test_c7_membership_revocation_vs_establishment_reauthorizes_before_source_locks(): void
@@ -330,7 +340,8 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
         [$scheduleId, , $entitlementId] = $this->effectiveEntitlement($tenantId, $actorId, $contractId);
         $actor = User::query()->findOrFail($actorId);
         $receivableId = app(EstablishEntitlementReceivable::class)->execute($tenantId, $entitlementId, $actor, ['receivable_establishment_operation_id' => (string) Str::ulid()]);
-        $barrier = $this->temporaryFile('erl-c9-start-');
+        $ready = $this->temporaryFile('erl-c9-ready-');
+        $release = $this->temporaryFile('erl-c9-release-');
         $operation = (string) Str::ulid();
         $reversal = (string) Str::ulid();
         $payload = [
@@ -342,15 +353,34 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
             'source_correction_reason' => 'Concurrent replay',
             'source_correction_reference' => 'ERL-C9',
             'entitlement_reversals' => [$entitlementId => $reversal],
-            'start_barrier' => $barrier,
         ];
 
-        $first = $this->startWorker($payload);
-        $second = $this->startWorker($payload);
-        touch($barrier);
-        $results = [$this->finishWorker($first), $this->finishWorker($second)];
+        $holder = $this->startWorker([
+            'action' => 'hold_link',
+            'tenant_id' => $tenantId,
+            'receivable_id' => $receivableId,
+            'ready_file' => $ready,
+            'release_file' => $release,
+            'application_name' => 'erl_c9_link_holder',
+        ]);
+        $this->waitForFile($ready);
 
-        self::assertSame(2, count(array_filter($results, static fn (array $result): bool => $result['ok'] === true)), json_encode($results));
+        $first = $this->startWorker($payload + ['application_name' => 'erl_c9_first']);
+        $this->waitForWorkerBlockedBy('erl_c9_first', 'erl_c9_link_holder');
+
+        $second = $this->startWorker($payload + ['application_name' => 'erl_c9_second']);
+        $this->waitForWorkerBlockedBy('erl_c9_second', 'erl_c9_first');
+
+        touch($release);
+        $holderResult = $this->finishWorker($holder);
+        $firstResult = $this->finishWorker($first);
+        $secondResult = $this->finishWorker($second);
+
+        self::assertTrue($holderResult['ok'], json_encode($holderResult));
+        self::assertTrue($firstResult['ok'], json_encode($firstResult));
+        self::assertTrue($secondResult['ok'], json_encode($secondResult));
+        self::assertSame($firstResult['id'], $secondResult['id'], json_encode([$firstResult, $secondResult]));
+        self::assertSame($scheduleId, $firstResult['id']);
         self::assertSame('cancelled', DB::table('contractual_billing_schedules')->where('id', $scheduleId)->value('status'));
         self::assertSame($operation, DB::table('contractual_billing_schedules')->where('id', $scheduleId)->value('source_correction_operation_id'));
         self::assertSame('reversed', DB::table('contractual_billing_entitlements')->where('id', $entitlementId)->value('status'));
@@ -527,6 +557,39 @@ final class ContractualBillingEntitlementReceivableConcurrencyTest extends TestC
             usleep(10_000);
             if ((hrtime(true) - $started) / 1_000_000 > $timeoutMs) {
                 self::fail("Timed out waiting for worker [{$applicationName}] to block on a PostgreSQL lock.");
+            }
+        }
+    }
+
+    private function waitForWorkerBlockedBy(string $waitingApplication, string $blockingApplication, int $timeoutMs = 5000): void
+    {
+        $started = hrtime(true);
+        while (true) {
+            $activity = DB::selectOne(
+                <<<'SQL'
+                    SELECT
+                      waiter.wait_event_type,
+                      EXISTS (
+                        SELECT 1
+                        FROM pg_catalog.unnest(pg_catalog.pg_blocking_pids(waiter.pid)) AS blocking(pid)
+                        JOIN pg_catalog.pg_stat_activity blocker
+                          ON blocker.pid = blocking.pid
+                        WHERE blocker.application_name = ?
+                      ) AS blocked_by_expected
+                    FROM pg_catalog.pg_stat_activity waiter
+                    WHERE waiter.application_name = ?
+                      AND waiter.pid <> pg_backend_pid()
+                    ORDER BY waiter.backend_start DESC
+                    LIMIT 1
+                    SQL,
+                [$blockingApplication, $waitingApplication],
+            );
+            if ($activity !== null && $activity->wait_event_type === 'Lock' && (bool) $activity->blocked_by_expected) {
+                return;
+            }
+            usleep(10_000);
+            if ((hrtime(true) - $started) / 1_000_000 > $timeoutMs) {
+                self::fail("Timed out waiting for worker [{$waitingApplication}] to block on PostgreSQL worker [{$blockingApplication}].");
             }
         }
     }
