@@ -18,7 +18,10 @@ final class ContractualBillingAuthorization
     public function authorize(string $tenantId, User $actor): void
     {
         try {
-            $this->authorization->authorize($tenantId, $actor);
+            $this->authorization->authorizeTenantAdministrator(
+                $tenantId,
+                $actor,
+            );
         } catch (ReceivablesAccessDenied $exception) {
             throw new ContractualBillingAccessDenied(
                 'Actor is not authorized for Contractual Billing.',
@@ -32,10 +35,11 @@ final class ContractualBillingAuthorization
         User $actor,
     ): void {
         try {
-            $this->authorization->authorizeTransactional(
-                $tenantId,
-                $actor,
-            );
+            $this->authorization
+                ->authorizeTransactionalTenantAdministrator(
+                    $tenantId,
+                    $actor,
+                );
         } catch (ReceivablesAccessDenied $exception) {
             throw new ContractualBillingAccessDenied(
                 'Actor is not authorized for Contractual Billing.',

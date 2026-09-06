@@ -135,6 +135,7 @@ final class CollectionBackedReceivableTest extends TestCase
         app(CancelReceivableAction::class)->execute($tenantId, $id, $actor, '2026-08-26T11:00:00+00:00', 'Historical correction');
         $this->cancelSourceCollection($collection, $actor);
 
+        DB::statement('SET CONSTRAINTS receivables_entitlement_final_state IMMEDIATE');
         $migration->up();
 
         self::assertSame('cancelled', DB::table('receivables')->where('id', $id)->value('status'));

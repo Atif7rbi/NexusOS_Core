@@ -10,7 +10,9 @@ use App\Modules\ContractualBilling\Exceptions\ContractualBillingValidationFailed
 use App\Modules\ContractualBilling\Support\ContractualBillingAuthorization;
 use App\Modules\ContractualBilling\Support\ContractualBillingFacts;
 use App\Modules\ContractualBilling\Support\ContractualBillingTransaction;
+use App\Modules\ContractualBilling\Support\EntitlementReceivableSourceCorrection;
 use Brick\Math\BigDecimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,6 +22,7 @@ final class SupersedeFinalizedContractualBillingSchedule
     public function __construct(
         private readonly ContractualBillingTransaction $tx,
         private readonly ContractualBillingAuthorization $auth,
+        private readonly EntitlementReceivableSourceCorrection $receivableCorrection,
     ) {}
 
     public function execute(
@@ -132,9 +135,7 @@ final class SupersedeFinalizedContractualBillingSchedule
                 );
             }
 
-            $sourceObligations = DB::table(
-                'contractual_billing_obligations',
-            )
+            DB::table('contractual_billing_obligations')
                 ->where('tenant_id', $tenantId)
                 ->where('schedule_id', $sourceScheduleId)
                 ->orderBy('id')
@@ -222,6 +223,9 @@ final class SupersedeFinalizedContractualBillingSchedule
                 );
             }
 
+            $downstream = $this->receivableCorrection
+                ->lockForFirstCorrection($tenantId, $entitlements);
+
             $timezone = DB::table('tenants')
                 ->where('id', $tenantId)
                 ->value('timezone');
@@ -232,7 +236,16 @@ final class SupersedeFinalizedContractualBillingSchedule
                 );
             }
 
-            $now = now();
+            $now = CarbonImmutable::now('UTC');
+
+            $this->receivableCorrection->cancelLinkedReceivables(
+                $tenantId,
+                $downstream,
+                $actor,
+                $facts['source_correction_operation_id'],
+                $now,
+                $facts['source_correction_reason'],
+            );
 
             foreach ($entitlements as $entitlement) {
                 $id = (string) $entitlement->id;
@@ -400,6 +413,12 @@ final class SupersedeFinalizedContractualBillingSchedule
                 'Schedule supersession replay used a different Entitlement reversal mapping.',
             );
         }
+
+        $this->receivableCorrection->assertReplayCoherent(
+            $tenantId,
+            $entitlements,
+            $facts['source_correction_operation_id'],
+        );
 
         return (string) $successor->id;
     }
