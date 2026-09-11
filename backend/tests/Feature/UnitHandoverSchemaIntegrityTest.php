@@ -69,12 +69,14 @@ final class UnitHandoverSchemaIntegrityTest extends TestCase
             FROM pg_catalog.pg_constraint
             WHERE conname IN (
               'unit_handover_evidence_final_state_guard',
-              'unit_handover_acceptance_final_state_guard'
+              'unit_handover_acceptance_final_state_guard',
+              'unit_handover_evidence_pair_final_state_guard',
+              'unit_handover_acceptance_pair_final_state_guard'
             )
             ORDER BY conname
             SQL);
 
-        self::assertCount(2, $guards);
+        self::assertCount(4, $guards);
 
         foreach ($guards as $guard) {
             self::assertTrue($guard->condeferrable);
@@ -322,6 +324,150 @@ final class UnitHandoverSchemaIntegrityTest extends TestCase
         );
     }
 
+    public function test_direct_sql_acceptance_only_reversal_is_rejected_at_final_state(): void
+    {
+        [
+            $tenantId,
+            $actorId,
+            $customerId,
+            $reservationId,
+            $unitId,
+            $contractId,
+        ] = $this->handoverContext();
+
+        $evidenceId = $this->insertEvidence(
+            $tenantId,
+            $actorId,
+            $customerId,
+            $reservationId,
+            $unitId,
+            $contractId,
+        );
+
+        $acceptanceId = $this->insertAcceptance(
+            $tenantId,
+            $actorId,
+            $customerId,
+            $reservationId,
+            $unitId,
+            $contractId,
+            $evidenceId,
+        );
+
+        $operationId = (string) Str::ulid();
+        $reversedAt = now();
+
+        $this->assertRejected(
+            fn () => DB::table('unit_handover_acceptances')
+                ->where('id', $acceptanceId)
+                ->update([
+                    'status' => 'reversed',
+                    'reversal_operation_id' => $operationId,
+                    'reversal_reason' => 'Invalid acceptance-only reversal',
+                    'reversal_reference' => 'REV/PAIR/ACCEPTANCE-ONLY',
+                    'reversed_by' => $actorId,
+                    'reversed_at' => $reversedAt,
+                    'updated_at' => $reversedAt,
+                ]),
+        );
+
+        self::assertSame(
+            'effective',
+            DB::table('unit_handover_acceptances')
+                ->where('id', $acceptanceId)
+                ->value('status'),
+        );
+
+        self::assertSame(
+            'effective',
+            DB::table('unit_handover_evidence')
+                ->where('id', $evidenceId)
+                ->value('status'),
+        );
+    }
+
+    public function test_direct_sql_mismatched_pair_reversal_metadata_is_rejected_at_final_state(): void
+    {
+        [
+            $tenantId,
+            $actorId,
+            $customerId,
+            $reservationId,
+            $unitId,
+            $contractId,
+        ] = $this->handoverContext();
+
+        $evidenceId = $this->insertEvidence(
+            $tenantId,
+            $actorId,
+            $customerId,
+            $reservationId,
+            $unitId,
+            $contractId,
+        );
+
+        $acceptanceId = $this->insertAcceptance(
+            $tenantId,
+            $actorId,
+            $customerId,
+            $reservationId,
+            $unitId,
+            $contractId,
+            $evidenceId,
+        );
+
+        $operationId = (string) Str::ulid();
+        $reversedAt = now();
+
+        $this->assertRejected(
+            function () use (
+                $acceptanceId,
+                $evidenceId,
+                $operationId,
+                $actorId,
+                $reversedAt,
+            ): void {
+                DB::table('unit_handover_acceptances')
+                    ->where('id', $acceptanceId)
+                    ->update([
+                        'status' => 'reversed',
+                        'reversal_operation_id' => $operationId,
+                        'reversal_reason' => 'Canonical pair correction',
+                        'reversal_reference' => 'REV/PAIR/CANONICAL',
+                        'reversed_by' => $actorId,
+                        'reversed_at' => $reversedAt,
+                        'updated_at' => $reversedAt,
+                    ]);
+
+                DB::table('unit_handover_evidence')
+                    ->where('id', $evidenceId)
+                    ->update([
+                        'status' => 'reversed',
+                        'reversal_operation_id' => $operationId,
+                        'reversal_reason' => 'DIFFERENT correction reason',
+                        'reversal_reference' => 'REV/PAIR/CANONICAL',
+                        'reversed_by' => $actorId,
+                        'reversed_at' => $reversedAt,
+                        'updated_at' => $reversedAt,
+                    ]);
+            },
+        );
+
+        self::assertSame(
+            'effective',
+            DB::table('unit_handover_acceptances')
+                ->where('id', $acceptanceId)
+                ->value('status'),
+        );
+
+        self::assertSame(
+            'effective',
+            DB::table('unit_handover_evidence')
+                ->where('id', $evidenceId)
+                ->value('status'),
+        );
+    }
+
     public function test_handover_business_truth_is_immutable_and_delete_is_forbidden(): void
     {
         [$tenantId, $actorId, $customerId, $reservationId, $unitId, $contractId] =
@@ -420,6 +566,7 @@ final class UnitHandoverSchemaIntegrityTest extends TestCase
             'validate_unit_handover_acceptance_source',
             'validate_unit_handover_evidence_final_state',
             'validate_unit_handover_acceptance_final_state',
+            'validate_unit_handover_pair_final_state',
             'prevent_contract_handover_provenance_mutation',
             'prevent_reservation_handover_provenance_mutation',
             'lock_unit_handover_evidence_tenant',
@@ -464,17 +611,20 @@ final class UnitHandoverSchemaIntegrityTest extends TestCase
         );
 
         $reversalOperationId = (string) Str::ulid();
+        $reversalReason = 'Correct handover performance source';
+        $reversalReference = 'REV/PERFORMANCE-001';
+        $reversedAt = now();
 
         DB::table('unit_handover_acceptances')
             ->where('id', $acceptanceId)
             ->update([
                 'status' => 'reversed',
                 'reversal_operation_id' => $reversalOperationId,
-                'reversal_reason' => 'Correct accepted handover source',
-                'reversal_reference' => 'REV/ACCEPTANCE-001',
+                'reversal_reason' => $reversalReason,
+                'reversal_reference' => $reversalReference,
                 'reversed_by' => $actorId,
-                'reversed_at' => now(),
-                'updated_at' => now(),
+                'reversed_at' => $reversedAt,
+                'updated_at' => $reversedAt,
             ]);
 
         DB::table('unit_handover_evidence')
@@ -482,11 +632,11 @@ final class UnitHandoverSchemaIntegrityTest extends TestCase
             ->update([
                 'status' => 'reversed',
                 'reversal_operation_id' => $reversalOperationId,
-                'reversal_reason' => 'Correct handover evidence',
-                'reversal_reference' => 'REV/EVIDENCE-001',
+                'reversal_reason' => $reversalReason,
+                'reversal_reference' => $reversalReference,
                 'reversed_by' => $actorId,
-                'reversed_at' => now(),
-                'updated_at' => now(),
+                'reversed_at' => $reversedAt,
+                'updated_at' => $reversedAt,
             ]);
 
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');

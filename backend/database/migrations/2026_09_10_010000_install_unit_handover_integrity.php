@@ -617,6 +617,94 @@ return new class extends Migration
             DEFERRABLE INITIALLY DEFERRED
             FOR EACH ROW
             EXECUTE FUNCTION public.validate_unit_handover_acceptance_final_state();
+
+
+            CREATE OR REPLACE FUNCTION public.validate_unit_handover_pair_final_state()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = pg_catalog, public
+            AS $$
+            DECLARE
+              evidence_id char(26);
+              evidence_row public.unit_handover_evidence%ROWTYPE;
+              acceptance_row public.unit_handover_acceptances%ROWTYPE;
+            BEGIN
+              IF TG_TABLE_NAME = 'unit_handover_evidence' THEN
+                evidence_id := NEW.id;
+              ELSE
+                evidence_id := NEW.handover_evidence_id;
+              END IF;
+
+              SELECT *
+              INTO evidence_row
+              FROM public.unit_handover_evidence
+              WHERE tenant_id = NEW.tenant_id
+                AND id = evidence_id;
+
+              IF NOT FOUND THEN
+                RETURN NULL;
+              END IF;
+
+              SELECT *
+              INTO acceptance_row
+              FROM public.unit_handover_acceptances
+              WHERE tenant_id = evidence_row.tenant_id
+                AND handover_evidence_id = evidence_row.id;
+
+              /*
+               * Evidence may legitimately exist without ever having produced
+               * an Acceptance. Pair invariants begin only once a historical
+               * Acceptance exists for this Evidence.
+               */
+              IF NOT FOUND THEN
+                RETURN NULL;
+              END IF;
+
+              IF acceptance_row.status IS DISTINCT FROM evidence_row.status THEN
+                RAISE EXCEPTION USING
+                  ERRCODE = '23514',
+                  MESSAGE = 'Unit Handover Acceptance and Evidence lifecycle states must match';
+              END IF;
+
+              IF acceptance_row.status = 'reversed'
+                 AND (
+                   acceptance_row.reversal_operation_id,
+                   acceptance_row.reversal_reason,
+                   acceptance_row.reversal_reference,
+                   acceptance_row.reversed_by,
+                   acceptance_row.reversed_at
+                 )
+                 IS DISTINCT FROM
+                 (
+                   evidence_row.reversal_operation_id,
+                   evidence_row.reversal_reason,
+                   evidence_row.reversal_reference,
+                   evidence_row.reversed_by,
+                   evidence_row.reversed_at
+                 ) THEN
+                RAISE EXCEPTION USING
+                  ERRCODE = '23514',
+                  MESSAGE = 'Unit Handover Acceptance and Evidence reversal facts must match';
+              END IF;
+
+              RETURN NULL;
+            END;
+            $$;
+
+            CREATE CONSTRAINT TRIGGER unit_handover_evidence_pair_final_state_guard
+            AFTER INSERT OR UPDATE
+            ON public.unit_handover_evidence
+            DEFERRABLE INITIALLY DEFERRED
+            FOR EACH ROW
+            EXECUTE FUNCTION public.validate_unit_handover_pair_final_state();
+
+            CREATE CONSTRAINT TRIGGER unit_handover_acceptance_pair_final_state_guard
+            AFTER INSERT OR UPDATE
+            ON public.unit_handover_acceptances
+            DEFERRABLE INITIALLY DEFERRED
+            FOR EACH ROW
+            EXECUTE FUNCTION public.validate_unit_handover_pair_final_state();
             SQL);
 
         DB::unprepared(<<<'SQL'
@@ -705,6 +793,7 @@ return new class extends Migration
               public.validate_unit_handover_acceptance_source(),
               public.validate_unit_handover_evidence_final_state(),
               public.validate_unit_handover_acceptance_final_state(),
+              public.validate_unit_handover_pair_final_state(),
               public.prevent_contract_handover_provenance_mutation(),
               public.prevent_reservation_handover_provenance_mutation()
             FROM PUBLIC;
@@ -737,6 +826,14 @@ return new class extends Migration
               ON public.contracts;
 
             DROP TRIGGER IF EXISTS
+              unit_handover_acceptance_pair_final_state_guard
+              ON public.unit_handover_acceptances;
+
+            DROP TRIGGER IF EXISTS
+              unit_handover_evidence_pair_final_state_guard
+              ON public.unit_handover_evidence;
+
+            DROP TRIGGER IF EXISTS
               unit_handover_acceptance_final_state_guard
               ON public.unit_handover_acceptances;
 
@@ -765,6 +862,9 @@ return new class extends Migration
 
             DROP FUNCTION IF EXISTS
               public.prevent_contract_handover_provenance_mutation();
+
+            DROP FUNCTION IF EXISTS
+              public.validate_unit_handover_pair_final_state();
 
             DROP FUNCTION IF EXISTS
               public.validate_unit_handover_acceptance_final_state();
@@ -879,6 +979,7 @@ return new class extends Migration
               public.validate_unit_handover_acceptance_source(),
               public.validate_unit_handover_evidence_final_state(),
               public.validate_unit_handover_acceptance_final_state(),
+              public.validate_unit_handover_pair_final_state(),
               public.prevent_contract_handover_provenance_mutation(),
               public.prevent_reservation_handover_provenance_mutation()
             FROM {$identifier};

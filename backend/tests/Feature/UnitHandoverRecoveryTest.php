@@ -8,8 +8,8 @@ use App\Models\User;
 use App\Modules\UnitHandover\Actions\CreateUnitHandoverAcceptance;
 use App\Modules\UnitHandover\Actions\RecordUnitHandoverEvidence;
 use App\Modules\UnitHandover\Actions\ReverseUnitHandoverPerformanceSource;
-use App\Modules\UnitHandover\Exceptions\UnitHandoverConflict;
 use App\Modules\UnitHandover\Support\UnitHandoverRecoveryResolver;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesActiveMembership;
@@ -254,7 +254,7 @@ final class UnitHandoverRecoveryTest extends TestCase
         );
     }
 
-    public function test_partial_reversal_truth_fails_closed(): void
+    public function test_partial_reversal_truth_is_rejected_before_becoming_durable(): void
     {
         [
             $tenantId,
@@ -277,36 +277,46 @@ final class UnitHandoverRecoveryTest extends TestCase
         $operationId = (string) Str::ulid();
         $now = now();
 
-        DB::table('unit_handover_acceptances')
-            ->where('tenant_id', $tenantId)
-            ->where('id', $acceptanceId)
-            ->update([
-                'status' => 'reversed',
-                'reversal_operation_id' => $operationId,
-                'reversal_reason' => 'Partial fixture',
-                'reversal_reference' => 'HANDOVER-RECOVERY-PARTIAL-001',
-                'reversed_by' => $actor->id,
-                'reversed_at' => $now,
-                'updated_at' => $now,
-            ]);
+        DB::beginTransaction();
 
-        $this->expectException(
-            UnitHandoverConflict::class,
-        );
+        try {
+            DB::table('unit_handover_acceptances')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $acceptanceId)
+                ->update([
+                    'status' => 'reversed',
+                    'reversal_operation_id' => $operationId,
+                    'reversal_reason' => 'Partial fixture',
+                    'reversal_reference' => 'HANDOVER-RECOVERY-PARTIAL-001',
+                    'reversed_by' => $actor->id,
+                    'reversed_at' => $now,
+                    'updated_at' => $now,
+                ]);
 
-        $this->expectExceptionMessage(
-            'Unit Handover reversal recovery found partial or contradictory durable truth.',
-        );
-
-        app(UnitHandoverRecoveryResolver::class)
-            ->recoverReversal(
-                $tenantId,
-                $acceptanceId,
-                $evidenceId,
-                $operationId,
-                'Partial fixture',
-                'HANDOVER-RECOVERY-PARTIAL-001',
+            $this->expectException(
+                QueryException::class,
             );
+
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        } finally {
+            DB::rollBack();
+        }
+
+        self::assertSame(
+            'effective',
+            DB::table('unit_handover_acceptances')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $acceptanceId)
+                ->value('status'),
+        );
+
+        self::assertSame(
+            'effective',
+            DB::table('unit_handover_evidence')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $evidenceId)
+                ->value('status'),
+        );
     }
 
     /**
