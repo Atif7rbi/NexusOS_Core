@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\UnitHandover\Actions;
 
 use App\Models\User;
+use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverConflict;
 use App\Modules\UnitHandover\Support\UnitHandoverAcceptanceRecoveryResolver;
 use App\Modules\UnitHandover\Support\UnitHandoverAuthorization;
@@ -20,6 +21,7 @@ final class CreateUnitHandoverAcceptance
         private readonly UnitHandoverTransaction $tx,
         private readonly UnitHandoverAuthorization $auth,
         private readonly UnitHandoverAcceptanceRecoveryResolver $recovery,
+        private readonly ContractConsiderationSourceCoordinator $consideration,
     ) {}
 
     public function execute(
@@ -57,6 +59,7 @@ final class CreateUnitHandoverAcceptance
                     $actor,
                     $evidenceId,
                     $operationId,
+                    $input,
                     &$canonicalFacts,
                 ): string {
                     return $this->create(
@@ -64,6 +67,7 @@ final class CreateUnitHandoverAcceptance
                         $actor,
                         $evidenceId,
                         $operationId,
+                        $input,
                         $canonicalFacts,
                     );
                 },
@@ -81,9 +85,20 @@ final class CreateUnitHandoverAcceptance
                 );
             }
 
-            return $this->recovery->resolve(
+            $this->recovery->resolve(
                 $tenantId,
                 $canonicalFacts,
+            );
+
+            /*
+             * Re-enter the authoritative source lock corridor after recovery.
+             * This verifies the winning Acceptance also carries the exact
+             * adopted Contract Consideration operation identity and graph.
+             */
+            return $this->execute(
+                $tenantId,
+                $actor,
+                $input,
             );
         }
     }
@@ -93,6 +108,7 @@ final class CreateUnitHandoverAcceptance
         User $actor,
         string $evidenceId,
         string $operationId,
+        array $input,
         ?array &$canonicalFacts,
     ): string {
         $this->auth->authorizeAcceptanceTransactional(
@@ -258,6 +274,12 @@ final class CreateUnitHandoverAcceptance
                 $facts,
             );
 
+            $this->consideration->assertUnitHandoverAcceptanceReplay(
+                $tenantId,
+                (string) $byOperation->id,
+                $input,
+            );
+
             return (string) $byOperation->id;
         }
 
@@ -314,6 +336,12 @@ final class CreateUnitHandoverAcceptance
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        $this->consideration->coordinateNewUnitHandoverAcceptance(
+            $tenantId,
+            $id,
+            $input,
+        );
 
         return $id;
     }

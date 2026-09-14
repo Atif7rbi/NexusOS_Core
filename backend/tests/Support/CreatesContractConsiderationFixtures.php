@@ -6,7 +6,6 @@ namespace Tests\Support;
 
 use App\Models\User;
 use App\Modules\ContractConsideration\Actions\AdoptContractConsideration;
-use App\Modules\ContractualBilling\Actions\ActivateContractualBillingEntitlement;
 use App\Modules\ContractualBilling\Actions\CreateContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\FinalizeContractualBillingSchedule;
 use App\Modules\ContractualBilling\Actions\SaveDraftContractualBillingObligation;
@@ -87,15 +86,43 @@ trait CreatesContractConsiderationFixtures
         return $ids;
     }
 
+    /** Direct SQL fixture only: application source integration is deliberately bypassed. */
     protected function billingSource(array $context, string $obligationId): array
     {
-        $id = app(ActivateContractualBillingEntitlement::class)->execute($context['tenant_id'], $obligationId, $context['actor'], [
-            'billing_entitlement_operation_id' => (string) Str::ulid(),
-        ]);
-        $source = DB::table('contractual_billing_entitlements')->where('id', $id)->first();
+        $obligation = DB::table('contractual_billing_obligations')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $obligationId)
+            ->first();
 
-        return ['id' => $id, 'source_type' => 'CONTRACTUAL_BILLING_ENTITLEMENT', 'economic_date' => $source->economic_date,
-            'amount' => $source->amount, 'semantic_precedence' => 20];
+        if ($obligation === null) {
+            throw new \LogicException('Missing Contractual Billing Obligation fixture.');
+        }
+
+        $id = (string) Str::ulid();
+        $now = now();
+
+        DB::table('contractual_billing_entitlements')->insert([
+            'id' => $id,
+            'tenant_id' => $context['tenant_id'],
+            'billing_entitlement_operation_id' => (string) Str::ulid(),
+            'schedule_id' => (string) $obligation->schedule_id,
+            'obligation_id' => $obligationId,
+            'contract_id' => $context['contract_id'],
+            'customer_id' => $context['customer_id'],
+            'amount' => (string) $obligation->amount,
+            'currency' => (string) $obligation->currency,
+            'economic_date' => (string) $obligation->contractual_due_date,
+            'effective_at' => $now,
+            'status' => 'effective',
+            'recognized_by' => $context['actor']->id,
+            'recognized_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return ['id' => $id, 'source_type' => 'CONTRACTUAL_BILLING_ENTITLEMENT',
+            'economic_date' => (string) $obligation->contractual_due_date,
+            'amount' => (string) $obligation->amount, 'semantic_precedence' => 20];
     }
 
     /** Direct SQL fixture only: application source integration is deliberately absent. */
