@@ -29,9 +29,9 @@ final class ContractConsiderationAdoption
         if (array_diff(array_keys($input), ['contract_id', 'coordination_adoption_operation_id']) !== []) {
             throw new ContractConsiderationValidationFailed('Adoption accepts identities only; canonical facts are source-derived.');
         }
-        foreach (['tenant_id' => $tenantId, 'contract_id' => $input['contract_id'] ?? null,
+        foreach (['contract_id' => $input['contract_id'] ?? null,
             'coordination_adoption_operation_id' => $input['coordination_adoption_operation_id'] ?? null] as $key => $id) {
-            if (! is_string($id) || preg_match('/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/D', $id) !== 1 || ! Str::isUlid($id)) {
+            if (! is_string($id) || ! Str::isUlid($id)) {
                 throw new ContractConsiderationValidationFailed($key.' must be a canonical ULID.');
             }
         }
