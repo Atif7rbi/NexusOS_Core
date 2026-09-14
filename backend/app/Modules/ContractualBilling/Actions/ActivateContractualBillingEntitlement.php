@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\ContractualBilling\Actions;
 
 use App\Models\User;
+use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingValidationFailed;
 use App\Modules\ContractualBilling\Support\ContractualBillingAuthorization;
@@ -20,6 +21,7 @@ final class ActivateContractualBillingEntitlement
     public function __construct(
         private readonly ContractualBillingTransaction $tx,
         private readonly ContractualBillingAuthorization $auth,
+        private readonly ContractConsiderationSourceCoordinator $consideration,
     ) {}
 
     public function execute(
@@ -46,6 +48,7 @@ final class ActivateContractualBillingEntitlement
             $obligationId,
             $actor,
             $operationId,
+            $input,
         ): string {
             $this->auth->authorizeTransactional($tenantId, $actor);
 
@@ -128,6 +131,12 @@ final class ActivateContractualBillingEntitlement
                         'Entitlement operation identity was reused with different facts.',
                     );
                 }
+
+                $this->consideration->assertBillingEntitlementReplay(
+                    $tenantId,
+                    (string) $byOperation->id,
+                    $input,
+                );
 
                 return (string) $byOperation->id;
             }
@@ -220,6 +229,12 @@ final class ActivateContractualBillingEntitlement
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
+
+            $this->consideration->coordinateNewBillingEntitlement(
+                $tenantId,
+                $id,
+                $input,
+            );
 
             return $id;
         });
