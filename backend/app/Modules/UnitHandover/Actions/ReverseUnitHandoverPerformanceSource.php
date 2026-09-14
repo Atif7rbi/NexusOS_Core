@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\UnitHandover\Actions;
 
 use App\Models\User;
+use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverConflict;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverValidationFailed;
 use App\Modules\UnitHandover\Support\UnitHandoverAuthorization;
@@ -22,6 +23,7 @@ final class ReverseUnitHandoverPerformanceSource
         private readonly UnitHandoverTransaction $tx,
         private readonly UnitHandoverAuthorization $auth,
         private readonly UnitHandoverReversalRecoveryResolver $recovery,
+        private readonly ContractConsiderationSourceCoordinator $consideration,
     ) {}
 
     public function execute(
@@ -100,13 +102,20 @@ final class ReverseUnitHandoverPerformanceSource
                 );
             }
 
-            return $this->recovery->resolve(
+            $this->recovery->resolve(
                 $tenantId,
                 $acceptanceId,
                 $evidenceId,
                 $reversalOperationId,
                 $reason,
                 $reference,
+            );
+
+            return $this->execute(
+                $tenantId,
+                $acceptanceId,
+                $actor,
+                $input,
             );
         }
     }
@@ -155,9 +164,9 @@ final class ReverseUnitHandoverPerformanceSource
          * -> Unit
          * -> Evidence
          * -> Acceptance
+         * -> Contract Consideration
          *
-         * Future downstream Consideration / Accounting locks must append
-         * after Acceptance. They must not introduce another corridor.
+         * Contract Consideration appends after the complete source corridor.
          */
         $contract = DB::table('contracts')
             ->where('tenant_id', $tenantId)
@@ -246,6 +255,11 @@ final class ReverseUnitHandoverPerformanceSource
                 $reversalOperationId,
                 $reason,
                 $reference,
+            );
+
+            $this->consideration->reverseUnitHandoverAcceptance(
+                $tenantId,
+                $acceptanceId,
             );
 
             return (string) $acceptance->id;
@@ -345,6 +359,11 @@ final class ReverseUnitHandoverPerformanceSource
                 'Unit Handover Evidence changed during reversal.',
             );
         }
+
+        $this->consideration->reverseUnitHandoverAcceptance(
+            $tenantId,
+            $acceptanceId,
+        );
 
         return $acceptanceId;
     }
