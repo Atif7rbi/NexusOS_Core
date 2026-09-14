@@ -18,7 +18,6 @@ use Tests\TestCase;
 final class ContractConsiderationAdoptionTest extends TestCase
 {
     use CreatesContractConsiderationFixtures;
-
     use RefreshDatabase;
 
     public function test_adoption_commits_exact_capacity_and_one_genesis_and_replays_original_ids(): void
