@@ -124,17 +124,48 @@ trait CreatesContractConsiderationFixtures
         return ['transition_id' => $transitionId, 'lot_id' => $lotId, 'edge_id' => $edgeId];
     }
 
-    protected function reverseHandover(array $context, array $source, ?array $graph): void
+    protected function reverseHandover(array $context, array $source, ?array $graph, array $transitionOverrides = []): void
     {
         $operation = (string) Str::ulid();
         $facts = ['status' => 'reversed', 'reversal_operation_id' => $operation, 'reversal_reason' => 'Correct source evidence',
             'reversal_reference' => 'CC/CORRECTION/'.$operation, 'reversed_by' => $context['actor']->id, 'reversed_at' => now()];
-        DB::table('unit_handover_acceptances')->where('id', $source['id'])->update($facts + ['updated_at' => now()]);
-        DB::table('unit_handover_evidence')->where('id', $source['evidence_id'])->update($facts + ['updated_at' => now()]);
         if ($graph !== null) {
             DB::table('contract_consideration_transitions')->where('id', $graph['transition_id'])
-                ->update(array_replace($facts, ['reversal_operation_id' => (string) Str::ulid(), 'reversal_source_operation_id' => $operation]));
+                ->update(array_replace($facts, ['reversal_source_operation_id' => $operation], $transitionOverrides));
         }
+        DB::table('unit_handover_acceptances')->where('id', $source['id'])->update($facts + ['updated_at' => now()]);
+        DB::table('unit_handover_evidence')->where('id', $source['evidence_id'])->update($facts + ['updated_at' => now()]);
+    }
+
+    protected function reverseBilling(array $context, array $source, array $graph, array $transitionOverrides = []): void
+    {
+        $entitlement = DB::table('contractual_billing_entitlements')->where('id', $source['id'])->first();
+        if ($entitlement === null) {
+            throw new \LogicException('Missing Contractual Billing Entitlement fixture.');
+        }
+
+        $sourceCorrection = (string) Str::ulid();
+        $reversalOperation = (string) Str::ulid();
+        $reason = 'Correct billing source';
+        $reference = 'CC/CORRECTION/'.$sourceCorrection;
+        $reversedAt = now();
+        DB::table('contract_consideration_transitions')->where('id', $graph['transition_id'])->update(array_replace([
+            'status' => 'reversed', 'reversal_operation_id' => $reversalOperation,
+            'reversal_source_operation_id' => $sourceCorrection, 'reversal_reason' => $reason,
+            'reversal_reference' => $reference, 'reversed_by' => $context['actor']->id, 'reversed_at' => $reversedAt,
+        ], $transitionOverrides));
+        DB::table('contractual_billing_entitlements')->where('id', $source['id'])->update([
+            'status' => 'reversed', 'reversal_operation_id' => $reversalOperation,
+            'source_correction_operation_id' => $sourceCorrection, 'reversal_reason' => $reason,
+            'source_rescission_reference' => $reference, 'reversed_by' => $context['actor']->id,
+            'reversed_at' => $reversedAt, 'updated_at' => $reversedAt,
+        ]);
+        DB::table('contractual_billing_schedules')->where('id', $entitlement->schedule_id)->update([
+            'status' => 'cancelled', 'source_correction_operation_id' => $sourceCorrection,
+            'source_corrected_by' => $context['actor']->id, 'source_corrected_at' => $reversedAt,
+            'source_correction_reason' => $reason, 'source_correction_reference' => $reference,
+            'updated_at' => $reversedAt,
+        ]);
     }
 
     protected function assertConsiderationSqlRejected(callable $callback, array $states = ['23514', '23503', '23505', '55000', '42501']): void

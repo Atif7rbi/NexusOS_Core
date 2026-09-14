@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Tenant;
+use App\Models\TenantUser;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -130,6 +133,92 @@ final class ContractConsiderationSchemaIntegrityTest extends TestCase
         self::assertSame('reversed', DB::table('contract_consideration_transitions')->where('id', $g['transition_id'])->value('status'));
     }
 
+    public function test_handover_reversal_provenance_must_exactly_match_its_source(): void
+    {
+        $c = $this->considerationContext();
+        $a = $this->adopt($c);
+        [$source, $g] = DB::transaction(function () use ($c, $a): array {
+            $source = $this->handoverSource($c);
+
+            return [$source, $this->transition($c, $a, $source, $a['genesis_lot_id'], 'EARNED_UNBILLED')];
+        });
+        $otherActor = $this->sameTenantActor($c['tenant_id']);
+        foreach ($this->reversalProvenanceMismatches($otherActor->id) as $mismatch) {
+            $this->assertConsiderationSqlRejected(
+                fn () => $this->reverseHandover($c, $source, $g, $mismatch),
+                ['23514'],
+            );
+        }
+        self::assertSame('effective', DB::table('unit_handover_acceptances')->where('id', $source['id'])->value('status'));
+        self::assertSame('effective', DB::table('contract_consideration_transitions')->where('id', $g['transition_id'])->value('status'));
+
+        DB::transaction(fn () => $this->reverseHandover($c, $source, $g));
+        $sourceRow = DB::table('unit_handover_acceptances')->where('id', $source['id'])->first();
+        $transition = DB::table('contract_consideration_transitions')->where('id', $g['transition_id'])->first();
+        self::assertNotNull($sourceRow);
+        self::assertNotNull($transition);
+        self::assertSame($sourceRow->reversal_operation_id, $transition->reversal_operation_id);
+        self::assertSame($sourceRow->reversal_operation_id, $transition->reversal_source_operation_id);
+        self::assertSame($sourceRow->reversal_reason, $transition->reversal_reason);
+        self::assertSame($sourceRow->reversal_reference, $transition->reversal_reference);
+        self::assertSame($sourceRow->reversed_by, $transition->reversed_by);
+        self::assertSame((string) $sourceRow->reversed_at, (string) $transition->reversed_at);
+    }
+
+    public function test_billing_reversal_provenance_must_exactly_match_its_source(): void
+    {
+        $c = $this->considerationContext();
+        $obligationId = $this->billingObligations($c, ['1000.00'])[0];
+        $a = $this->adopt($c);
+        [$source, $g] = DB::transaction(function () use ($c, $a, $obligationId): array {
+            $source = $this->billingSource($c, $obligationId);
+
+            return [$source, $this->transition($c, $a, $source, $a['genesis_lot_id'], 'BILLED_UNEARNED')];
+        });
+        $otherActor = $this->sameTenantActor($c['tenant_id']);
+        foreach ($this->reversalProvenanceMismatches($otherActor->id) as $mismatch) {
+            $this->assertConsiderationSqlRejected(
+                fn () => $this->reverseBilling($c, $source, $g, $mismatch),
+                ['23514'],
+            );
+        }
+        self::assertSame('effective', DB::table('contractual_billing_entitlements')->where('id', $source['id'])->value('status'));
+        self::assertSame('effective', DB::table('contract_consideration_transitions')->where('id', $g['transition_id'])->value('status'));
+
+        DB::transaction(fn () => $this->reverseBilling($c, $source, $g));
+        $sourceRow = DB::table('contractual_billing_entitlements')->where('id', $source['id'])->first();
+        $transition = DB::table('contract_consideration_transitions')->where('id', $g['transition_id'])->first();
+        self::assertNotNull($sourceRow);
+        self::assertNotNull($transition);
+        self::assertSame($sourceRow->reversal_operation_id, $transition->reversal_operation_id);
+        self::assertSame($sourceRow->source_correction_operation_id, $transition->reversal_source_operation_id);
+        self::assertSame($sourceRow->reversal_reason, $transition->reversal_reason);
+        self::assertSame($sourceRow->source_rescission_reference, $transition->reversal_reference);
+        self::assertSame($sourceRow->reversed_by, $transition->reversed_by);
+        self::assertSame((string) $sourceRow->reversed_at, (string) $transition->reversed_at);
+    }
+
+    public function test_backdated_transition_cannot_follow_later_reversed_history(): void
+    {
+        $c = $this->considerationContext();
+        $obligationId = $this->billingObligations($c, ['1000.00'], '2026-08-19')[0];
+        $a = $this->adopt($c);
+        [$source, $g] = DB::transaction(function () use ($c, $a): array {
+            $source = $this->handoverSource($c);
+
+            return [$source, $this->transition($c, $a, $source, $a['genesis_lot_id'], 'EARNED_UNBILLED')];
+        });
+        DB::transaction(fn () => $this->reverseHandover($c, $source, $g));
+        self::assertSame('reversed', DB::table('contract_consideration_transitions')->where('id', $g['transition_id'])->value('status'));
+
+        $this->assertConsiderationSqlRejected(function () use ($c, $a, $obligationId): void {
+            $backdated = $this->billingSource($c, $obligationId);
+            $this->transition($c, $a, $backdated, $a['genesis_lot_id'], 'BILLED_UNEARNED');
+        }, ['23514']);
+        self::assertSame(1, DB::table('contract_consideration_transitions')->where('position_id', $a['position_id'])->count());
+        self::assertSame(0, DB::table('contractual_billing_entitlements')->where('tenant_id', $c['tenant_id'])->count());
+    }
+
     public function test_handover_then_partial_billing_uses_earned_lot_and_preserves_remainder(): void
     {
         $c = $this->considerationContext();
@@ -171,5 +260,32 @@ final class ContractConsiderationSchemaIntegrityTest extends TestCase
             self::assertTrue((bool) $guard->tgdeferrable);
             self::assertTrue((bool) $guard->tginitdeferred);
         }
+    }
+
+    private function sameTenantActor(string $tenantId): User
+    {
+        $actor = User::factory()->create([
+            'status' => User::STATUS_ACTIVE,
+            'role' => User::ROLE_ADMINISTRATOR,
+        ]);
+        TenantUser::factory()
+            ->forTenant(Tenant::query()->findOrFail($tenantId))
+            ->forUser($actor)
+            ->active()
+            ->create();
+
+        return $actor;
+    }
+
+    private function reversalProvenanceMismatches(int $otherActorId): array
+    {
+        return [
+            ['reversal_operation_id' => (string) Str::ulid()],
+            ['reversal_source_operation_id' => (string) Str::ulid()],
+            ['reversal_reason' => 'Different correction reason'],
+            ['reversal_reference' => 'CC/CORRECTION/DIFFERENT'],
+            ['reversed_by' => $otherActorId],
+            ['reversed_at' => now()->addSecond()],
+        ];
     }
 }

@@ -200,9 +200,13 @@ return new class extends Migration
               PERFORM id FROM public.contracts WHERE tenant_id = NEW.tenant_id AND id = NEW.contract_id FOR UPDATE NOWAIT;
               PERFORM id FROM public.contract_consideration_positions
                 WHERE tenant_id = NEW.tenant_id AND id = NEW.position_id FOR UPDATE NOWAIT;
+              -- New history may never be inserted behind any recorded Transition,
+              -- including a Transition that has since been reversed. Updates retain
+              -- successor-first reversal by considering only later effective history.
               IF EXISTS (SELECT 1 FROM public.contract_consideration_transitions t
                          WHERE t.tenant_id = NEW.tenant_id AND t.position_id = NEW.position_id
-                           AND t.status = 'effective' AND t.id <> NEW.id
+                           AND t.id <> NEW.id
+                           AND (TG_OP = 'INSERT' OR t.status = 'effective')
                            AND (t.economic_date,t.semantic_precedence,t.source_id) >
                                (NEW.economic_date,NEW.semantic_precedence,NEW.source_id)) THEN
                 RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'Transition requires latest canonical order';
@@ -287,6 +291,11 @@ return new class extends Migration
               source_currency text;
               source_status text;
               source_reversal_operation_id char(26);
+              source_reversal_source_operation_id char(26);
+              source_reversal_reason text;
+              source_reversal_reference text;
+              source_reversed_by bigint;
+              source_reversed_at timestamptz;
             BEGIN
               SELECT * INTO p FROM public.contract_consideration_positions WHERE tenant_id = p_tenant AND id = p_position;
               IF NOT FOUND THEN
@@ -355,19 +364,28 @@ return new class extends Migration
               LOOP
                 IF t.source_type = 'UNIT_HANDOVER_ACCEPTANCE' THEN
                   SELECT s.contract_id,s.performance_date AS economic_date,s.performance_amount AS amount,s.currency,
-                         s.status::text,s.reversal_operation_id
+                         s.status::text,s.reversal_operation_id,s.reversal_operation_id,
+                         s.reversal_reason,s.reversal_reference,s.reversed_by,s.reversed_at
                     INTO source_contract_id,source_economic_date,source_amount,source_currency,
-                         source_status,source_reversal_operation_id
+                         source_status,source_reversal_operation_id,source_reversal_source_operation_id,
+                         source_reversal_reason,source_reversal_reference,source_reversed_by,source_reversed_at
                     FROM public.unit_handover_acceptances s WHERE s.tenant_id = p_tenant AND s.id = t.source_id;
                 ELSE
-                  SELECT s.contract_id,s.economic_date,s.amount,s.currency,s.status::text,s.reversal_operation_id
+                  SELECT s.contract_id,s.economic_date,s.amount,s.currency,s.status::text,s.reversal_operation_id,
+                         s.source_correction_operation_id,s.reversal_reason,s.source_rescission_reference,
+                         s.reversed_by,s.reversed_at
                     INTO source_contract_id,source_economic_date,source_amount,source_currency,
-                         source_status,source_reversal_operation_id
+                         source_status,source_reversal_operation_id,source_reversal_source_operation_id,
+                         source_reversal_reason,source_reversal_reference,source_reversed_by,source_reversed_at
                     FROM public.contractual_billing_entitlements s WHERE s.tenant_id = p_tenant AND s.id = t.source_id;
                 END IF;
                 IF NOT FOUND OR (source_contract_id,source_economic_date,source_amount,source_currency,source_status)
                    IS DISTINCT FROM (t.contract_id,t.economic_date,t.transition_amount,t.currency,t.status)
-                   OR (t.status = 'reversed' AND t.reversal_source_operation_id IS DISTINCT FROM source_reversal_operation_id)
+                   OR (t.status = 'reversed' AND
+                     (t.reversal_operation_id,t.reversal_source_operation_id,t.reversal_reason,
+                      t.reversal_reference,t.reversed_by,t.reversed_at) IS DISTINCT FROM
+                     (source_reversal_operation_id,source_reversal_source_operation_id,source_reversal_reason,
+                      source_reversal_reference,source_reversed_by,source_reversed_at))
                    OR (t.source_type = 'UNIT_HANDOVER_ACCEPTANCE' AND t.transition_amount <> p.consideration_amount) THEN
                   RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'Transition must preserve exact authoritative source truth';
                 END IF;

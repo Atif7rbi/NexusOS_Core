@@ -20,11 +20,21 @@ final class ContractConsiderationHistory
             $handover = $transition->source_type === 'UNIT_HANDOVER_ACCEPTANCE';
             $table = $handover ? 'unit_handover_acceptances' : 'contractual_billing_entitlements';
             $source = DB::table($table)->where('tenant_id', $tenantId)->where('id', $transition->source_id)->lockForUpdate()->first();
+            $reversalDiffers = $source !== null && $transition->status === 'reversed' && (
+                $source->reversal_operation_id !== $transition->reversal_operation_id
+                || ($handover ? $source->reversal_operation_id : $source->source_correction_operation_id)
+                    !== $transition->reversal_source_operation_id
+                || $source->reversal_reason !== $transition->reversal_reason
+                || ($handover ? $source->reversal_reference : $source->source_rescission_reference)
+                    !== $transition->reversal_reference
+                || $source->reversed_by !== $transition->reversed_by
+                || $source->reversed_at !== $transition->reversed_at
+            );
             if ($source === null || $source->contract_id !== $position->contract_id || $source->status !== $transition->status
                 || $source->currency !== $transition->currency
                 || ($handover ? $source->performance_date : $source->economic_date) !== $transition->economic_date
                 || ! BigDecimal::of($handover ? $source->performance_amount : $source->amount)->isEqualTo($transition->transition_amount)
-                || ($transition->status === 'reversed' && $source->reversal_operation_id !== $transition->reversal_source_operation_id)) {
+                || $reversalDiffers) {
                 $this->invalid('Transition differs from canonical source history.');
             }
         }
