@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\User;
 use App\Modules\ContractConsideration\Actions\AdoptContractConsideration;
-use App\Modules\ContractConsideration\Actions\RecoverContractConsiderationAdoption;
 use App\Modules\ContractualBilling\Actions\ActivateContractualBillingEntitlement;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +13,7 @@ $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 $payload = json_decode(base64_decode($argv[1], true), true, flags: JSON_THROW_ON_ERROR);
 
-if (! app()->environment('testing') || ! str_ends_with((string) config('database.connections.pgsql.database'), '_testing')) {
+if (app()->environment('testing') === false || str_ends_with((string) config('database.connections.pgsql.database'), '_testing') === false) {
     throw new RuntimeException('Consideration concurrency workers require an isolated testing database.');
 }
 DB::selectOne("SELECT set_config('application_name', ?, false)", [$payload['name']]);
@@ -23,7 +22,7 @@ function considerationBarrier(array $payload): void
 {
     file_put_contents($payload['ready'], 'ready');
     $deadline = microtime(true) + 12;
-    while (! is_file($payload['release'])) {
+    while (is_file($payload['release']) === false) {
         if (microtime(true) > $deadline) {
             throw new RuntimeException('Consideration barrier timed out.');
         }

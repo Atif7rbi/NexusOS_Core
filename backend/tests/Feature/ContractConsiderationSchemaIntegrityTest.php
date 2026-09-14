@@ -13,6 +13,7 @@ use Tests\TestCase;
 final class ContractConsiderationSchemaIntegrityTest extends TestCase
 {
     use CreatesContractConsiderationFixtures;
+
     use RefreshDatabase;
 
     public function test_exactly_four_foundation_tables_and_no_separate_consumption(): void
