@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 use Tests\Support\CreatesContractConsiderationFixtures;
 use Tests\TestCase;
 
-final class ContractConsiderationSourceIntegrationSuccessorFirstTest extends TestCase
+final class ContractConsiderationSourceIntegrationTestSuccessorFirst extends TestCase
 {
     use CreatesContractConsiderationFixtures;
     use RefreshDatabase;
