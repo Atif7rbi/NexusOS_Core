@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\ContractualBilling\Actions;
 
 use App\Models\User;
+use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingValidationFailed;
 use App\Modules\ContractualBilling\Support\ContractualBillingAuthorization;
@@ -22,6 +23,7 @@ final class CorrectFinalizedContractualBillingSchedule
         private readonly ContractualBillingTransaction $tx,
         private readonly ContractualBillingAuthorization $auth,
         private readonly EntitlementReceivableSourceCorrection $receivableCorrection,
+        private readonly ContractConsiderationSourceCoordinator $consideration,
     ) {}
 
     public function execute(
@@ -64,7 +66,8 @@ final class CorrectFinalizedContractualBillingSchedule
             /*
              * Frozen correction lock order:
              * authorization -> Contract -> Schedule -> Obligations ->
-             * Entitlements -> existing Links -> linked Receivables.
+             * Entitlements -> existing Links -> linked Receivables ->
+             * Contract Consideration.
              */
             $contract = DB::table('contracts')
                 ->where('tenant_id', $tenantId)
@@ -201,6 +204,11 @@ final class CorrectFinalizedContractualBillingSchedule
                         'updated_at' => $now,
                     ]);
             }
+
+            $this->consideration->reverseBillingEntitlements(
+                $tenantId,
+                $expectedIds,
+            );
 
             DB::table('contractual_billing_schedules')
                 ->where('tenant_id', $tenantId)
@@ -352,6 +360,11 @@ final class CorrectFinalizedContractualBillingSchedule
             $tenantId,
             $entitlements,
             $facts['source_correction_operation_id'],
+        );
+
+        $this->consideration->reverseBillingEntitlements(
+            $tenantId,
+            array_keys($actualMapping),
         );
 
         return (string) $schedule->id;
