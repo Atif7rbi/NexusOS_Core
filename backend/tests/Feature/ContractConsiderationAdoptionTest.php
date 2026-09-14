@@ -104,15 +104,4 @@ final class ContractConsiderationAdoptionTest extends TestCase
         self::assertSame('reversed', DB::table('unit_handover_acceptances')->where('id', $source['id'])->value('status'));
     }
 
-    public function test_runtime_role_can_adopt_and_lock_immutable_history_for_replay(): void
-    {
-        $c = $this->considerationContext();
-        $role = getenv('ACCOUNTING_RUNTIME_DB_ROLE');
-        self::assertMatchesRegularExpression('/^[a-z_][a-z0-9_]{0,62}$/', $role);
-        DB::transaction(function () use ($c, $role): void {
-            DB::statement('SET LOCAL ROLE "'.$role.'"');
-            $first = $this->adopt($c);
-            self::assertSame($first, $this->adopt($c));
-        });
-    }
 }

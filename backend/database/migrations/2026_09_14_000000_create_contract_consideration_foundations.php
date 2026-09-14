@@ -281,7 +281,12 @@ return new class extends Migration
             DECLARE
               p public.contract_consideration_positions%ROWTYPE;
               t public.contract_consideration_transitions%ROWTYPE;
-              source_row record;
+              source_contract_id char(26);
+              source_economic_date date;
+              source_amount numeric(19,2);
+              source_currency text;
+              source_status text;
+              source_reversal_operation_id char(26);
             BEGIN
               SELECT * INTO p FROM public.contract_consideration_positions WHERE tenant_id = p_tenant AND id = p_position;
               IF NOT FOUND THEN
@@ -350,15 +355,19 @@ return new class extends Migration
               LOOP
                 IF t.source_type = 'UNIT_HANDOVER_ACCEPTANCE' THEN
                   SELECT s.contract_id,s.performance_date AS economic_date,s.performance_amount AS amount,s.currency,
-                         s.status,s.reversal_operation_id INTO source_row
+                         s.status::text,s.reversal_operation_id
+                    INTO source_contract_id,source_economic_date,source_amount,source_currency,
+                         source_status,source_reversal_operation_id
                     FROM public.unit_handover_acceptances s WHERE s.tenant_id = p_tenant AND s.id = t.source_id;
                 ELSE
-                  SELECT s.contract_id,s.economic_date,s.amount,s.currency,s.status,s.reversal_operation_id INTO source_row
+                  SELECT s.contract_id,s.economic_date,s.amount,s.currency,s.status::text,s.reversal_operation_id
+                    INTO source_contract_id,source_economic_date,source_amount,source_currency,
+                         source_status,source_reversal_operation_id
                     FROM public.contractual_billing_entitlements s WHERE s.tenant_id = p_tenant AND s.id = t.source_id;
                 END IF;
-                IF NOT FOUND OR (source_row.contract_id,source_row.economic_date,source_row.amount,source_row.currency,source_row.status)
+                IF NOT FOUND OR (source_contract_id,source_economic_date,source_amount,source_currency,source_status)
                    IS DISTINCT FROM (t.contract_id,t.economic_date,t.transition_amount,t.currency,t.status)
-                   OR (t.status = 'reversed' AND t.reversal_source_operation_id IS DISTINCT FROM source_row.reversal_operation_id)
+                   OR (t.status = 'reversed' AND t.reversal_source_operation_id IS DISTINCT FROM source_reversal_operation_id)
                    OR (t.source_type = 'UNIT_HANDOVER_ACCEPTANCE' AND t.transition_amount <> p.consideration_amount) THEN
                   RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'Transition must preserve exact authoritative source truth';
                 END IF;
