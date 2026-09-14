@@ -131,7 +131,7 @@ return new class extends Migration
             CREATE INDEX cc_edge_predecessor ON public.contract_consideration_transition_lots (tenant_id,lot_id);
             CREATE INDEX cc_edge_successor ON public.contract_consideration_transition_lots (tenant_id,successor_lot_id);
 
-            CREATE FUNCTION public.cc_immutable_history() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.cc_immutable_history() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
               RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'Contract Consideration historical facts are immutable';
@@ -144,7 +144,7 @@ return new class extends Migration
             CREATE TRIGGER cc_edge_immutable BEFORE UPDATE OR DELETE ON public.contract_consideration_transition_lots
               FOR EACH ROW EXECUTE FUNCTION public.cc_immutable_history();
 
-            CREATE FUNCTION public.cc_adoption_source() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.cc_adoption_source() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             DECLARE c public.contracts%ROWTYPE;
             BEGIN
@@ -165,7 +165,7 @@ return new class extends Migration
             CREATE TRIGGER cc_adoption_source_guard BEFORE INSERT ON public.contract_consideration_positions
               FOR EACH ROW EXECUTE FUNCTION public.cc_adoption_source();
 
-            CREATE FUNCTION public.cc_contract_capacity() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.cc_contract_capacity() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
               IF (NEW.total_amount,NEW.currency,NEW.reservation_id) IS DISTINCT FROM
@@ -179,7 +179,7 @@ return new class extends Migration
             CREATE TRIGGER cc_contract_capacity_guard BEFORE UPDATE OF total_amount,currency,reservation_id ON public.contracts
               FOR EACH ROW EXECUTE FUNCTION public.cc_contract_capacity();
 
-            CREATE FUNCTION public.cc_transition_history() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.cc_transition_history() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
               IF TG_OP = 'DELETE' THEN
@@ -217,7 +217,7 @@ return new class extends Migration
             CREATE TRIGGER cc_transition_history_guard BEFORE INSERT OR UPDATE OR DELETE ON public.contract_consideration_transitions
               FOR EACH ROW EXECUTE FUNCTION public.cc_transition_history();
 
-            CREATE FUNCTION public.cc_graph_insert_lock() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.cc_graph_insert_lock() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
               PERFORM id FROM public.contracts WHERE tenant_id = NEW.tenant_id AND id = NEW.contract_id FOR UPDATE NOWAIT;
@@ -230,7 +230,7 @@ return new class extends Migration
             CREATE TRIGGER cc_edge_insert_guard BEFORE INSERT ON public.contract_consideration_transition_lots
               FOR EACH ROW EXECUTE FUNCTION public.cc_graph_insert_lock();
 
-            CREATE FUNCTION public.cc_validate_transition_selection(p_tenant char(26), p_transition char(26)) RETURNS void
+            CREATE OR REPLACE FUNCTION public.cc_validate_transition_selection(p_tenant char(26), p_transition char(26)) RETURNS void
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             DECLARE
               t public.contract_consideration_transitions%ROWTYPE;
@@ -276,7 +276,7 @@ return new class extends Migration
                   END IF;
             END $$;
 
-            CREATE FUNCTION public.cc_validate_graph(p_tenant char(26), p_position char(26)) RETURNS void
+            CREATE OR REPLACE FUNCTION public.cc_validate_graph(p_tenant char(26), p_position char(26)) RETURNS void
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             DECLARE
               p public.contract_consideration_positions%ROWTYPE;
@@ -376,7 +376,7 @@ return new class extends Migration
               END LOOP;
             END $$;
 
-            CREATE FUNCTION public.cc_graph_final_state() RETURNS trigger
+            CREATE OR REPLACE FUNCTION public.cc_graph_final_state() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             DECLARE root_id char(26);
             BEGIN
