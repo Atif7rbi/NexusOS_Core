@@ -105,5 +105,4 @@ final class ContractConsiderationAdoptionTest extends TestCase
         self::assertSame('committed', $this->adopt($c)['status']);
         self::assertSame('reversed', DB::table('unit_handover_acceptances')->where('id', $source['id'])->value('status'));
     }
-
 }
