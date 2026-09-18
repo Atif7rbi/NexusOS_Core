@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
