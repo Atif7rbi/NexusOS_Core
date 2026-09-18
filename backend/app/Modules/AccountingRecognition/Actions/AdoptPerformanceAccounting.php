@@ -191,7 +191,7 @@ final class AdoptPerformanceAccounting
             );
 
             foreach ($billedUnearned as $lot) {
-                $origins = DB::table('accounting_position_origins')
+                DB::table('accounting_position_origins')
                     ->where('tenant_id', $tenantId)
                     ->where('contract_id', $contractId)
                     ->where('position_type', 'CONTRACT_LIABILITY')
@@ -202,24 +202,39 @@ final class AdoptPerformanceAccounting
                     ->lockForUpdate()
                     ->get();
 
-                $available = '0.00';
-                foreach ($origins as $origin) {
-                    $consumed = (string) DB::table(
-                        'accounting_position_consumptions',
-                    )
-                        ->where('tenant_id', $tenantId)
-                        ->where('origin_id', $origin->id)
-                        ->where('status', 'effective')
-                        ->sum('amount');
+                $capacity = DB::selectOne(
+                    <<<'SQL'
+                        SELECT COALESCE(SUM(
+                          origin.origin_amount - COALESCE((
+                            SELECT SUM(consumption.amount)
+                            FROM accounting_position_consumptions consumption
+                            WHERE consumption.tenant_id=origin.tenant_id
+                              AND consumption.origin_id=origin.id
+                              AND consumption.status='effective'
+                          ),0)
+                        ),0) AS available
+                        FROM accounting_position_origins origin
+                        WHERE origin.tenant_id=?
+                          AND origin.contract_id=?
+                          AND origin.position_type='CONTRACT_LIABILITY'
+                          AND origin.status='effective'
+                          AND origin.consideration_transition_id=?
+                          AND origin.consideration_lot_id=?
+                        SQL,
+                    [
+                        $tenantId,
+                        $contractId,
+                        $lot->transition_id,
+                        $lot->id,
+                    ],
+                );
 
-                    $available = bcadd(
-                        $available,
-                        bcsub((string) $origin->origin_amount, $consumed, 2),
-                        2,
-                    );
-                }
+                $sufficient = (bool) DB::selectOne(
+                    'SELECT ?::numeric >= ?::numeric AS sufficient',
+                    [(string) $capacity->available, (string) $lot->remaining],
+                )->sufficient;
 
-                if (bccomp($available, (string) $lot->remaining, 2) < 0) {
+                if (! $sufficient) {
                     throw new AccountingRecognitionConflict(
                         'Clean Performance Accounting adoption requires exact protocol-backed Contract Liability capacity.',
                     );
