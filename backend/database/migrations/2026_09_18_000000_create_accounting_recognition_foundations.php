@@ -348,7 +348,7 @@ return new class extends Migration
               p_table text,
               p_tenant char(26)
             ) RETURNS void
-            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $
+            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             DECLARE
               total_count integer;
               active_count integer;
@@ -393,17 +393,17 @@ return new class extends Migration
               IF valid_history IS DISTINCT FROM true THEN
                 RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting Recognition policy versions or effective windows are inconsistent';
               END IF;
-            END $;
+            END $$;
 
             CREATE OR REPLACE FUNCTION public.accounting_recognition_policy_final_state() RETURNS trigger
-            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $
+            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
               PERFORM public.validate_accounting_recognition_policy_history(
                 TG_TABLE_NAME,
                 COALESCE(NEW.tenant_id,OLD.tenant_id)
               );
               RETURN NULL;
-            END $;
+            END $$;
 
             CREATE CONSTRAINT TRIGGER receivable_ar_policy_final
               AFTER INSERT OR UPDATE OR DELETE ON public.receivable_ar_policies
