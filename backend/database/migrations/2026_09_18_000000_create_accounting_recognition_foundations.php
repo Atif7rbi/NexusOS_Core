@@ -344,6 +344,80 @@ return new class extends Migration
               BEFORE INSERT OR UPDATE OR DELETE ON public.performance_accounting_policies
               FOR EACH ROW EXECUTE FUNCTION public.accounting_recognition_policy_history_guard();
 
+            CREATE OR REPLACE FUNCTION public.validate_accounting_recognition_policy_history(
+              p_table text,
+              p_tenant char(26)
+            ) RETURNS void
+            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $
+            DECLARE
+              total_count integer;
+              active_count integer;
+              valid_history boolean;
+            BEGIN
+              IF p_table NOT IN (
+                'receivable_ar_policies',
+                'contract_consideration_accounting_policies',
+                'performance_accounting_policies'
+              ) THEN
+                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Unsupported Accounting Recognition policy family';
+              END IF;
+
+              EXECUTE format(
+                'SELECT count(*), count(*) FILTER (WHERE status=''active'') FROM public.%I WHERE tenant_id=$1',
+                p_table
+              ) INTO total_count,active_count USING p_tenant;
+
+              IF total_count=0 THEN
+                RETURN;
+              END IF;
+              IF active_count<>1 THEN
+                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting Recognition policy history requires exactly one active version';
+              END IF;
+
+              EXECUTE format(
+                'SELECT bool_and(policy_version=rn AND effective_from>COALESCE(previous_from,DATE ''1999-12-31'') AND
+                  ((next_from IS NULL AND status=''active'' AND effective_to IS NULL)
+                   OR
+                   (next_from IS NOT NULL AND status=''superseded'' AND effective_to=next_from-1)))
+                 FROM (
+                   SELECT policy_version,status,effective_from,effective_to,
+                     row_number() OVER (ORDER BY policy_version) AS rn,
+                     lag(effective_from) OVER (ORDER BY policy_version) AS previous_from,
+                     lead(effective_from) OVER (ORDER BY policy_version) AS next_from
+                   FROM public.%I
+                   WHERE tenant_id=$1
+                 ) history',
+                p_table
+              ) INTO valid_history USING p_tenant;
+
+              IF valid_history IS DISTINCT FROM true THEN
+                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting Recognition policy versions or effective windows are inconsistent';
+              END IF;
+            END $;
+
+            CREATE OR REPLACE FUNCTION public.accounting_recognition_policy_final_state() RETURNS trigger
+            LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $
+            BEGIN
+              PERFORM public.validate_accounting_recognition_policy_history(
+                TG_TABLE_NAME,
+                COALESCE(NEW.tenant_id,OLD.tenant_id)
+              );
+              RETURN NULL;
+            END $;
+
+            CREATE CONSTRAINT TRIGGER receivable_ar_policy_final
+              AFTER INSERT OR UPDATE OR DELETE ON public.receivable_ar_policies
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              EXECUTE FUNCTION public.accounting_recognition_policy_final_state();
+            CREATE CONSTRAINT TRIGGER contract_consideration_policy_final
+              AFTER INSERT OR UPDATE OR DELETE ON public.contract_consideration_accounting_policies
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              EXECUTE FUNCTION public.accounting_recognition_policy_final_state();
+            CREATE CONSTRAINT TRIGGER performance_policy_final
+              AFTER INSERT OR UPDATE OR DELETE ON public.performance_accounting_policies
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              EXECUTE FUNCTION public.accounting_recognition_policy_final_state();
+
             CREATE OR REPLACE FUNCTION public.accounting_recognition_immutable_history() RETURNS trigger
             LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
             BEGIN
@@ -665,6 +739,8 @@ return new class extends Migration
             DROP FUNCTION public.accounting_position_consumption_history_guard();
             DROP FUNCTION public.accounting_position_origin_history_guard();
             DROP FUNCTION public.accounting_recognition_immutable_history();
+            DROP FUNCTION public.accounting_recognition_policy_final_state();
+            DROP FUNCTION public.validate_accounting_recognition_policy_history(text,character);
             DROP FUNCTION public.accounting_recognition_policy_history_guard();
             DROP FUNCTION public.accounting_recognition_policy_account_guard();
             SQL);
@@ -705,6 +781,8 @@ return new class extends Migration
         DB::unprepared("REVOKE EXECUTE ON FUNCTION
           public.accounting_recognition_policy_account_guard(),
           public.accounting_recognition_policy_history_guard(),
+          public.validate_accounting_recognition_policy_history(text,character),
+          public.accounting_recognition_policy_final_state(),
           public.accounting_recognition_immutable_history(),
           public.accounting_position_origin_history_guard(),
           public.accounting_position_consumption_history_guard(),
