@@ -534,7 +534,7 @@ return new class extends Migration
               a public.performance_accounting_adoptions%ROWTYPE;
               c public.contracts%ROWTYPE;
               p public.contract_consideration_positions%ROWTYPE;
-              billed_unearned numeric(19,2);
+              billed record;
               liability_capacity numeric(19,2);
             BEGIN
               SELECT * INTO a FROM public.performance_accounting_adoptions WHERE tenant_id=p_tenant AND id=p_adoption;
@@ -563,34 +563,52 @@ return new class extends Migration
                 RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Clean Performance Accounting adoption rejects prior performance-accounting protocol history';
               END IF;
 
-              SELECT COALESCE(sum(
-                l.amount - COALESCE((
-                  SELECT sum(e.consumed_amount)
-                  FROM public.contract_consideration_transition_lots e
-                  JOIN public.contract_consideration_transitions consumer
-                    ON consumer.tenant_id=e.tenant_id AND consumer.id=e.transition_id
-                  WHERE e.tenant_id=l.tenant_id AND e.lot_id=l.id AND consumer.status='effective'
-                ),0)
-              ),0) INTO billed_unearned
-              FROM public.contract_consideration_lots l
-              JOIN public.contract_consideration_transitions creator
-                ON creator.tenant_id=l.tenant_id AND creator.id=l.transition_id
-              WHERE l.tenant_id=a.tenant_id AND l.position_id=a.consideration_position_id
-                AND l.semantic_position='BILLED_UNEARNED' AND creator.status='effective';
+              FOR billed IN
+                SELECT
+                  l.id,
+                  l.transition_id,
+                  l.amount - COALESCE((
+                    SELECT sum(e.consumed_amount)
+                    FROM public.contract_consideration_transition_lots e
+                    JOIN public.contract_consideration_transitions consumer
+                      ON consumer.tenant_id=e.tenant_id AND consumer.id=e.transition_id
+                    WHERE e.tenant_id=l.tenant_id
+                      AND e.lot_id=l.id
+                      AND consumer.status='effective'
+                  ),0) AS remaining
+                FROM public.contract_consideration_lots l
+                JOIN public.contract_consideration_transitions creator
+                  ON creator.tenant_id=l.tenant_id AND creator.id=l.transition_id
+                WHERE l.tenant_id=a.tenant_id
+                  AND l.position_id=a.consideration_position_id
+                  AND l.semantic_position='BILLED_UNEARNED'
+                  AND creator.status='effective'
+              LOOP
+                IF billed.remaining <= 0 THEN
+                  CONTINUE;
+                END IF;
 
-              SELECT COALESCE(sum(
-                o.origin_amount - COALESCE((
-                  SELECT sum(cn.amount) FROM public.accounting_position_consumptions cn
-                  WHERE cn.tenant_id=o.tenant_id AND cn.origin_id=o.id AND cn.status='effective'
-                ),0)
-              ),0) INTO liability_capacity
-              FROM public.accounting_position_origins o
-              WHERE o.tenant_id=a.tenant_id AND o.contract_id=a.contract_id
-                AND o.position_type='CONTRACT_LIABILITY' AND o.status='effective';
+                SELECT COALESCE(sum(
+                  o.origin_amount - COALESCE((
+                    SELECT sum(cn.amount)
+                    FROM public.accounting_position_consumptions cn
+                    WHERE cn.tenant_id=o.tenant_id
+                      AND cn.origin_id=o.id
+                      AND cn.status='effective'
+                  ),0)
+                ),0) INTO liability_capacity
+                FROM public.accounting_position_origins o
+                WHERE o.tenant_id=a.tenant_id
+                  AND o.contract_id=a.contract_id
+                  AND o.position_type='CONTRACT_LIABILITY'
+                  AND o.status='effective'
+                  AND o.consideration_transition_id=billed.transition_id
+                  AND o.consideration_lot_id=billed.id;
 
-              IF liability_capacity < billed_unearned THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Clean Performance Accounting adoption requires exact protocol-backed Contract Liability capacity';
-              END IF;
+                IF liability_capacity < billed.remaining THEN
+                  RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Clean Performance Accounting adoption requires exact protocol-backed Contract Liability capacity';
+                END IF;
+              END LOOP;
             END $$;
 
             CREATE OR REPLACE FUNCTION public.performance_accounting_adoption_final_state() RETURNS trigger
