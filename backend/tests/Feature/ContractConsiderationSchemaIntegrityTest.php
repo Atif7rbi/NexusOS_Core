@@ -285,7 +285,7 @@ final class ContractConsiderationSchemaIntegrityTest extends TestCase
             ['reversal_reason' => 'Different correction reason'],
             ['reversal_reference' => 'CC/CORRECTION/DIFFERENT'],
             ['reversed_by' => $otherActorId],
-            ['reversed_at' => now()->addSecond()],
+            ['reversed_at' => now()->addMinute()],
         ];
     }
 }
