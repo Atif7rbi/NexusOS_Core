@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
-use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Exceptions\AccountingRecognitionConflict;
 use Illuminate\Support\Facades\DB;
