@@ -722,6 +722,19 @@ return new class extends Migration
         }
 
         DB::unprepared(<<<'SQL'
+            DROP FUNCTION public.performance_accounting_adoption_final_state() CASCADE;
+            DROP FUNCTION public.validate_performance_accounting_adoption(character,character);
+            DROP FUNCTION public.accounting_position_final_state() CASCADE;
+            DROP FUNCTION public.validate_accounting_position_consumption(character,character);
+            DROP FUNCTION public.validate_accounting_position_origin(character,character);
+            DROP FUNCTION public.accounting_position_consumption_history_guard() CASCADE;
+            DROP FUNCTION public.accounting_position_origin_history_guard() CASCADE;
+            DROP FUNCTION public.accounting_recognition_immutable_history() CASCADE;
+            DROP FUNCTION public.accounting_recognition_policy_final_state() CASCADE;
+            DROP FUNCTION public.validate_accounting_recognition_policy_history(text,character);
+            DROP FUNCTION public.accounting_recognition_policy_history_guard() CASCADE;
+            DROP FUNCTION public.accounting_recognition_policy_account_guard() CASCADE;
+
             DROP TABLE public.accounting_position_consumption_journal_line_allocations;
             DROP TABLE public.accounting_position_origin_journal_line_allocations;
             DROP TABLE public.accounting_position_consumptions;
@@ -730,19 +743,6 @@ return new class extends Migration
             DROP TABLE public.performance_accounting_policies;
             DROP TABLE public.contract_consideration_accounting_policies;
             DROP TABLE public.receivable_ar_policies;
-
-            DROP FUNCTION public.performance_accounting_adoption_final_state();
-            DROP FUNCTION public.validate_performance_accounting_adoption(character,character);
-            DROP FUNCTION public.accounting_position_final_state();
-            DROP FUNCTION public.validate_accounting_position_consumption(character,character);
-            DROP FUNCTION public.validate_accounting_position_origin(character,character);
-            DROP FUNCTION public.accounting_position_consumption_history_guard();
-            DROP FUNCTION public.accounting_position_origin_history_guard();
-            DROP FUNCTION public.accounting_recognition_immutable_history();
-            DROP FUNCTION public.accounting_recognition_policy_final_state();
-            DROP FUNCTION public.validate_accounting_recognition_policy_history(text,character);
-            DROP FUNCTION public.accounting_recognition_policy_history_guard();
-            DROP FUNCTION public.accounting_recognition_policy_account_guard();
             SQL);
     }
 
