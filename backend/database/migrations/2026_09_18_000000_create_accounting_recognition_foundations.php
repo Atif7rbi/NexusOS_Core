@@ -46,7 +46,7 @@ return new class extends Migration
             CREATE UNIQUE INDEX receivable_ar_policies_one_active
               ON public.receivable_ar_policies(tenant_id) WHERE status='active';
 
-            CREATE TABLE public.contract_consideration_accounting_policies (
+            CREATE TABLE public.receivable_ar_counterpart_policies (
               id char(26) PRIMARY KEY CHECK (id ~ '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'),
               tenant_id char(26) NOT NULL,
               policy_version integer NOT NULL CHECK (policy_version > 0),
@@ -73,8 +73,8 @@ return new class extends Migration
                   AND superseded_by IS NOT NULL AND superseded_at IS NOT NULL)
               )
             );
-            CREATE UNIQUE INDEX contract_consideration_accounting_policies_one_active
-              ON public.contract_consideration_accounting_policies(tenant_id) WHERE status='active';
+            CREATE UNIQUE INDEX receivable_ar_counterpart_policies_one_active
+              ON public.receivable_ar_counterpart_policies(tenant_id) WHERE status='active';
 
             CREATE TABLE public.performance_accounting_policies (
               id char(26) PRIMARY KEY CHECK (id ~ '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'),
@@ -263,7 +263,7 @@ return new class extends Migration
             BEGIN
               IF TG_TABLE_NAME='receivable_ar_policies' THEN
                 ar_id := NEW.ar_control_account_id;
-              ELSIF TG_TABLE_NAME='contract_consideration_accounting_policies' THEN
+              ELSIF TG_TABLE_NAME='receivable_ar_counterpart_policies' THEN
                 asset_id := NEW.contract_asset_control_account_id;
                 liability_id := NEW.contract_liability_control_account_id;
               ELSIF TG_TABLE_NAME='performance_accounting_policies' THEN
@@ -302,9 +302,9 @@ return new class extends Migration
             CREATE TRIGGER receivable_ar_policy_account_guard
               BEFORE INSERT OR UPDATE OF ar_control_account_id ON public.receivable_ar_policies
               FOR EACH ROW EXECUTE FUNCTION public.accounting_recognition_policy_account_guard();
-            CREATE TRIGGER contract_consideration_policy_account_guard
+            CREATE TRIGGER receivable_ar_counterpart_policy_account_guard
               BEFORE INSERT OR UPDATE OF contract_asset_control_account_id,contract_liability_control_account_id
-              ON public.contract_consideration_accounting_policies
+              ON public.receivable_ar_counterpart_policies
               FOR EACH ROW EXECUTE FUNCTION public.accounting_recognition_policy_account_guard();
             CREATE TRIGGER performance_policy_account_guard
               BEFORE INSERT OR UPDATE OF revenue_account_id,contract_asset_control_account_id,contract_liability_control_account_id
@@ -337,8 +337,8 @@ return new class extends Migration
             CREATE TRIGGER receivable_ar_policy_history_guard
               BEFORE INSERT OR UPDATE OR DELETE ON public.receivable_ar_policies
               FOR EACH ROW EXECUTE FUNCTION public.accounting_recognition_policy_history_guard();
-            CREATE TRIGGER contract_consideration_policy_history_guard
-              BEFORE INSERT OR UPDATE OR DELETE ON public.contract_consideration_accounting_policies
+            CREATE TRIGGER receivable_ar_counterpart_policy_history_guard
+              BEFORE INSERT OR UPDATE OR DELETE ON public.receivable_ar_counterpart_policies
               FOR EACH ROW EXECUTE FUNCTION public.accounting_recognition_policy_history_guard();
             CREATE TRIGGER performance_policy_history_guard
               BEFORE INSERT OR UPDATE OR DELETE ON public.performance_accounting_policies
@@ -356,7 +356,7 @@ return new class extends Migration
             BEGIN
               IF p_table NOT IN (
                 'receivable_ar_policies',
-                'contract_consideration_accounting_policies',
+                'receivable_ar_counterpart_policies',
                 'performance_accounting_policies'
               ) THEN
                 RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Unsupported Accounting Recognition policy family';
@@ -409,8 +409,8 @@ return new class extends Migration
               AFTER INSERT OR UPDATE OR DELETE ON public.receivable_ar_policies
               DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.accounting_recognition_policy_final_state();
-            CREATE CONSTRAINT TRIGGER contract_consideration_policy_final
-              AFTER INSERT OR UPDATE OR DELETE ON public.contract_consideration_accounting_policies
+            CREATE CONSTRAINT TRIGGER receivable_ar_counterpart_policy_final
+              AFTER INSERT OR UPDATE OR DELETE ON public.receivable_ar_counterpart_policies
               DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.accounting_recognition_policy_final_state();
             CREATE CONSTRAINT TRIGGER performance_policy_final
@@ -847,7 +847,7 @@ return new class extends Migration
             'accounting_position_origins',
             'performance_accounting_adoptions',
             'performance_accounting_policies',
-            'contract_consideration_accounting_policies',
+            'receivable_ar_counterpart_policies',
             'receivable_ar_policies',
         ] as $table) {
             if (DB::table($table)->exists()) {
@@ -875,7 +875,7 @@ return new class extends Migration
             DROP TABLE public.accounting_position_origins;
             DROP TABLE public.performance_accounting_adoptions;
             DROP TABLE public.performance_accounting_policies;
-            DROP TABLE public.contract_consideration_accounting_policies;
+            DROP TABLE public.receivable_ar_counterpart_policies;
             DROP TABLE public.receivable_ar_policies;
             SQL);
     }
@@ -890,7 +890,7 @@ return new class extends Migration
         $identifier = '"'.str_replace('"', '""', $runtimeRole).'"';
         DB::unprepared("REVOKE ALL ON TABLE
           public.receivable_ar_policies,
-          public.contract_consideration_accounting_policies,
+          public.receivable_ar_counterpart_policies,
           public.performance_accounting_policies,
           public.performance_accounting_adoptions,
           public.accounting_position_origins,
@@ -901,7 +901,7 @@ return new class extends Migration
 
         DB::unprepared("GRANT SELECT,INSERT,UPDATE ON TABLE
           public.receivable_ar_policies,
-          public.contract_consideration_accounting_policies,
+          public.receivable_ar_counterpart_policies,
           public.performance_accounting_policies
           TO {$identifier}");
         DB::unprepared("GRANT SELECT,INSERT ON TABLE public.performance_accounting_adoptions TO {$identifier}");
