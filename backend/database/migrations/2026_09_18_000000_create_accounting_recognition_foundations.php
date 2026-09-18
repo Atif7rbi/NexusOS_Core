@@ -509,6 +509,9 @@ return new class extends Migration
                  OR t.contract_id<>o.contract_id OR l.contract_id<>o.contract_id
                  OR l.transition_id IS DISTINCT FROM t.id
                  OR t.source_type<>o.economic_source_type OR t.source_id<>o.economic_source_id
+                 OR o.origin_amount<>l.amount
+                 OR o.currency<>t.currency OR o.currency<>l.currency
+                 OR o.accounting_date<>t.economic_date
                  OR (o.status='effective' AND t.status<>'effective')
                  OR j.status<>'posted' OR j.entry_date<>o.accounting_date
                  OR a.kind<>'posting'
@@ -623,7 +626,8 @@ return new class extends Migration
                  OR t.contract_id<>c.contract_id
                  OR l.contract_id<>c.contract_id
                  OR l.transition_id IS DISTINCT FROM t.id
-                 OR c.currency<>o.currency
+                 OR c.currency<>o.currency OR c.currency<>t.currency OR c.currency<>l.currency
+                 OR j.entry_date<>t.economic_date
                  OR (c.status='effective' AND (o.status<>'effective' OR t.status<>'effective'))
                  OR j.status<>'posted'
                  OR (o.position_type='CONTRACT_ASSET' AND (
