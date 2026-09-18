@@ -270,7 +270,7 @@ final class AccountingRecognitionFoundationsTest extends TestCase
 
         foreach ([
             'receivable_ar_policies',
-            'contract_consideration_accounting_policies',
+            'receivable_ar_counterpart_policies',
             'performance_accounting_policies',
             'performance_accounting_adoptions',
         ] as $table) {
