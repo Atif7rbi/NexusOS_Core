@@ -42,7 +42,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             return [$source, $graph];
         });
 
-        $journal = $this->post(
+        $journal = $this->postFixtureJournal(
             $context,
             '2026-08-20',
             $accounts['contract_asset'],
@@ -68,7 +68,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             'origin_amount' => '1000.00',
         ]);
 
-        $wrongJournal = $this->post(
+        $wrongJournal = $this->postFixtureJournal(
             $context,
             '2026-08-20',
             $accounts['other_asset'],
@@ -120,7 +120,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             return [$source, $graph];
         });
 
-        $journal = $this->post(
+        $journal = $this->postFixtureJournal(
             $context,
             '2026-08-19',
             $accounts['ar'],
@@ -172,7 +172,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             return [$source, $graph];
         });
 
-        $journal = $this->post(
+        $journal = $this->postFixtureJournal(
             $context,
             '2026-08-19',
             $accounts['ar'],
@@ -240,7 +240,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             return [$source, $graph];
         });
 
-        $billingJournal = $this->post(
+        $billingJournal = $this->postFixtureJournal(
             $context,
             '2026-08-19',
             $accounts['ar'],
@@ -285,7 +285,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             return [$source, $graph];
         });
 
-        $performanceJournal = $this->post(
+        $performanceJournal = $this->postFixtureJournal(
             $context,
             '2026-08-20',
             $accounts['contract_liability'],
@@ -309,7 +309,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             'status' => 'effective',
         ]);
 
-        $secondJournal = $this->post(
+        $secondJournal = $this->postFixtureJournal(
             $context,
             '2026-08-20',
             $accounts['contract_liability'],
@@ -358,7 +358,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
             return [$source, $graph];
         });
 
-        $journal = $this->post(
+        $journal = $this->postFixtureJournal(
             $context,
             '2026-08-20',
             $accounts['contract_asset'],
@@ -427,7 +427,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
         ];
     }
 
-    private function post(
+    private function postFixtureJournal(
         array $context,
         string $date,
         string $debitAccountId,
