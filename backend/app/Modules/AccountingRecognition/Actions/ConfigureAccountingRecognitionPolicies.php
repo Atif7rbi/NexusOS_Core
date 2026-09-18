@@ -46,7 +46,7 @@ final class ConfigureAccountingRecognitionPolicies
         return $this->replace(
             $tenantId,
             $actor,
-            'contract_consideration_accounting_policies',
+            'receivable_ar_counterpart_policies',
             $effectiveFrom,
             [
                 'contract_asset_control_account_id' => $contractAssetControlAccountId,
