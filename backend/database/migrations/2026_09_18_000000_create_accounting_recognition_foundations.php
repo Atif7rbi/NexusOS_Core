@@ -486,47 +486,110 @@ return new class extends Migration
               l public.contract_consideration_lots%ROWTYPE;
               j public.journal_entries%ROWTYPE;
               a public.accounts%ROWTYPE;
+              allocation record;
               consumed numeric(19,2);
               allocated numeric(19,2);
+              line_covered numeric(19,2);
+              line_amount numeric(19,2);
             BEGIN
-              SELECT * INTO o FROM public.accounting_position_origins WHERE tenant_id=p_tenant AND id=p_origin;
+              SELECT * INTO o FROM public.accounting_position_origins
+                WHERE tenant_id=p_tenant AND id=p_origin;
               IF NOT FOUND THEN RETURN; END IF;
-              SELECT * INTO t FROM public.contract_consideration_transitions WHERE tenant_id=o.tenant_id AND id=o.consideration_transition_id;
-              SELECT * INTO l FROM public.contract_consideration_lots WHERE tenant_id=o.tenant_id AND id=o.consideration_lot_id;
-              SELECT * INTO j FROM public.journal_entries WHERE tenant_id=o.tenant_id AND id=o.origin_journal_entry_id;
-              SELECT * INTO a FROM public.accounts WHERE tenant_id=o.tenant_id AND id=o.account_id;
+
+              SELECT * INTO t FROM public.contract_consideration_transitions
+                WHERE tenant_id=o.tenant_id AND id=o.consideration_transition_id;
+              SELECT * INTO l FROM public.contract_consideration_lots
+                WHERE tenant_id=o.tenant_id AND id=o.consideration_lot_id;
+              SELECT * INTO j FROM public.journal_entries
+                WHERE tenant_id=o.tenant_id AND id=o.origin_journal_entry_id;
+              SELECT * INTO a FROM public.accounts
+                WHERE tenant_id=o.tenant_id AND id=o.account_id;
 
               IF t.id IS NULL OR l.id IS NULL OR j.id IS NULL OR a.id IS NULL
                  OR t.contract_id<>o.contract_id OR l.contract_id<>o.contract_id
                  OR l.transition_id IS DISTINCT FROM t.id
                  OR t.source_type<>o.economic_source_type OR t.source_id<>o.economic_source_id
+                 OR (o.status='effective' AND t.status<>'effective')
                  OR j.status<>'posted' OR j.entry_date<>o.accounting_date
                  OR a.kind<>'posting'
-                 OR (o.position_type='CONTRACT_ASSET' AND a.account_type<>'asset')
-                 OR (o.position_type='CONTRACT_LIABILITY' AND a.account_type<>'liability') THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting position origin provenance is inconsistent';
+                 OR (o.position_type='CONTRACT_ASSET' AND (
+                      a.account_type<>'asset'
+                      OR l.semantic_position<>'EARNED_UNBILLED'
+                      OR t.source_type<>'UNIT_HANDOVER_ACCEPTANCE'
+                 ))
+                 OR (o.position_type='CONTRACT_LIABILITY' AND (
+                      a.account_type<>'liability'
+                      OR l.semantic_position<>'BILLED_UNEARNED'
+                      OR t.source_type<>'CONTRACTUAL_BILLING_ENTITLEMENT'
+                 )) THEN
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Accounting position origin provenance is inconsistent';
               END IF;
 
               SELECT COALESCE(sum(amount),0) INTO consumed
                 FROM public.accounting_position_consumptions
                 WHERE tenant_id=o.tenant_id AND origin_id=o.id AND status='effective';
+
               IF consumed > o.origin_amount THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting position origin is over-consumed';
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Accounting position origin is over-consumed';
               END IF;
               IF o.status='reversed' AND consumed<>0 THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting position origin reversal requires successor-first consumption reversal';
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Accounting position origin reversal requires successor-first consumption reversal';
               END IF;
 
               SELECT COALESCE(sum(x.amount),0) INTO allocated
                 FROM public.accounting_position_origin_journal_line_allocations x
-                JOIN public.journal_lines line ON line.tenant_id=x.tenant_id AND line.id=x.journal_line_id
-                WHERE x.tenant_id=o.tenant_id AND x.origin_id=o.id
+                JOIN public.journal_lines line
+                  ON line.tenant_id=x.tenant_id AND line.id=x.journal_line_id
+                WHERE x.tenant_id=o.tenant_id
+                  AND x.origin_id=o.id
+                  AND x.contract_id=o.contract_id
                   AND x.journal_entry_id=o.origin_journal_entry_id
+                  AND x.currency=o.currency
+                  AND x.economic_leg_identity=o.economic_leg_identity
                   AND line.journal_entry_id=o.origin_journal_entry_id
-                  AND line.account_id=o.account_id;
+                  AND line.account_id=o.account_id
+                  AND (
+                    (o.position_type='CONTRACT_ASSET' AND line.debit>0 AND line.credit=0)
+                    OR
+                    (o.position_type='CONTRACT_LIABILITY' AND line.credit>0 AND line.debit=0)
+                  );
+
               IF allocated<>o.origin_amount THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting position origin requires exact Journal-line allocation';
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Accounting position origin requires exact Journal-line allocation';
               END IF;
+
+              FOR allocation IN
+                SELECT x.journal_line_id,line.debit,line.credit
+                FROM public.accounting_position_origin_journal_line_allocations x
+                JOIN public.journal_lines line
+                  ON line.tenant_id=x.tenant_id AND line.id=x.journal_line_id
+                WHERE x.tenant_id=o.tenant_id AND x.origin_id=o.id
+              LOOP
+                SELECT COALESCE(sum(other.amount),0) INTO line_covered
+                  FROM public.accounting_position_origin_journal_line_allocations other
+                  JOIN public.accounting_position_origins other_origin
+                    ON other_origin.tenant_id=other.tenant_id
+                   AND other_origin.id=other.origin_id
+                  WHERE other.tenant_id=o.tenant_id
+                    AND other.journal_entry_id=o.origin_journal_entry_id
+                    AND other.journal_line_id=allocation.journal_line_id
+                    AND other_origin.position_type=o.position_type
+                    AND other_origin.account_id=o.account_id;
+
+                line_amount := CASE
+                  WHEN o.position_type='CONTRACT_ASSET' THEN allocation.debit
+                  ELSE allocation.credit
+                END;
+
+                IF line_covered<>line_amount THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',
+                    MESSAGE='Controlled origin Journal line must be fully explained by provenance allocations';
+                END IF;
+              END LOOP;
             END $$;
 
             CREATE OR REPLACE FUNCTION public.validate_accounting_position_consumption(p_tenant char(26), p_consumption char(26)) RETURNS void
@@ -537,33 +600,100 @@ return new class extends Migration
               t public.contract_consideration_transitions%ROWTYPE;
               l public.contract_consideration_lots%ROWTYPE;
               j public.journal_entries%ROWTYPE;
+              allocation record;
               allocated numeric(19,2);
+              line_covered numeric(19,2);
+              line_amount numeric(19,2);
             BEGIN
-              SELECT * INTO c FROM public.accounting_position_consumptions WHERE tenant_id=p_tenant AND id=p_consumption;
+              SELECT * INTO c FROM public.accounting_position_consumptions
+                WHERE tenant_id=p_tenant AND id=p_consumption;
               IF NOT FOUND THEN RETURN; END IF;
-              SELECT * INTO o FROM public.accounting_position_origins WHERE tenant_id=c.tenant_id AND id=c.origin_id;
-              SELECT * INTO t FROM public.contract_consideration_transitions WHERE tenant_id=c.tenant_id AND id=c.consideration_transition_id;
-              SELECT * INTO l FROM public.contract_consideration_lots WHERE tenant_id=c.tenant_id AND id=c.consideration_lot_id;
-              SELECT * INTO j FROM public.journal_entries WHERE tenant_id=c.tenant_id AND id=c.consuming_journal_entry_id;
+
+              SELECT * INTO o FROM public.accounting_position_origins
+                WHERE tenant_id=c.tenant_id AND id=c.origin_id;
+              SELECT * INTO t FROM public.contract_consideration_transitions
+                WHERE tenant_id=c.tenant_id AND id=c.consideration_transition_id;
+              SELECT * INTO l FROM public.contract_consideration_lots
+                WHERE tenant_id=c.tenant_id AND id=c.consideration_lot_id;
+              SELECT * INTO j FROM public.journal_entries
+                WHERE tenant_id=c.tenant_id AND id=c.consuming_journal_entry_id;
 
               IF o.id IS NULL OR t.id IS NULL OR l.id IS NULL OR j.id IS NULL
-                 OR o.contract_id<>c.contract_id OR t.contract_id<>c.contract_id OR l.contract_id<>c.contract_id
-                 OR c.currency<>o.currency OR j.status<>'posted'
-                 OR (o.position_type='CONTRACT_ASSET' AND c.consuming_recognition_type<>'RECEIVABLE_AR_RECOGNITION')
-                 OR (o.position_type='CONTRACT_LIABILITY' AND c.consuming_recognition_type<>'PERFORMANCE_ACCOUNTING_RECOGNITION') THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting position consumption provenance is inconsistent';
+                 OR o.contract_id<>c.contract_id
+                 OR t.contract_id<>c.contract_id
+                 OR l.contract_id<>c.contract_id
+                 OR l.transition_id IS DISTINCT FROM t.id
+                 OR c.currency<>o.currency
+                 OR (c.status='effective' AND (o.status<>'effective' OR t.status<>'effective'))
+                 OR j.status<>'posted'
+                 OR (o.position_type='CONTRACT_ASSET' AND (
+                      c.consuming_recognition_type<>'RECEIVABLE_AR_RECOGNITION'
+                      OR t.source_type<>'CONTRACTUAL_BILLING_ENTITLEMENT'
+                      OR l.semantic_position<>'BILLED_EARNED'
+                 ))
+                 OR (o.position_type='CONTRACT_LIABILITY' AND (
+                      c.consuming_recognition_type<>'PERFORMANCE_ACCOUNTING_RECOGNITION'
+                      OR t.source_type<>'UNIT_HANDOVER_ACCEPTANCE'
+                      OR l.semantic_position<>'BILLED_EARNED'
+                 )) THEN
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Accounting position consumption provenance is inconsistent';
               END IF;
 
               SELECT COALESCE(sum(x.amount),0) INTO allocated
                 FROM public.accounting_position_consumption_journal_line_allocations x
-                JOIN public.journal_lines line ON line.tenant_id=x.tenant_id AND line.id=x.journal_line_id
-                WHERE x.tenant_id=c.tenant_id AND x.consumption_id=c.id
+                JOIN public.journal_lines line
+                  ON line.tenant_id=x.tenant_id AND line.id=x.journal_line_id
+                WHERE x.tenant_id=c.tenant_id
+                  AND x.consumption_id=c.id
+                  AND x.contract_id=c.contract_id
                   AND x.journal_entry_id=c.consuming_journal_entry_id
+                  AND x.currency=c.currency
+                  AND x.economic_leg_identity=c.economic_leg_identity
                   AND line.journal_entry_id=c.consuming_journal_entry_id
-                  AND line.account_id=o.account_id;
+                  AND line.account_id=o.account_id
+                  AND (
+                    (o.position_type='CONTRACT_ASSET' AND line.credit>0 AND line.debit=0)
+                    OR
+                    (o.position_type='CONTRACT_LIABILITY' AND line.debit>0 AND line.credit=0)
+                  );
+
               IF allocated<>c.amount THEN
-                RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Accounting position consumption requires exact Journal-line allocation';
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Accounting position consumption requires exact Journal-line allocation';
               END IF;
+
+              FOR allocation IN
+                SELECT x.journal_line_id,line.debit,line.credit
+                FROM public.accounting_position_consumption_journal_line_allocations x
+                JOIN public.journal_lines line
+                  ON line.tenant_id=x.tenant_id AND line.id=x.journal_line_id
+                WHERE x.tenant_id=c.tenant_id AND x.consumption_id=c.id
+              LOOP
+                SELECT COALESCE(sum(other.amount),0) INTO line_covered
+                  FROM public.accounting_position_consumption_journal_line_allocations other
+                  JOIN public.accounting_position_consumptions other_consumption
+                    ON other_consumption.tenant_id=other.tenant_id
+                   AND other_consumption.id=other.consumption_id
+                  JOIN public.accounting_position_origins other_origin
+                    ON other_origin.tenant_id=other_consumption.tenant_id
+                   AND other_origin.id=other_consumption.origin_id
+                  WHERE other.tenant_id=c.tenant_id
+                    AND other.journal_entry_id=c.consuming_journal_entry_id
+                    AND other.journal_line_id=allocation.journal_line_id
+                    AND other_origin.position_type=o.position_type
+                    AND other_origin.account_id=o.account_id;
+
+                line_amount := CASE
+                  WHEN o.position_type='CONTRACT_ASSET' THEN allocation.credit
+                  ELSE allocation.debit
+                END;
+
+                IF line_covered<>line_amount THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',
+                    MESSAGE='Controlled consumption Journal line must be fully explained by provenance allocations';
+                END IF;
+              END LOOP;
             END $$;
 
             CREATE OR REPLACE FUNCTION public.accounting_position_final_state() RETURNS trigger
