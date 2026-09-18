@@ -87,7 +87,7 @@ final class AccountingRecognitionProvenanceIntegrityTest extends TestCase
                 'PERFORMANCE_ACCOUNTING_RECOGNITION',
                 '1000.00',
                 'PERFORMANCE:EARNED_UNBILLED',
-                false,
+                true,
             ),
         );
     }
