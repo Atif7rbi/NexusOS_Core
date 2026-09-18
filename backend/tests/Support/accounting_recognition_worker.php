@@ -101,8 +101,7 @@ try {
                 $actor,
                 [
                     'contract_id' => $payload['contract_id'],
-                    'performance_accounting_adoption_operation_id' =>
-                        $payload['operation_id'],
+                    'performance_accounting_adoption_operation_id' => $payload['operation_id'],
                 ],
             ),
             'acceptance',
@@ -113,10 +112,8 @@ try {
                         $actor,
                         [
                             'handover_evidence_id' => $payload['evidence_id'],
-                            'handover_acceptance_operation_id' =>
-                                $payload['operation_id'],
-                            'contract_consideration_transition_operation_id' =>
-                                $payload['transition_operation_id'],
+                            'handover_acceptance_operation_id' => $payload['operation_id'],
+                            'contract_consideration_transition_operation_id' => $payload['transition_operation_id'],
                         ],
                     ),
             ],
