@@ -533,6 +533,112 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
         );
     }
 
+    public function test_recognition_first_serializes_then_account_archive_preserves_historical_snapshot(): void
+    {
+        [$context, $source, $accounts] = $this->performanceContext();
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'pa_account_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $archive = $this->start([
+            'action' => 'account_archive',
+            'application_name' => 'pa_account_archive_waiter',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'account_id' => $accounts['revenue'],
+        ]);
+
+        $this->blocked(
+            'pa_account_archive_waiter',
+            'pa_account_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $archiveResult = $this->finish($archive);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue($archiveResult['ok'], json_encode($archiveResult));
+
+        self::assertSame(
+            'archived',
+            DB::table('accounts')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('id', $accounts['revenue'])
+                ->value('status'),
+        );
+
+        $row = DB::table('performance_accounting_recognitions')
+            ->where(
+                'id',
+                $recognitionResult['result']['recognition_id'],
+            )
+            ->first();
+
+        self::assertNotNull($row);
+        self::assertSame($accounts['revenue'], $row->revenue_account_id);
+        self::assertSame('posted', $row->status);
+    }
+
+    public function test_account_archive_first_serializes_then_blocks_new_recognition(): void
+    {
+        [$context, $source, $accounts] = $this->performanceContext();
+
+        [$archive, $directory] = $this->hold([
+            'action' => 'account_archive_hold',
+            'application_name' => 'pa_account_first_holder',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'account_id' => $accounts['revenue'],
+        ]);
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'pa_recognition_after_account',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'pa_recognition_after_account',
+            'pa_account_first_holder',
+        );
+        touch($directory.'/release');
+
+        $archiveResult = $this->finish($archive);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue($archiveResult['ok'], json_encode($archiveResult));
+        self::assertFalse(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertSame(
+            AccountingRecognitionConflict::class,
+            $recognitionResult['class'],
+        );
+        self::assertSame(
+            0,
+            DB::table('performance_accounting_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('unit_handover_acceptance_id', $source['id'])
+                ->count(),
+        );
+    }
+
     private function performanceContext(): array
     {
         $context = $this->considerationContext();
