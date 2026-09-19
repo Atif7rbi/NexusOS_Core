@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\UnitHandover\Actions;
 
 use App\Models\User;
-use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\AccountingRecognition\Support\PerformanceAccountingSourceCorrectionCoordinator;
+use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverConflict;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverValidationFailed;
 use App\Modules\UnitHandover\Support\UnitHandoverAuthorization;
@@ -26,7 +26,8 @@ final class ReverseUnitHandoverPerformanceSource
         private readonly UnitHandoverReversalRecoveryResolver $recovery,
         private readonly ContractConsiderationSourceCoordinator $consideration,
         private readonly PerformanceAccountingSourceCorrectionCoordinator $performanceAccounting,
-    ) {}
+    ) {
+    }
 
     public function execute(
         string $tenantId,
