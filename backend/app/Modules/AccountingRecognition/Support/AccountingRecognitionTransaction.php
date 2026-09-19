@@ -11,8 +11,11 @@ use Illuminate\Support\Facades\DB;
 
 final class AccountingRecognitionTransaction
 {
-    public function run(callable $operation): mixed
-    {
+    public function run(
+        callable $operation,
+        bool $preserveUniqueViolation = false,
+    ): mixed {
+
         try {
             return DB::transaction(function () use ($operation): mixed {
                 DB::statement("SET LOCAL lock_timeout = '5s'");
@@ -22,6 +25,9 @@ final class AccountingRecognitionTransaction
             }, 3);
         } catch (QueryException $exception) {
             $state = (string) ($exception->errorInfo[0] ?? '');
+            if ($preserveUniqueViolation && $state === '23505') {
+                throw $exception;
+            }
             if (in_array($state, ['23505', '40P01', '40001', '55P03', '57014'], true)) {
                 throw new AccountingRecognitionConflict(
                     'Accounting Recognition operation conflicted; retry using the same business identity.',
