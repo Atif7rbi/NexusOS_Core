@@ -9,6 +9,7 @@ use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
 use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
+use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
@@ -596,6 +597,198 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                 $input,
             ),
         );
+    }
+
+    public function test_accounting_only_correction_creates_linear_successor_and_preserves_economic_origin(): void
+    {
+        $context = $this->considerationContext();
+        $consideration = $this->adopt($context);
+        $accounts = $this->accountingProtocol($context);
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
+            ],
+        );
+        $this->commitDeferredState();
+
+        [$source, $graph] = DB::transaction(function () use (
+            $context,
+            $consideration,
+        ): array {
+            $source = $this->handoverSource($context);
+            $graph = $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source, $graph];
+        });
+
+        $originalOperation = (string) Str::ulid();
+
+        $originalId = app(RecognizePerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $source['id'],
+                'performance_accounting_operation_id' => $originalOperation,
+            ],
+        );
+
+        $originalOrigin = DB::table('accounting_position_origins')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('origin_recognition_id', $originalId)
+            ->first();
+
+        self::assertNotNull($originalOrigin);
+
+        $correctedAsset = app(ManageAccountAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'code' => 'PA-CA-CORR',
+                'name' => 'Corrected Performance Contract Asset',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'asset',
+                'classification' => 'current_asset',
+                'parent_id' => null,
+            ],
+        );
+
+        $correctedRevenue = app(ManageAccountAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'code' => 'PA-REV-CORR',
+                'name' => 'Corrected Performance Revenue',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'revenue',
+                'classification' => 'operating_revenue',
+                'parent_id' => null,
+            ],
+        );
+
+        $policy = app(ConfigureAccountingRecognitionPolicies::class)->performance(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-08-01',
+            $correctedRevenue,
+            $correctedAsset,
+            $accounts['contract_liability'],
+        );
+
+        self::assertSame(2, $policy['policy_version']);
+
+        $correctionOperation = (string) Str::ulid();
+        $input = [
+            'unit_handover_acceptance_id' => $source['id'],
+            'performance_accounting_correction_operation_id' =>
+                $correctionOperation,
+            'correction_reason' => 'Correct Performance Accounting mapping',
+            'correction_reference' => 'PA-CORR-001',
+        ];
+
+        $successorId = app(CorrectPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            $input,
+        );
+
+        $original = DB::table('performance_accounting_recognitions')
+            ->where('id', $originalId)
+            ->first();
+        $successor = DB::table('performance_accounting_recognitions')
+            ->where('id', $successorId)
+            ->first();
+
+        self::assertNotNull($original);
+        self::assertNotNull($successor);
+        self::assertSame('reversed', $original->status);
+        self::assertSame($correctionOperation, $original->reversal_operation_id);
+        self::assertNotNull($original->reversal_journal_entry_id);
+
+        self::assertSame('accounting_correction', $successor->recognition_kind);
+        self::assertSame('posted', $successor->status);
+        self::assertSame($originalId, $successor->root_recognition_id);
+        self::assertSame($originalId, $successor->predecessor_recognition_id);
+        self::assertSame(
+            $correctionOperation,
+            $successor->performance_accounting_correction_operation_id,
+        );
+        self::assertSame($source['id'], $successor->unit_handover_acceptance_id);
+        self::assertSame(
+            $graph['transition_id'],
+            $successor->performance_consideration_transition_id,
+        );
+        self::assertSame($original->performance_amount, $successor->performance_amount);
+        self::assertSame($original->accounting_date, $successor->accounting_date);
+        self::assertSame($correctedAsset, $successor->contract_asset_account_id);
+        self::assertSame($correctedRevenue, $successor->revenue_account_id);
+        self::assertSame(2, (int) $successor->performance_accounting_policy_version);
+
+        $successorOrigin = DB::table('accounting_position_origins')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('origin_recognition_id', $successorId)
+            ->first();
+
+        self::assertNotNull($successorOrigin);
+        self::assertSame('reversed', $originalOrigin->status === 'reversed'
+            ? $originalOrigin->status
+            : (string) DB::table('accounting_position_origins')
+                ->where('id', $originalOrigin->id)
+                ->value('status'));
+        self::assertSame($originalOrigin->consideration_lot_id, $successorOrigin->consideration_lot_id);
+        self::assertSame($originalOrigin->economic_leg_identity, $successorOrigin->economic_leg_identity);
+        self::assertSame($originalOrigin->origin_amount, $successorOrigin->origin_amount);
+        self::assertSame($correctedAsset, $successorOrigin->account_id);
+
+        self::assertSame(
+            $successorId,
+            app(CorrectPerformanceAccounting::class)->execute(
+                $context['tenant_id'],
+                $context['actor'],
+                $input,
+            ),
+        );
+
+        self::assertSame(
+            $originalId,
+            app(RecognizePerformanceAccounting::class)->execute(
+                $context['tenant_id'],
+                $context['actor'],
+                [
+                    'unit_handover_acceptance_id' => $source['id'],
+                    'performance_accounting_operation_id' =>
+                        $originalOperation,
+                ],
+            ),
+        );
+
+        try {
+            app(CorrectPerformanceAccounting::class)->execute(
+                $context['tenant_id'],
+                $context['actor'],
+                $input + ['correction_reason' => 'Different reason'],
+            );
+            self::fail('Correction replay accepted different canonical facts.');
+        } catch (AccountingRecognitionConflict) {
+            self::assertSame(
+                2,
+                DB::table('performance_accounting_recognitions')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where('root_recognition_id', $originalId)
+                    ->count(),
+            );
+        }
     }
 
     public function test_closed_performance_period_fails_without_partial_accounting_truth(): void
