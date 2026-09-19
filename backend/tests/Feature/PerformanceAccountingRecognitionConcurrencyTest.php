@@ -305,6 +305,130 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
         DB::statement('SET CONSTRAINTS ALL DEFERRED');
     }
 
+    public function test_recognition_first_serializes_then_source_correction_reverses_accounting_before_source(): void
+    {
+        [$context, $source] = $this->performanceContext();
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'pa_source_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $sourceCorrection = $this->start([
+            'action' => 'source_reverse',
+            'application_name' => 'pa_source_correction_waiter',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'acceptance_id' => $source['id'],
+            'operation_id' => (string) Str::ulid(),
+            'reason' => 'Concurrent source correction',
+            'reference' => 'PA-SOURCE-CORR-001',
+        ]);
+
+        $this->blocked(
+            'pa_source_correction_waiter',
+            'pa_source_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $correctionResult = $this->finish($sourceCorrection);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue(
+            $correctionResult['ok'],
+            json_encode($correctionResult),
+        );
+
+        self::assertSame(
+            'reversed',
+            DB::table('unit_handover_acceptances')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('id', $source['id'])
+                ->value('status'),
+        );
+        self::assertSame(
+            0,
+            DB::table('performance_accounting_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('unit_handover_acceptance_id', $source['id'])
+                ->where('status', 'posted')
+                ->count(),
+        );
+        self::assertSame(
+            1,
+            DB::table('performance_accounting_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('unit_handover_acceptance_id', $source['id'])
+                ->where('status', 'reversed')
+                ->count(),
+        );
+    }
+
+    public function test_source_correction_first_serializes_then_blocks_new_performance_recognition(): void
+    {
+        [$context, $source] = $this->performanceContext();
+
+        [$sourceCorrection, $directory] = $this->hold([
+            'action' => 'source_reverse_hold',
+            'application_name' => 'pa_source_first_holder',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'acceptance_id' => $source['id'],
+            'operation_id' => (string) Str::ulid(),
+            'reason' => 'Source correction wins',
+            'reference' => 'PA-SOURCE-FIRST-001',
+        ]);
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'pa_recognition_after_source',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'pa_recognition_after_source',
+            'pa_source_first_holder',
+        );
+        touch($directory.'/release');
+
+        $correctionResult = $this->finish($sourceCorrection);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue(
+            $correctionResult['ok'],
+            json_encode($correctionResult),
+        );
+        self::assertFalse(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertSame(
+            AccountingRecognitionConflict::class,
+            $recognitionResult['class'],
+        );
+
+        self::assertSame(
+            0,
+            DB::table('performance_accounting_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('unit_handover_acceptance_id', $source['id'])
+                ->count(),
+        );
+    }
+
     private function performanceContext(): array
     {
         $context = $this->considerationContext();
