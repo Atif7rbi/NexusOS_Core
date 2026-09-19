@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\Accounting\Actions\ReverseJournalAction;
 use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
@@ -14,8 +15,11 @@ use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
 use App\Modules\Accounting\DTOs\JournalLineData;
+use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use App\Modules\AccountingRecognition\Exceptions\AccountingRecognitionConflict;
+use App\Modules\AccountingRecognition\Support\PerformanceAccountingJournalWriter;
 use App\Modules\UnitHandover\Actions\ReverseUnitHandoverPerformanceSource;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -486,6 +490,126 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         self::assertNotNull($origin);
         self::assertSame('500.00', $origin->origin_amount);
         self::assertSame($performanceGraph['earned_lot_id'], $origin->consideration_lot_id);
+    }
+
+    public function test_performance_owned_journal_cannot_be_reversed_outside_owner_workflow(): void
+    {
+        $context = $this->considerationContext();
+        $consideration = $this->adopt($context);
+        $this->accountingProtocol($context);
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+        $this->commitDeferredState();
+
+        [$source] = DB::transaction(function () use (
+            $context,
+            $consideration,
+        ): array {
+            $source = $this->handoverSource($context);
+            $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source];
+        });
+
+        $recognitionId = app(RecognizePerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $source['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $recognition = DB::table('performance_accounting_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($recognition);
+
+        try {
+            app(ReverseJournalAction::class)->execute(
+                $context['tenant_id'],
+                (string) $recognition->journal_entry_id,
+                $context['actor'],
+                (string) $recognition->accounting_date,
+                'Generic reversal must be rejected',
+            );
+            self::fail(
+                'Generic Journal reversal bypassed Performance Accounting ownership.',
+            );
+        } catch (AccountingValidationFailed) {
+            self::assertSame(
+                0,
+                DB::table('journal_entries')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where(
+                        'reverses_journal_entry_id',
+                        $recognition->journal_entry_id,
+                    )
+                    ->count(),
+            );
+        }
+
+        $target = DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $recognition->journal_entry_id)
+            ->first();
+
+        self::assertNotNull($target);
+
+        DB::beginTransaction();
+
+        try {
+            app(PerformanceAccountingJournalWriter::class)->reverseExact(
+                $context['tenant_id'],
+                $context['actor'],
+                $target,
+                'Owner-state bypass must fail at final state',
+            );
+
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+
+            self::fail(
+                'PostgreSQL accepted a Performance Journal reversal without owner-state reversal.',
+            );
+        } catch (QueryException $exception) {
+            self::assertSame(
+                '23514',
+                (string) ($exception->errorInfo[0] ?? ''),
+                $exception->getMessage(),
+            );
+        } finally {
+            DB::rollBack();
+        }
+
+        self::assertDatabaseHas('performance_accounting_recognitions', [
+            'id' => $recognitionId,
+            'status' => 'posted',
+        ]);
+        self::assertSame(
+            0,
+            DB::table('journal_entries')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where(
+                    'reverses_journal_entry_id',
+                    $recognition->journal_entry_id,
+                )
+                ->count(),
+        );
     }
 
     public function test_handover_source_correction_reverses_effective_performance_accounting_before_economic_source(): void
