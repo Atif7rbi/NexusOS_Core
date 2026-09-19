@@ -26,8 +26,7 @@ final class ReverseUnitHandoverPerformanceSource
         private readonly UnitHandoverReversalRecoveryResolver $recovery,
         private readonly ContractConsiderationSourceCoordinator $consideration,
         private readonly PerformanceAccountingSourceCorrectionCoordinator $performanceAccounting,
-    ) {
-    }
+    ) {}
 
     public function execute(
         string $tenantId,
