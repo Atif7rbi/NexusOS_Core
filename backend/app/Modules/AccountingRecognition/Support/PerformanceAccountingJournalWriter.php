@@ -19,7 +19,7 @@ final class PerformanceAccountingJournalWriter
         private readonly AccountingAuditWriter $audit,
     ) {}
 
-    public function postOriginal(
+    public function postRecognition(
         string $tenantId,
         User $actor,
         string $recognitionId,
