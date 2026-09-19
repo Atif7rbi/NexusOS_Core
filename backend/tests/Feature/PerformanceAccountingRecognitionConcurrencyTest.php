@@ -237,16 +237,6 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
         [$context, $source, $accounts] = $this->performanceContext();
         $operationId = (string) Str::ulid();
 
-        [$holder, $directory] = $this->hold(
-            $this->recognitionPayload(
-                $context,
-                $source['id'],
-                $operationId,
-                'pa_policy_holder',
-                'recognize_hold',
-            ),
-        );
-
         $correctedAsset = $this->account(
             $context,
             'PA-POL-A',
@@ -258,6 +248,16 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
             'PA-POL-R',
             'revenue',
             'operating_revenue',
+        );
+
+        [$holder, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                $operationId,
+                'pa_policy_holder',
+                'recognize_hold',
+            ),
         );
 
         $policy = $this->start([
