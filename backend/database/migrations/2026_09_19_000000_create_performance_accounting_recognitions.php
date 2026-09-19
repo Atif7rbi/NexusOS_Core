@@ -288,7 +288,6 @@ return new class extends Migration
                  OR adoption.accounting_scope_version<>'PERFORMANCE_ACCOUNTING_V1'
                  OR policy.policy_version<>r.performance_accounting_policy_version
                  OR r.accounting_date<policy.effective_from
-                 OR (policy.effective_to IS NOT NULL AND r.accounting_date>policy.effective_to)
                  OR policy.revenue_account_id<>r.revenue_account_id
                  OR (
                     r.contract_asset_amount>0
