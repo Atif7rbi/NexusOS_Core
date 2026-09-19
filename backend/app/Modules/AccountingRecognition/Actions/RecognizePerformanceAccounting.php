@@ -355,7 +355,7 @@ final class RecognizePerformanceAccounting
 
         $recognitionId = (string) Str::ulid();
 
-        $journal = $this->journals->postOriginal(
+        $journal = $this->journals->postRecognition(
             $tenantId,
             $actor,
             $recognitionId,
