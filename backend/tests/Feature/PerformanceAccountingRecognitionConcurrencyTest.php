@@ -429,6 +429,110 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
         );
     }
 
+    public function test_recognition_first_serializes_then_period_close_preserves_posted_history(): void
+    {
+        [$context, $source, , $periodId] = $this->performanceContext();
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'pa_period_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $close = $this->start([
+            'action' => 'period_close',
+            'application_name' => 'pa_period_close_waiter',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'period_id' => $periodId,
+        ]);
+
+        $this->blocked(
+            'pa_period_close_waiter',
+            'pa_period_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $closeResult = $this->finish($close);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue($closeResult['ok'], json_encode($closeResult));
+
+        self::assertSame(
+            'closed',
+            DB::table('accounting_periods')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('id', $periodId)
+                ->value('status'),
+        );
+        self::assertSame(
+            'posted',
+            DB::table('performance_accounting_recognitions')
+                ->where(
+                    'id',
+                    $recognitionResult['result']['recognition_id'],
+                )
+                ->value('status'),
+        );
+    }
+
+    public function test_period_close_first_serializes_then_blocks_new_recognition_without_date_shift(): void
+    {
+        [$context, $source, , $periodId] = $this->performanceContext();
+
+        [$close, $directory] = $this->hold([
+            'action' => 'period_close_hold',
+            'application_name' => 'pa_period_first_holder',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'period_id' => $periodId,
+        ]);
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'pa_recognition_after_period',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'pa_recognition_after_period',
+            'pa_period_first_holder',
+        );
+        touch($directory.'/release');
+
+        $closeResult = $this->finish($close);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue($closeResult['ok'], json_encode($closeResult));
+        self::assertFalse(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertSame(
+            AccountingRecognitionConflict::class,
+            $recognitionResult['class'],
+        );
+        self::assertSame(
+            0,
+            DB::table('performance_accounting_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('unit_handover_acceptance_id', $source['id'])
+                ->count(),
+        );
+    }
+
     private function performanceContext(): array
     {
         $context = $this->considerationContext();
@@ -439,7 +543,7 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
             $context['actor'],
         );
 
-        app(ManageAccountingPeriodAction::class)->create(
+        $periodId = app(ManageAccountingPeriodAction::class)->create(
             $context['tenant_id'],
             $context['actor'],
             '2026-01-01',
@@ -505,7 +609,7 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
             return [$source];
         });
 
-        return [$context, $source, $accounts];
+        return [$context, $source, $accounts, $periodId];
     }
 
     private function account(
