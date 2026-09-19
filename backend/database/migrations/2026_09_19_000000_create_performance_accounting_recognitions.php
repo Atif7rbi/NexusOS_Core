@@ -733,12 +733,12 @@ return new class extends Migration
           public.accounting_position_consumption_journal_line_allocations
           TO {$identifier}");
 
-        DB::unprepared(<<<SQL
+        $guardSql = <<<'SQL'
             CREATE OR REPLACE FUNCTION public.performance_accounting_runtime_provenance_guard() RETURNS trigger
-            LANGUAGE plpgsql SET search_path=pg_catalog,public AS \$\$
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE owner_type text;
             BEGIN
-              IF current_user <> {$literal} THEN
+              IF current_user <> '__RUNTIME_LITERAL__' THEN
                 RETURN NEW;
               END IF;
 
@@ -767,7 +767,7 @@ return new class extends Migration
               END IF;
 
               RETURN NEW;
-            END \$\$;
+            END $$;
 
             CREATE TRIGGER performance_accounting_runtime_origin_guard
               BEFORE INSERT OR UPDATE ON public.accounting_position_origins
@@ -787,8 +787,15 @@ return new class extends Migration
               public.validate_performance_accounting_recognition(character,character),
               public.performance_accounting_recognition_final_state(),
               public.performance_accounting_runtime_provenance_guard()
-              FROM {$identifier};
-            SQL);
+              FROM __RUNTIME_IDENTIFIER__;
+            SQL;
+
+        $guardSql = str_replace(
+            ['__RUNTIME_LITERAL__', '__RUNTIME_IDENTIFIER__'],
+            [$runtimeRole, $identifier],
+            $guardSql,
+        );
+        DB::unprepared($guardSql);
     }
 
     private function runtimeRole(): string
