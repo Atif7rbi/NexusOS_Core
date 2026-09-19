@@ -40,6 +40,8 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             ],
         );
 
+        $this->commitDeferredState();
+
         [$source, $graph] = DB::transaction(function () use (
             $context,
             $consideration,
@@ -216,6 +218,8 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             ],
         );
 
+        $this->commitDeferredState();
+
         [$handoverSource, $handoverGraph] = DB::transaction(function () use (
             $context,
             $consideration,
@@ -313,6 +317,8 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             ],
         );
 
+        $this->commitDeferredState();
+
         [$source] = DB::transaction(function () use (
             $context,
             $consideration,
@@ -370,6 +376,12 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                     ->count(),
             );
         }
+    }
+
+    private function commitDeferredState(): void
+    {
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        DB::statement('SET CONSTRAINTS ALL DEFERRED');
     }
 
     private function accountingProtocol(
