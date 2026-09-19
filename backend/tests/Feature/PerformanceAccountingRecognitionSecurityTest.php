@@ -237,7 +237,12 @@ final class PerformanceAccountingRecognitionSecurityTest extends TestCase
         ): mixed {
             DB::statement("SET LOCAL ROLE {$identifier}");
 
-            return $callback();
+            $result = $callback();
+
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            return $result;
         });
     }
 }
