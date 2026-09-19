@@ -306,10 +306,14 @@ final class PerformanceAccountingRecognitionTest extends TestCase
     public function test_mixed_handover_groups_exact_liability_accounts_and_creates_contract_asset(): void
     {
         $context = $this->considerationContext();
-        $obligationIds = $this->billingObligations(
-            $context,
-            ['300.00', '200.00'],
-            '2026-08-19',
+        $obligationIds = array_slice(
+            $this->billingObligations(
+                $context,
+                ['300.00', '200.00', '500.00'],
+                '2026-08-19',
+            ),
+            0,
+            2,
         );
         $consideration = $this->adopt($context);
         $accounts = $this->accountingProtocol($context);
