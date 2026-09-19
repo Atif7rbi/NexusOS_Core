@@ -607,8 +607,7 @@ final class CorrectPerformanceAccounting
             )->isZero()
                 ? null
                 : [
-                    'account_id' =>
-                        (string) $policy->contract_asset_control_account_id,
+                    'account_id' => (string) $policy->contract_asset_control_account_id,
                     'amount' => (string) $leaf->contract_asset_amount,
                 ],
             [
@@ -621,10 +620,8 @@ final class CorrectPerformanceAccounting
             'id' => $successorId,
             'tenant_id' => $tenantId,
             'contract_id' => $leaf->contract_id,
-            'unit_handover_acceptance_id' =>
-                $leaf->unit_handover_acceptance_id,
-            'performance_consideration_transition_id' =>
-                $leaf->performance_consideration_transition_id,
+            'unit_handover_acceptance_id' => $leaf->unit_handover_acceptance_id,
+            'performance_consideration_transition_id' => $leaf->performance_consideration_transition_id,
             'recognition_kind' => 'accounting_correction',
             'performance_accounting_operation_id' => null,
             'performance_accounting_correction_operation_id' => $operationId,
@@ -636,16 +633,13 @@ final class CorrectPerformanceAccounting
             'currency' => $leaf->currency,
             'accounting_date' => $leaf->accounting_date,
             'contract_asset_amount' => $leaf->contract_asset_amount,
-            'contract_liability_release_amount' =>
-                $leaf->contract_liability_release_amount,
+            'contract_liability_release_amount' => $leaf->contract_liability_release_amount,
             'revenue_amount' => $leaf->revenue_amount,
             'performance_accounting_policy_id' => $policy->id,
-            'performance_accounting_policy_version' =>
-                $policy->policy_version,
-            'contract_asset_account_id' =>
-                BigDecimal::of(
-                    (string) $leaf->contract_asset_amount,
-                )->isZero()
+            'performance_accounting_policy_version' => $policy->policy_version,
+            'contract_asset_account_id' => BigDecimal::of(
+                (string) $leaf->contract_asset_amount,
+            )->isZero()
                     ? null
                     : $policy->contract_asset_control_account_id,
             'revenue_account_id' => $policy->revenue_account_id,
@@ -677,15 +671,12 @@ final class CorrectPerformanceAccounting
                 'tenant_id' => $tenantId,
                 'contract_id' => $leaf->contract_id,
                 'origin_id' => $consumption->origin_id,
-                'consuming_recognition_type' =>
-                    'PERFORMANCE_ACCOUNTING_RECOGNITION',
+                'consuming_recognition_type' => 'PERFORMANCE_ACCOUNTING_RECOGNITION',
                 'consuming_recognition_id' => $successorId,
                 'consuming_journal_entry_id' => $journal['journal_entry_id'],
-                'consideration_transition_id' =>
-                    $consumption->consideration_transition_id,
+                'consideration_transition_id' => $consumption->consideration_transition_id,
                 'consideration_lot_id' => $consumption->consideration_lot_id,
-                'economic_leg_identity' =>
-                    $consumption->economic_leg_identity,
+                'economic_leg_identity' => $consumption->economic_leg_identity,
                 'amount' => $consumption->amount,
                 'currency' => $consumption->currency,
                 'status' => 'effective',
@@ -705,8 +696,7 @@ final class CorrectPerformanceAccounting
                 'journal_line_id' => $lineId,
                 'amount' => $consumption->amount,
                 'currency' => $consumption->currency,
-                'economic_leg_identity' =>
-                    $consumption->economic_leg_identity,
+                'economic_leg_identity' => $consumption->economic_leg_identity,
                 'created_at' => $now,
             ]);
         }
@@ -727,16 +717,13 @@ final class CorrectPerformanceAccounting
                 'tenant_id' => $tenantId,
                 'contract_id' => $leaf->contract_id,
                 'position_type' => 'CONTRACT_ASSET',
-                'origin_recognition_type' =>
-                    'PERFORMANCE_ACCOUNTING_RECOGNITION',
+                'origin_recognition_type' => 'PERFORMANCE_ACCOUNTING_RECOGNITION',
                 'origin_recognition_id' => $successorId,
                 'origin_journal_entry_id' => $journal['journal_entry_id'],
-                'account_id' =>
-                    $policy->contract_asset_control_account_id,
+                'account_id' => $policy->contract_asset_control_account_id,
                 'economic_source_type' => $origin->economic_source_type,
                 'economic_source_id' => $origin->economic_source_id,
-                'consideration_transition_id' =>
-                    $origin->consideration_transition_id,
+                'consideration_transition_id' => $origin->consideration_transition_id,
                 'consideration_lot_id' => $origin->consideration_lot_id,
                 'economic_leg_identity' => $origin->economic_leg_identity,
                 'origin_amount' => $origin->origin_amount,
@@ -772,11 +759,9 @@ final class CorrectPerformanceAccounting
             (int) $actor->id,
             [
                 'predecessor_recognition_id' => (string) $leaf->id,
-                'performance_accounting_correction_operation_id' =>
-                    $operationId,
+                'performance_accounting_correction_operation_id' => $operationId,
                 'reversal_journal_entry_id' => $reversalJournalId,
-                'successor_journal_entry_id' =>
-                    (string) $journal['journal_entry_id'],
+                'successor_journal_entry_id' => (string) $journal['journal_entry_id'],
                 'correction_reference' => $reference,
             ],
             $now,

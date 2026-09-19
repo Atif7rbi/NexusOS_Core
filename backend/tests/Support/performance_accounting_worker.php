@@ -108,10 +108,8 @@ try {
                     $payload['tenant_id'],
                     $actor,
                     [
-                        'unit_handover_acceptance_id' =>
-                            $payload['acceptance_id'],
-                        'performance_accounting_operation_id' =>
-                            $payload['operation_id'],
+                        'unit_handover_acceptance_id' => $payload['acceptance_id'],
+                        'performance_accounting_operation_id' => $payload['operation_id'],
                     ],
                 ),
             ],
@@ -123,10 +121,8 @@ try {
                     $payload['tenant_id'],
                     $actor,
                     [
-                        'unit_handover_acceptance_id' =>
-                            $payload['acceptance_id'],
-                        'performance_accounting_correction_operation_id' =>
-                            $payload['operation_id'],
+                        'unit_handover_acceptance_id' => $payload['acceptance_id'],
+                        'performance_accounting_correction_operation_id' => $payload['operation_id'],
                         'correction_reason' => $payload['reason'],
                         'correction_reference' => $payload['reference'],
                     ],

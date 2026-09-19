@@ -624,8 +624,7 @@ final class RecognizePerformanceAccounting
             $edgePlans = [];
 
             foreach (
-                $lockedOrigins[$edge['predecessor_lot_id']] ?? []
-                as $locked
+                $lockedOrigins[$edge['predecessor_lot_id']] ?? [] as $locked
             ) {
                 $origin = $locked['origin'];
 
@@ -798,8 +797,7 @@ final class RecognizePerformanceAccounting
                 'tenant_id' => $tenantId,
                 'contract_id' => $contractId,
                 'origin_id' => $origin->id,
-                'consuming_recognition_type' =>
-                    'PERFORMANCE_ACCOUNTING_RECOGNITION',
+                'consuming_recognition_type' => 'PERFORMANCE_ACCOUNTING_RECOGNITION',
                 'consuming_recognition_id' => $recognitionId,
                 'consuming_journal_entry_id' => $journalId,
                 'consideration_transition_id' => $transitionId,
@@ -860,8 +858,7 @@ final class RecognizePerformanceAccounting
             'tenant_id' => $tenantId,
             'contract_id' => $contractId,
             'position_type' => 'CONTRACT_ASSET',
-            'origin_recognition_type' =>
-                'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            'origin_recognition_type' => 'PERFORMANCE_ACCOUNTING_RECOGNITION',
             'origin_recognition_id' => $recognitionId,
             'origin_journal_entry_id' => $journalId,
             'account_id' => $accountId,

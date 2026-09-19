@@ -99,8 +99,7 @@ final class PerformanceAccountingSourceCorrectionCoordinator
                 ->get();
 
             if ($downstream->contains(
-                static fn (object $row): bool =>
-                    $row->status === 'effective',
+                static fn (object $row): bool => $row->status === 'effective',
             )) {
                 throw new AccountingRecognitionConflict(
                     'Performance Accounting source correction is blocked by effective downstream Contract Asset consumption.',
@@ -249,8 +248,7 @@ final class PerformanceAccountingSourceCorrectionCoordinator
                 ->where('status', 'effective')
                 ->update([
                     'status' => 'reversed',
-                    'reversal_origin_operation_id' =>
-                        $sourceReversalOperationId,
+                    'reversal_origin_operation_id' => $sourceReversalOperationId,
                     'reversed_at' => $now,
                 ]);
         }
@@ -280,8 +278,7 @@ final class PerformanceAccountingSourceCorrectionCoordinator
             (string) $leaf->id,
             (int) $actor->id,
             [
-                'source_reversal_operation_id' =>
-                    $sourceReversalOperationId,
+                'source_reversal_operation_id' => $sourceReversalOperationId,
                 'reversal_journal_entry_id' => $reversalJournalId,
             ],
             $now,

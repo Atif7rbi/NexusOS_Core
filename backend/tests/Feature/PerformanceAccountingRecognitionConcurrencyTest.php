@@ -268,8 +268,7 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
             'effective_from' => '2026-08-01',
             'revenue_account_id' => $correctedRevenue,
             'contract_asset_account_id' => $correctedAsset,
-            'contract_liability_account_id' =>
-                $accounts['contract_liability'],
+            'contract_liability_account_id' => $accounts['contract_liability'],
         ]);
 
         $this->blocked('pa_policy_waiter', 'pa_policy_holder');
@@ -691,8 +690,7 @@ final class PerformanceAccountingRecognitionConcurrencyTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 

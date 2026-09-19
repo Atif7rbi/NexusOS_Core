@@ -8,17 +8,18 @@ use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
 use App\Modules\Accounting\Actions\ReverseJournalAction;
-use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
-use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
-use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
-use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
 use App\Modules\Accounting\DTOs\JournalLineData;
 use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
+use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
+use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
+use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
+use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\AccountingRecognition\Exceptions\AccountingRecognitionConflict;
 use App\Modules\AccountingRecognition\Support\PerformanceAccountingJournalWriter;
 use App\Modules\UnitHandover\Actions\ReverseUnitHandoverPerformanceSource;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -346,8 +347,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
 
         usort(
             $billing,
-            static fn (array $left, array $right): int =>
-                strcmp($left['source']['id'], $right['source']['id']),
+            static fn (array $left, array $right): int => strcmp($left['source']['id'], $right['source']['id']),
         );
 
         DB::transaction(function () use (
@@ -470,10 +470,9 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             '500.00',
             $consumptions
                 ->reduce(
-                    static fn (string $sum, object $row): string =>
-                        (string) \Brick\Math\BigDecimal::of($sum)->plus(
-                            \Brick\Math\BigDecimal::of((string) $row->amount),
-                        ),
+                    static fn (string $sum, object $row): string => (string) BigDecimal::of($sum)->plus(
+                        BigDecimal::of((string) $row->amount),
+                    ),
                     '0.00',
                 ),
         );
@@ -503,8 +502,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
         $this->commitDeferredState();
@@ -815,8 +813,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         $correctionOperation = (string) Str::ulid();
         $input = [
             'unit_handover_acceptance_id' => $source['id'],
-            'performance_accounting_correction_operation_id' =>
-                $correctionOperation,
+            'performance_accounting_correction_operation_id' => $correctionOperation,
             'correction_reason' => 'Correct Performance Accounting mapping',
             'correction_reference' => 'PA-CORR-001',
         ];
@@ -892,8 +889,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                 $context['actor'],
                 [
                     'unit_handover_acceptance_id' => $source['id'],
-                    'performance_accounting_operation_id' =>
-                        $originalOperation,
+                    'performance_accounting_operation_id' => $originalOperation,
                 ],
             ),
         );
@@ -930,8 +926,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
         $this->commitDeferredState();
@@ -1005,8 +1000,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $context['actor'],
             [
                 'unit_handover_acceptance_id' => $source['id'],
-                'performance_accounting_correction_operation_id' =>
-                    $correctionOperation,
+                'performance_accounting_correction_operation_id' => $correctionOperation,
                 'correction_reason' => 'Correct mapping before source reversal',
                 'correction_reference' => 'PA-LEAF-CORR-001',
             ],
@@ -1193,8 +1187,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
     private function accountingProtocol(
         array $context,
         bool $separateHistoricalLiability = false,
-    ): array
-    {
+    ): array {
         app(ActivateAccountingAction::class)->execute(
             $context['tenant_id'],
             $context['actor'],
@@ -1273,6 +1266,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             'revenue' => $revenue,
         ];
     }
+
     private function mixedPerformanceTransition(
         array $context,
         array $consideration,
@@ -1465,5 +1459,4 @@ final class PerformanceAccountingRecognitionTest extends TestCase
 
         return $originId;
     }
-
 }
