@@ -14,6 +14,7 @@ use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
 use App\Modules\Accounting\DTOs\JournalLineData;
 use App\Modules\AccountingRecognition\Exceptions\AccountingRecognitionConflict;
+use App\Modules\UnitHandover\Actions\ReverseUnitHandoverPerformanceSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -480,6 +481,117 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         self::assertNotNull($origin);
         self::assertSame('500.00', $origin->origin_amount);
         self::assertSame($performanceGraph['earned_lot_id'], $origin->consideration_lot_id);
+    }
+
+    public function test_handover_source_correction_reverses_effective_performance_accounting_before_economic_source(): void
+    {
+        $context = $this->considerationContext();
+        $consideration = $this->adopt($context);
+        $this->accountingProtocol($context);
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
+            ],
+        );
+        $this->commitDeferredState();
+
+        [$source, $graph] = DB::transaction(function () use (
+            $context,
+            $consideration,
+        ): array {
+            $source = $this->handoverSource($context);
+            $graph = $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source, $graph];
+        });
+
+        $recognitionId = app(RecognizePerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $source['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $before = DB::table('performance_accounting_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($before);
+
+        $reversalOperation = (string) Str::ulid();
+        $input = [
+            'reversal_operation_id' => $reversalOperation,
+            'reversal_reason' => 'Customer acceptance rescinded',
+            'reversal_reference' => 'PA-SOURCE-REV-001',
+        ];
+
+        self::assertSame(
+            $source['id'],
+            app(ReverseUnitHandoverPerformanceSource::class)->execute(
+                $context['tenant_id'],
+                $source['id'],
+                $context['actor'],
+                $input,
+            ),
+        );
+
+        $recognition = DB::table('performance_accounting_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($recognition);
+        self::assertSame('reversed', $recognition->status);
+        self::assertSame($reversalOperation, $recognition->reversal_operation_id);
+        self::assertNotNull($recognition->reversal_journal_entry_id);
+
+        $reversalJournal = DB::table('journal_entries')
+            ->where('id', $recognition->reversal_journal_entry_id)
+            ->first();
+
+        self::assertNotNull($reversalJournal);
+        self::assertSame('posted', $reversalJournal->status);
+        self::assertSame('reversal', $reversalJournal->origin);
+        self::assertSame($before->journal_entry_id, $reversalJournal->source_id);
+        self::assertSame('2026-08-20', (string) $reversalJournal->entry_date);
+
+        self::assertDatabaseHas('accounting_position_origins', [
+            'origin_recognition_id' => $recognitionId,
+            'status' => 'reversed',
+            'reversal_origin_operation_id' => $reversalOperation,
+        ]);
+
+        self::assertDatabaseHas('unit_handover_acceptances', [
+            'id' => $source['id'],
+            'status' => 'reversed',
+            'reversal_operation_id' => $reversalOperation,
+        ]);
+
+        self::assertDatabaseHas('contract_consideration_transitions', [
+            'id' => $graph['transition_id'],
+            'status' => 'reversed',
+        ]);
+
+        self::assertSame(
+            $source['id'],
+            app(ReverseUnitHandoverPerformanceSource::class)->execute(
+                $context['tenant_id'],
+                $source['id'],
+                $context['actor'],
+                $input,
+            ),
+        );
     }
 
     public function test_closed_performance_period_fails_without_partial_accounting_truth(): void
