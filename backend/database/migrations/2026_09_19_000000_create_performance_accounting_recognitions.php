@@ -641,6 +641,16 @@ return new class extends Migration
                 END IF;
               END LOOP;
 
+              IF r.status='posted' AND EXISTS (
+                SELECT 1
+                FROM public.journal_entries direct_reversal
+                WHERE direct_reversal.tenant_id=r.tenant_id
+                  AND direct_reversal.reverses_journal_entry_id=r.journal_entry_id
+              ) THEN
+                RAISE EXCEPTION USING ERRCODE='23514',
+                  MESSAGE='Effective Performance Accounting cannot have a direct Journal reversal';
+              END IF;
+
               IF r.status='reversed' THEN
                 SELECT * INTO reversal FROM public.journal_entries
                   WHERE tenant_id=r.tenant_id AND id=r.reversal_journal_entry_id;
@@ -695,6 +705,15 @@ return new class extends Migration
                   RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Reversed Performance Transition cannot retain effective Performance Accounting';
                 END IF;
                 RETURN NULL;
+              ELSIF TG_TABLE_NAME='journal_entries' THEN
+                IF NEW.source_type='performance_accounting_recognition' THEN
+                  recognition_id:=NEW.source_id;
+                ELSIF NEW.reverses_journal_entry_id IS NOT NULL THEN
+                  SELECT id INTO recognition_id
+                  FROM public.performance_accounting_recognitions
+                  WHERE tenant_id=NEW.tenant_id
+                    AND journal_entry_id=NEW.reverses_journal_entry_id;
+                END IF;
               ELSIF TG_TABLE_NAME='accounting_position_origins' THEN
                 IF NEW.origin_recognition_type='PERFORMANCE_ACCOUNTING_RECOGNITION' THEN
                   recognition_id:=NEW.origin_recognition_id;
@@ -736,6 +755,10 @@ return new class extends Migration
 
             CREATE CONSTRAINT TRIGGER performance_accounting_recognition_final
               AFTER INSERT OR UPDATE ON public.performance_accounting_recognitions
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              EXECUTE FUNCTION public.performance_accounting_recognition_final_state();
+            CREATE CONSTRAINT TRIGGER performance_accounting_journal_final
+              AFTER INSERT OR UPDATE ON public.journal_entries
               DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.performance_accounting_recognition_final_state();
             CREATE CONSTRAINT TRIGGER performance_accounting_handover_final
