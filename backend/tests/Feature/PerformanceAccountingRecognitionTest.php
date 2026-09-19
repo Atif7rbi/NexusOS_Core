@@ -795,6 +795,195 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         }
     }
 
+    public function test_source_correction_after_accounting_correction_targets_only_effective_leaf(): void
+    {
+        $context = $this->considerationContext();
+        $consideration = $this->adopt($context);
+        $accounts = $this->accountingProtocol($context);
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+        $this->commitDeferredState();
+
+        [$source] = DB::transaction(function () use (
+            $context,
+            $consideration,
+        ): array {
+            $source = $this->handoverSource($context);
+            $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source];
+        });
+
+        $rootId = app(RecognizePerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $source['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $correctedAsset = app(ManageAccountAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'code' => 'PA-LEAF-A',
+                'name' => 'Leaf corrected Contract Asset',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'asset',
+                'classification' => 'current_asset',
+                'parent_id' => null,
+            ],
+        );
+
+        $correctedRevenue = app(ManageAccountAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'code' => 'PA-LEAF-R',
+                'name' => 'Leaf corrected Revenue',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'revenue',
+                'classification' => 'operating_revenue',
+                'parent_id' => null,
+            ],
+        );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->performance(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-08-01',
+            $correctedRevenue,
+            $correctedAsset,
+            $accounts['contract_liability'],
+        );
+
+        $correctionOperation = (string) Str::ulid();
+
+        $leafId = app(CorrectPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $source['id'],
+                'performance_accounting_correction_operation_id' =>
+                    $correctionOperation,
+                'correction_reason' => 'Correct mapping before source reversal',
+                'correction_reference' => 'PA-LEAF-CORR-001',
+            ],
+        );
+
+        $rootBeforeSourceCorrection = DB::table(
+            'performance_accounting_recognitions',
+        )
+            ->where('id', $rootId)
+            ->first();
+
+        self::assertNotNull($rootBeforeSourceCorrection);
+        self::assertSame('reversed', $rootBeforeSourceCorrection->status);
+        self::assertSame(
+            $correctionOperation,
+            $rootBeforeSourceCorrection->reversal_operation_id,
+        );
+        self::assertNotNull(
+            $rootBeforeSourceCorrection->reversal_journal_entry_id,
+        );
+
+        $sourceReversalOperation = (string) Str::ulid();
+        $sourceInput = [
+            'reversal_operation_id' => $sourceReversalOperation,
+            'reversal_reason' => 'Economic source corrected after accounting mapping correction',
+            'reversal_reference' => 'PA-LEAF-SOURCE-REV-001',
+        ];
+
+        self::assertSame(
+            $source['id'],
+            app(ReverseUnitHandoverPerformanceSource::class)->execute(
+                $context['tenant_id'],
+                $source['id'],
+                $context['actor'],
+                $sourceInput,
+            ),
+        );
+
+        $root = DB::table('performance_accounting_recognitions')
+            ->where('id', $rootId)
+            ->first();
+        $leaf = DB::table('performance_accounting_recognitions')
+            ->where('id', $leafId)
+            ->first();
+
+        self::assertNotNull($root);
+        self::assertNotNull($leaf);
+        self::assertSame('reversed', $root->status);
+        self::assertSame($correctionOperation, $root->reversal_operation_id);
+        self::assertSame(
+            $rootBeforeSourceCorrection->reversal_journal_entry_id,
+            $root->reversal_journal_entry_id,
+        );
+
+        self::assertSame('reversed', $leaf->status);
+        self::assertSame(
+            $sourceReversalOperation,
+            $leaf->reversal_operation_id,
+        );
+        self::assertNotNull($leaf->reversal_journal_entry_id);
+
+        self::assertDatabaseHas('accounting_position_origins', [
+            'origin_recognition_id' => $leafId,
+            'status' => 'reversed',
+            'reversal_origin_operation_id' => $sourceReversalOperation,
+        ]);
+
+        self::assertSame(
+            0,
+            DB::table('performance_accounting_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('root_recognition_id', $rootId)
+                ->where('status', 'posted')
+                ->count(),
+        );
+
+        self::assertSame(
+            $source['id'],
+            app(ReverseUnitHandoverPerformanceSource::class)->execute(
+                $context['tenant_id'],
+                $source['id'],
+                $context['actor'],
+                $sourceInput,
+            ),
+        );
+
+        $rootAfterReplay = DB::table('performance_accounting_recognitions')
+            ->where('id', $rootId)
+            ->first();
+
+        self::assertNotNull($rootAfterReplay);
+        self::assertSame(
+            $correctionOperation,
+            $rootAfterReplay->reversal_operation_id,
+        );
+        self::assertSame(
+            $rootBeforeSourceCorrection->reversal_journal_entry_id,
+            $rootAfterReplay->reversal_journal_entry_id,
+        );
+    }
+
     public function test_closed_performance_period_fails_without_partial_accounting_truth(): void
     {
         $context = $this->considerationContext();
