@@ -302,6 +302,186 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         );
     }
 
+    public function test_mixed_handover_groups_exact_liability_accounts_and_creates_contract_asset(): void
+    {
+        $context = $this->considerationContext();
+        $obligationIds = $this->billingObligations(
+            $context,
+            ['300.00', '200.00'],
+            '2026-08-19',
+        );
+        $consideration = $this->adopt($context);
+        $accounts = $this->accountingProtocol($context);
+
+        $secondLiability = app(ManageAccountAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'code' => 'PA-CL-2',
+                'name' => 'Performance Historical Liability 2',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'liability',
+                'classification' => 'current_liability',
+                'parent_id' => null,
+            ],
+        );
+
+        $billing = [];
+
+        foreach ($obligationIds as $obligationId) {
+            $source = $this->billingSource($context, $obligationId);
+            $billing[] = ['source' => $source];
+        }
+
+        usort(
+            $billing,
+            static fn (array $left, array $right): int =>
+                strcmp($left['source']['id'], $right['source']['id']),
+        );
+
+        DB::transaction(function () use (
+            $context,
+            $consideration,
+            &$billing,
+        ): void {
+            foreach ($billing as $index => &$entry) {
+                $entry['graph'] = $this->transition(
+                    $context,
+                    $consideration,
+                    $entry['source'],
+                    $consideration['genesis_lot_id'],
+                    'BILLED_UNEARNED',
+                );
+            }
+        });
+
+        $this->createLiabilityOrigin(
+            $context,
+            $billing[0]['source'],
+            $billing[0]['graph'],
+            $accounts['contract_liability'],
+            $accounts['contract_asset'],
+        );
+        $this->createLiabilityOrigin(
+            $context,
+            $billing[1]['source'],
+            $billing[1]['graph'],
+            $secondLiability,
+            $accounts['contract_asset'],
+        );
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
+            ],
+        );
+        $this->commitDeferredState();
+
+        $handover = $this->handoverSource($context);
+
+        $performanceGraph = DB::transaction(
+            fn (): array => $this->mixedPerformanceTransition(
+                $context,
+                $consideration,
+                $handover,
+                $consideration['genesis_lot_id'],
+                [
+                    [
+                        'lot_id' => $billing[0]['graph']['lot_id'],
+                        'amount' => $billing[0]['source']['amount'],
+                    ],
+                    [
+                        'lot_id' => $billing[1]['graph']['lot_id'],
+                        'amount' => $billing[1]['source']['amount'],
+                    ],
+                ],
+                '500.00',
+            ),
+        );
+
+        $recognitionId = app(RecognizePerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $handover['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $recognition = DB::table('performance_accounting_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($recognition);
+        self::assertSame('500.00', $recognition->contract_asset_amount);
+        self::assertSame('500.00', $recognition->contract_liability_release_amount);
+        self::assertSame('1000.00', $recognition->revenue_amount);
+
+        $lines = DB::table('journal_lines')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('journal_entry_id', $recognition->journal_entry_id)
+            ->get()
+            ->keyBy('account_id');
+
+        self::assertCount(4, $lines);
+        self::assertSame(
+            $billing[0]['source']['amount'],
+            $lines->get($accounts['contract_liability'])->debit,
+        );
+        self::assertSame(
+            $billing[1]['source']['amount'],
+            $lines->get($secondLiability)->debit,
+        );
+        self::assertSame(
+            '500.00',
+            $lines->get($accounts['contract_asset'])->debit,
+        );
+        self::assertSame(
+            '1000.00',
+            $lines->get($accounts['revenue'])->credit,
+        );
+
+        $consumptions = DB::table('accounting_position_consumptions')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where(
+                'consuming_recognition_type',
+                'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            )
+            ->where('consuming_recognition_id', $recognitionId)
+            ->orderBy('origin_id')
+            ->get();
+
+        self::assertCount(2, $consumptions);
+        self::assertSame(
+            '500.00',
+            $consumptions
+                ->reduce(
+                    static fn (string $sum, object $row): string =>
+                        (string) \Brick\Math\BigDecimal::of($sum)->plus(
+                            \Brick\Math\BigDecimal::of((string) $row->amount),
+                        ),
+                    '0.00',
+                ),
+        );
+
+        $origin = DB::table('accounting_position_origins')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where(
+                'origin_recognition_type',
+                'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            )
+            ->where('origin_recognition_id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($origin);
+        self::assertSame('500.00', $origin->origin_amount);
+        self::assertSame($performanceGraph['earned_lot_id'], $origin->consideration_lot_id);
+    }
+
     public function test_closed_performance_period_fails_without_partial_accounting_truth(): void
     {
         $context = $this->considerationContext();
@@ -467,6 +647,97 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             'revenue' => $revenue,
         ];
     }
+    private function mixedPerformanceTransition(
+        array $context,
+        array $consideration,
+        array $source,
+        string $unbilledLotId,
+        array $billedLots,
+        string $unbilledAmount,
+    ): array {
+        $transitionId = (string) Str::ulid();
+        $earnedLotId = (string) Str::ulid();
+        $billedEarnedLotId = (string) Str::ulid();
+        $now = now();
+
+        $owner = [
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'position_id' => $consideration['position_id'],
+        ];
+
+        DB::table('contract_consideration_transitions')->insert($owner + [
+            'id' => $transitionId,
+            'transition_operation_id' => (string) Str::ulid(),
+            'source_type' => 'UNIT_HANDOVER_ACCEPTANCE',
+            'source_id' => $source['id'],
+            'economic_date' => $source['economic_date'],
+            'semantic_precedence' => 10,
+            'transition_amount' => '1000.00',
+            'currency' => 'SAR',
+            'status' => 'effective',
+            'created_by' => $context['actor']->id,
+            'created_at' => $now,
+        ]);
+
+        DB::table('contract_consideration_lots')->insert([
+            $owner + [
+                'id' => $earnedLotId,
+                'transition_id' => $transitionId,
+                'lot_kind' => 'TRANSITION_OUTPUT',
+                'semantic_position' => 'EARNED_UNBILLED',
+                'amount' => $unbilledAmount,
+                'currency' => 'SAR',
+                'created_at' => $now,
+            ],
+            $owner + [
+                'id' => $billedEarnedLotId,
+                'transition_id' => $transitionId,
+                'lot_kind' => 'TRANSITION_OUTPUT',
+                'semantic_position' => 'BILLED_EARNED',
+                'amount' => '500.00',
+                'currency' => 'SAR',
+                'created_at' => $now,
+            ],
+        ]);
+
+        $edges = [[
+            'id' => (string) Str::ulid(),
+            'lot_id' => $unbilledLotId,
+            'successor_lot_id' => $earnedLotId,
+            'consumed_amount' => $unbilledAmount,
+        ]];
+
+        foreach ($billedLots as $billed) {
+            $edges[] = [
+                'id' => (string) Str::ulid(),
+                'lot_id' => $billed['lot_id'],
+                'successor_lot_id' => $billedEarnedLotId,
+                'consumed_amount' => $billed['amount'],
+            ];
+        }
+
+        foreach ($edges as $edge) {
+            DB::table('contract_consideration_transition_lots')->insert(
+                $owner + [
+                    'id' => $edge['id'],
+                    'transition_id' => $transitionId,
+                    'lot_id' => $edge['lot_id'],
+                    'successor_lot_id' => $edge['successor_lot_id'],
+                    'consumed_amount' => $edge['consumed_amount'],
+                    'currency' => 'SAR',
+                    'created_at' => $now,
+                ],
+            );
+        }
+
+        return [
+            'transition_id' => $transitionId,
+            'earned_lot_id' => $earnedLotId,
+            'billed_earned_lot_id' => $billedEarnedLotId,
+        ];
+    }
+
     private function createLiabilityOrigin(
         array $context,
         array $source,
