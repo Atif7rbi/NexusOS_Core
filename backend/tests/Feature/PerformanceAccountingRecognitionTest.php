@@ -741,11 +741,12 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             ->first();
 
         self::assertNotNull($successorOrigin);
-        self::assertSame('reversed', $originalOrigin->status === 'reversed'
-            ? $originalOrigin->status
-            : (string) DB::table('accounting_position_origins')
+        self::assertSame(
+            'reversed',
+            (string) DB::table('accounting_position_origins')
                 ->where('id', $originalOrigin->id)
-                ->value('status'));
+                ->value('status'),
+        );
         self::assertSame($originalOrigin->consideration_lot_id, $successorOrigin->consideration_lot_id);
         self::assertSame($originalOrigin->economic_leg_identity, $successorOrigin->economic_leg_identity);
         self::assertSame($originalOrigin->origin_amount, $successorOrigin->origin_amount);
@@ -777,7 +778,10 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             app(CorrectPerformanceAccounting::class)->execute(
                 $context['tenant_id'],
                 $context['actor'],
-                $input + ['correction_reason' => 'Different reason'],
+                array_merge(
+                    $input,
+                    ['correction_reason' => 'Different reason'],
+                ),
             );
             self::fail('Correction replay accepted different canonical facts.');
         } catch (AccountingRecognitionConflict) {
