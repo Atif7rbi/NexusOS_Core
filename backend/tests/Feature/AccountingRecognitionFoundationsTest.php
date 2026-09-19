@@ -287,6 +287,26 @@ final class AccountingRecognitionFoundationsTest extends TestCase
         foreach ([
             'accounting_position_origins',
             'accounting_position_consumptions',
+        ] as $table) {
+            self::assertTrue((bool) DB::selectOne(
+                'SELECT has_table_privilege(?, ?, ?) AS allowed',
+                [$role, 'public.'.$table, 'SELECT'],
+            )->allowed);
+            self::assertTrue((bool) DB::selectOne(
+                'SELECT has_table_privilege(?, ?, ?) AS allowed',
+                [$role, 'public.'.$table, 'INSERT'],
+            )->allowed);
+            self::assertTrue((bool) DB::selectOne(
+                'SELECT has_table_privilege(?, ?, ?) AS allowed',
+                [$role, 'public.'.$table, 'UPDATE'],
+            )->allowed);
+            self::assertFalse((bool) DB::selectOne(
+                'SELECT has_table_privilege(?, ?, ?) AS allowed',
+                [$role, 'public.'.$table, 'DELETE'],
+            )->allowed);
+        }
+
+        foreach ([
             'accounting_position_origin_journal_line_allocations',
             'accounting_position_consumption_journal_line_allocations',
         ] as $table) {
@@ -294,7 +314,7 @@ final class AccountingRecognitionFoundationsTest extends TestCase
                 'SELECT has_table_privilege(?, ?, ?) AS allowed',
                 [$role, 'public.'.$table, 'SELECT'],
             )->allowed);
-            self::assertFalse((bool) DB::selectOne(
+            self::assertTrue((bool) DB::selectOne(
                 'SELECT has_table_privilege(?, ?, ?) AS allowed',
                 [$role, 'public.'.$table, 'INSERT'],
             )->allowed);
@@ -308,11 +328,18 @@ final class AccountingRecognitionFoundationsTest extends TestCase
             )->allowed);
         }
 
+        self::assertTrue((bool) DB::selectOne(
+            'SELECT has_table_privilege(?, ?, ?) AS allowed',
+            [$role, 'public.performance_accounting_recognitions', 'INSERT'],
+        )->allowed);
+
         foreach ([
             'validate_accounting_recognition_policy_history(text,character)',
             'validate_accounting_position_origin(character,character)',
             'validate_accounting_position_consumption(character,character)',
             'validate_performance_accounting_adoption(character,character)',
+            'validate_performance_accounting_recognition(character,character)',
+            'performance_accounting_runtime_provenance_guard()',
         ] as $function) {
             self::assertFalse((bool) DB::selectOne(
                 'SELECT has_function_privilege(?, ?, ?) AS allowed',
