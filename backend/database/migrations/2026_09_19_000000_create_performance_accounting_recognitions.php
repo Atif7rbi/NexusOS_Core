@@ -584,6 +584,16 @@ return new class extends Migration
               END IF;
 
               IF recognition_id IS NOT NULL THEN
+                IF NOT EXISTS (
+                  SELECT 1
+                  FROM public.performance_accounting_recognitions r
+                  WHERE r.tenant_id=COALESCE(NEW.tenant_id,OLD.tenant_id)
+                    AND r.id=recognition_id
+                ) THEN
+                  RAISE EXCEPTION USING ERRCODE='23503',
+                    MESSAGE='Performance Accounting provenance requires an exact Recognition owner';
+                END IF;
+
                 PERFORM public.validate_performance_accounting_recognition(
                   COALESCE(NEW.tenant_id,OLD.tenant_id),
                   recognition_id
