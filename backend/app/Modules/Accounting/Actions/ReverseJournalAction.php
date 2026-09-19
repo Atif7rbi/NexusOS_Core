@@ -52,6 +52,14 @@ final class ReverseJournalAction
             if ($target === null || $target->status !== 'posted' || $entryDate < $target->entry_date) {
                 throw new AccountingValidationFailed('Only a terminal Posted Journal can be reversed chronologically.');
             }
+            if (
+                $target->origin === 'business'
+                && $target->source_type === 'performance_accounting_recognition'
+            ) {
+                throw new AccountingValidationFailed(
+                    'Performance Accounting Journals must be reversed through the owning correction workflow.',
+                );
+            }
             if (DB::table('journal_entries')->where('tenant_id', $tenantId)->where('reverses_journal_entry_id', $targetId)->exists()) {
                 throw new AccountingConflict('Journal already has a direct reversal.');
             }
