@@ -117,11 +117,11 @@ jobs:
       - name: Accounting Recognition foundations tests
         run: php artisan migrate:fresh --force && php artisan test --filter='/AccountingRecognition(?:Foundations|ProvenanceIntegrity)Test/'
       - name: Accounting Recognition concurrency tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingRecognitionConcurrencyTest'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/^Tests\\\\Feature\\\\AccountingRecognitionConcurrencyTest::/'
       - name: Performance Accounting Recognition focused tests
         run: php artisan migrate:fresh --force && php artisan test --filter='/PerformanceAccountingRecognition(?:Test|SecurityTest)/'
       - name: Performance Accounting Recognition concurrency tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='PerformanceAccountingRecognitionConcurrencyTest'
+        run: php artisan migrate:fresh --force && php artisan test --filter='/^Tests\\\\Feature\\\\PerformanceAccountingRecognitionConcurrencyTest::/'
       - name: Contract Consideration recovery tests
         run: php artisan migrate:fresh --force && php artisan test --filter='ContractConsiderationRecoveryTest'
       - name: Contract Consideration concurrency tests
