@@ -455,6 +455,7 @@ final class RecognizePerformanceAccounting
         );
 
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        DB::statement('SET CONSTRAINTS ALL DEFERRED');
 
         return $recognitionId;
     }
