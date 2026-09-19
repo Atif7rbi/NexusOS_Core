@@ -720,8 +720,6 @@ return new class extends Migration
     {
         $runtimeRole = $this->runtimeRole();
         $identifier = '"'.str_replace('"', '""', $runtimeRole).'"';
-        $literal = "'".str_replace("'", "''", $runtimeRole)."'";
-
         DB::unprepared("REVOKE ALL ON TABLE public.performance_accounting_recognitions FROM {$identifier}");
         DB::unprepared("GRANT SELECT,INSERT,UPDATE ON TABLE public.performance_accounting_recognitions TO {$identifier}");
         DB::unprepared("GRANT SELECT,INSERT,UPDATE ON TABLE
@@ -787,7 +785,7 @@ return new class extends Migration
               public.validate_performance_accounting_recognition(character,character),
               public.performance_accounting_recognition_final_state(),
               public.performance_accounting_runtime_provenance_guard()
-              FROM __RUNTIME_IDENTIFIER__;
+              FROM PUBLIC,__RUNTIME_IDENTIFIER__;
             SQL;
 
         $guardSql = str_replace(
