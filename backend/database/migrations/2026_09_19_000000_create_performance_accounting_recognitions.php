@@ -237,6 +237,9 @@ return new class extends Migration
               predecessor public.performance_accounting_recognitions%ROWTYPE;
               root_row public.performance_accounting_recognitions%ROWTYPE;
               reversal public.journal_entries%ROWTYPE;
+              lineage_cursor char(26);
+              lineage_row public.performance_accounting_recognitions%ROWTYPE;
+              lineage_hops integer;
               u numeric(19,2);
               b numeric(19,2);
               origin_total numeric(19,2);
@@ -324,6 +327,36 @@ return new class extends Migration
                 THEN
                   RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Performance Accounting correction lineage is inconsistent';
                 END IF;
+
+                lineage_cursor:=r.predecessor_recognition_id;
+                lineage_hops:=0;
+
+                LOOP
+                  lineage_hops:=lineage_hops+1;
+                  IF lineage_hops>1000 OR lineage_cursor=r.id THEN
+                    RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Performance Accounting correction lineage contains a cycle';
+                  END IF;
+
+                  SELECT * INTO lineage_row
+                  FROM public.performance_accounting_recognitions
+                  WHERE tenant_id=r.tenant_id AND id=lineage_cursor;
+
+                  IF NOT FOUND
+                     OR lineage_row.root_recognition_id<>r.root_recognition_id
+                     OR lineage_row.unit_handover_acceptance_id<>r.unit_handover_acceptance_id
+                     OR lineage_row.performance_consideration_transition_id<>r.performance_consideration_transition_id
+                  THEN
+                    RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Performance Accounting correction lineage does not remain on one root';
+                  END IF;
+
+                  EXIT WHEN lineage_row.id=r.root_recognition_id;
+
+                  IF lineage_row.predecessor_recognition_id IS NULL THEN
+                    RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Performance Accounting correction lineage does not terminate at its root';
+                  END IF;
+
+                  lineage_cursor:=lineage_row.predecessor_recognition_id;
+                END LOOP;
               END IF;
 
               IF r.status='posted' AND (a.status<>'effective' OR t.status<>'effective') THEN
