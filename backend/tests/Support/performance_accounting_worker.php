@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
+use App\Modules\UnitHandover\Actions\ReverseUnitHandoverPerformanceSource;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -140,6 +141,21 @@ try {
                 $payload['contract_asset_account_id'],
                 $payload['contract_liability_account_id'],
             ),
+            'source_reverse',
+            'source_reverse_hold' => [
+                'evidence_id' => app(
+                    ReverseUnitHandoverPerformanceSource::class,
+                )->execute(
+                    $payload['tenant_id'],
+                    $payload['acceptance_id'],
+                    $actor,
+                    [
+                        'reversal_operation_id' => $payload['operation_id'],
+                        'reversal_reason' => $payload['reason'],
+                        'reversal_reference' => $payload['reference'],
+                    ],
+                ),
+            ],
             default => throw new InvalidArgumentException(
                 'Unsupported Performance Accounting concurrency action.',
             ),
