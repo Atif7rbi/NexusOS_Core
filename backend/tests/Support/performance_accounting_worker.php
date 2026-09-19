@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
@@ -166,6 +167,16 @@ try {
                 );
 
                 return ['period_id' => $payload['period_id']];
+            })(),
+            'account_archive',
+            'account_archive_hold' => (function () use ($payload, $actor): array {
+                app(ManageAccountAction::class)->archive(
+                    $payload['tenant_id'],
+                    $payload['account_id'],
+                    $actor,
+                );
+
+                return ['account_id' => $payload['account_id']];
             })(),
             default => throw new InvalidArgumentException(
                 'Unsupported Performance Accounting concurrency action.',
