@@ -7,6 +7,8 @@ namespace Tests\Feature;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\Accounting\Actions\ReverseJournalAction;
+use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
@@ -316,6 +318,32 @@ final class ReceivableArRecognitionTest extends TestCase
             ],
         );
 
+        $beforeCorrection = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($beforeCorrection);
+
+        try {
+            app(ReverseJournalAction::class)->execute(
+                $context['tenant_id'],
+                (string) $beforeCorrection->journal_entry_id,
+                $context['actor'],
+                (string) $beforeCorrection->accounting_date,
+                'Generic reversal must be rejected',
+            );
+            self::fail(
+                'Generic Journal reversal bypassed Receivable AR ownership.',
+            );
+        } catch (AccountingValidationFailed) {
+            self::assertSame(
+                'posted',
+                DB::table('receivable_ar_recognitions')
+                    ->where('id', $recognitionId)
+                    ->value('status'),
+            );
+        }
+
         $entitlement = DB::table('contractual_billing_entitlements')
             ->where('id', $source['id'])
             ->first();
@@ -358,6 +386,35 @@ final class ReceivableArRecognitionTest extends TestCase
             'reverses_journal_entry_id' => $recognition->journal_entry_id,
             'status' => 'posted',
         ]);
+
+        $recordedReversal = DB::table('journal_entries')
+            ->where('id', $recognition->reversal_journal_entry_id)
+            ->first();
+
+        self::assertNotNull($recordedReversal);
+
+        try {
+            app(ReverseJournalAction::class)->execute(
+                $context['tenant_id'],
+                (string) $recordedReversal->id,
+                $context['actor'],
+                (string) $recordedReversal->entry_date,
+                'Reversal-of-reversal must be rejected',
+            );
+            self::fail(
+                'Generic Journal reversal reactivated reversed Receivable AR.',
+            );
+        } catch (AccountingValidationFailed) {
+            self::assertSame(
+                0,
+                DB::table('journal_entries')
+                    ->where(
+                        'reverses_journal_entry_id',
+                        $recordedReversal->id,
+                    )
+                    ->count(),
+            );
+        }
 
         self::assertDatabaseHas('accounting_position_origins', [
             'origin_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
