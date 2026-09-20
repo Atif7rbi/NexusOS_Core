@@ -693,6 +693,11 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         self::assertSame($before->journal_entry_id, $reversalJournal->source_id);
         self::assertSame('2026-08-20', (string) $reversalJournal->entry_date);
 
+        $this->assertRecordedPerformanceReversalIsProtected(
+            $context,
+            (string) $recognition->reversal_journal_entry_id,
+        );
+
         self::assertDatabaseHas('accounting_position_origins', [
             'origin_recognition_id' => $recognitionId,
             'status' => 'reversed',
@@ -837,6 +842,11 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         self::assertSame($correctionOperation, $original->reversal_operation_id);
         self::assertNotNull($original->reversal_journal_entry_id);
 
+        $this->assertRecordedPerformanceReversalIsProtected(
+            $context,
+            (string) $original->reversal_journal_entry_id,
+        );
+
         self::assertSame('accounting_correction', $successor->recognition_kind);
         self::assertSame('posted', $successor->status);
         self::assertSame($originalId, $successor->root_recognition_id);
@@ -910,6 +920,337 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                 DB::table('performance_accounting_recognitions')
                     ->where('tenant_id', $context['tenant_id'])
                     ->where('root_recognition_id', $originalId)
+                    ->count(),
+            );
+        }
+    }
+
+    public function test_correction_operation_reuse_across_roots_conflicts_without_mutating_second_root(): void
+    {
+        $first = $this->considerationContext();
+        $firstConsideration = $this->adopt($first);
+        $accounts = $this->accountingProtocol($first);
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $first['tenant_id'],
+            $first['actor'],
+            [
+                'contract_id' => $first['contract_id'],
+                'performance_accounting_adoption_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+
+        $second = $this->sameTenantPerformanceContext($first);
+        $secondConsideration = $this->adopt($second);
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $second['tenant_id'],
+            $second['actor'],
+            [
+                'contract_id' => $second['contract_id'],
+                'performance_accounting_adoption_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+
+        $this->commitDeferredState();
+
+        [$firstSource] = DB::transaction(function () use (
+            $first,
+            $firstConsideration,
+        ): array {
+            $source = $this->handoverSource($first);
+            $this->transition(
+                $first,
+                $firstConsideration,
+                $source,
+                $firstConsideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source];
+        });
+
+        [$secondSource] = DB::transaction(function () use (
+            $second,
+            $secondConsideration,
+        ): array {
+            $source = $this->handoverSource($second);
+            $this->transition(
+                $second,
+                $secondConsideration,
+                $source,
+                $secondConsideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source];
+        });
+
+        $firstRoot = app(RecognizePerformanceAccounting::class)->execute(
+            $first['tenant_id'],
+            $first['actor'],
+            [
+                'unit_handover_acceptance_id' => $firstSource['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $secondRoot = app(RecognizePerformanceAccounting::class)->execute(
+            $second['tenant_id'],
+            $second['actor'],
+            [
+                'unit_handover_acceptance_id' => $secondSource['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $correctedAsset = app(ManageAccountAction::class)->create(
+            $first['tenant_id'],
+            $first['actor'],
+            [
+                'code' => 'PA-XROOT-A',
+                'name' => 'Cross-root corrected Contract Asset',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'asset',
+                'classification' => 'current_asset',
+                'parent_id' => null,
+            ],
+        );
+
+        $correctedRevenue = app(ManageAccountAction::class)->create(
+            $first['tenant_id'],
+            $first['actor'],
+            [
+                'code' => 'PA-XROOT-R',
+                'name' => 'Cross-root corrected Revenue',
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => 'revenue',
+                'classification' => 'operating_revenue',
+                'parent_id' => null,
+            ],
+        );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->performance(
+            $first['tenant_id'],
+            $first['actor'],
+            '2026-08-01',
+            $correctedRevenue,
+            $correctedAsset,
+            $accounts['contract_liability'],
+        );
+
+        $operationId = (string) Str::ulid();
+        $reason = 'Correct shared-tenant accounting mapping';
+        $reference = 'PA-XROOT-CORR-001';
+
+        $firstSuccessor = app(CorrectPerformanceAccounting::class)->execute(
+            $first['tenant_id'],
+            $first['actor'],
+            [
+                'unit_handover_acceptance_id' => $firstSource['id'],
+                'performance_accounting_correction_operation_id' =>
+                    $operationId,
+                'correction_reason' => $reason,
+                'correction_reference' => $reference,
+            ],
+        );
+
+        $secondBefore = DB::table('performance_accounting_recognitions')
+            ->where('id', $secondRoot)
+            ->first();
+
+        self::assertNotNull($secondBefore);
+        self::assertSame('posted', $secondBefore->status);
+        self::assertNull($secondBefore->reversal_operation_id);
+
+        try {
+            app(CorrectPerformanceAccounting::class)->execute(
+                $second['tenant_id'],
+                $second['actor'],
+                [
+                    'unit_handover_acceptance_id' => $secondSource['id'],
+                    'performance_accounting_correction_operation_id' =>
+                        $operationId,
+                    'correction_reason' => $reason,
+                    'correction_reference' => $reference,
+                ],
+            );
+            self::fail(
+                'Tenant-wide correction operation was reused on another root.',
+            );
+        } catch (AccountingRecognitionConflict) {
+            self::assertSame(
+                1,
+                DB::table('performance_accounting_recognitions')
+                    ->where('tenant_id', $second['tenant_id'])
+                    ->where('root_recognition_id', $secondRoot)
+                    ->count(),
+            );
+
+            $secondAfter = DB::table('performance_accounting_recognitions')
+                ->where('id', $secondRoot)
+                ->first();
+
+            self::assertNotNull($secondAfter);
+            self::assertSame('posted', $secondAfter->status);
+            self::assertNull($secondAfter->reversal_operation_id);
+            self::assertNull($secondAfter->reversal_journal_entry_id);
+
+            self::assertSame(
+                1,
+                DB::table('journal_entries')
+                    ->where('tenant_id', $second['tenant_id'])
+                    ->where('source_type', 'performance_accounting_recognition')
+                    ->where('source_id', $secondRoot)
+                    ->count(),
+            );
+
+            self::assertDatabaseHas('performance_accounting_recognitions', [
+                'id' => $firstSuccessor,
+                'root_recognition_id' => $firstRoot,
+                'performance_accounting_correction_operation_id' =>
+                    $operationId,
+            ]);
+        }
+    }
+
+    public function test_fully_billed_unchanged_policy_correction_is_atomic_no_op_conflict(): void
+    {
+        $context = $this->considerationContext();
+        $obligationId = $this->billingObligations(
+            $context,
+            ['1000.00'],
+            '2026-08-19',
+        )[0];
+        $consideration = $this->adopt($context);
+        $accounts = $this->accountingProtocol($context, true);
+
+        [$billingSource, $billingGraph] = DB::transaction(function () use (
+            $context,
+            $consideration,
+            $obligationId,
+        ): array {
+            $source = $this->billingSource($context, $obligationId);
+            $graph = $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'BILLED_UNEARNED',
+            );
+
+            return [$source, $graph];
+        });
+
+        $this->createLiabilityOrigin(
+            $context,
+            $billingSource,
+            $billingGraph,
+            $accounts['historical_liability'],
+            $accounts['contract_asset'],
+        );
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+
+        $this->commitDeferredState();
+
+        [$handoverSource] = DB::transaction(function () use (
+            $context,
+            $consideration,
+            $billingGraph,
+        ): array {
+            $source = $this->handoverSource($context);
+            $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $billingGraph['lot_id'],
+                'BILLED_EARNED',
+            );
+
+            return [$source];
+        });
+
+        $recognitionId = app(RecognizePerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'unit_handover_acceptance_id' => $handoverSource['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $before = DB::table('performance_accounting_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($before);
+        self::assertSame('0.00', $before->contract_asset_amount);
+        self::assertNull($before->contract_asset_account_id);
+
+        try {
+            app(CorrectPerformanceAccounting::class)->execute(
+                $context['tenant_id'],
+                $context['actor'],
+                [
+                    'unit_handover_acceptance_id' => $handoverSource['id'],
+                    'performance_accounting_correction_operation_id' =>
+                        (string) Str::ulid(),
+                    'correction_reason' => 'No actual mapping change',
+                    'correction_reference' => 'PA-NOOP-FULLY-BILLED',
+                ],
+            );
+            self::fail(
+                'Fully billed Recognition accepted an unchanged immutable policy correction.',
+            );
+        } catch (AccountingRecognitionConflict) {
+            self::assertSame(
+                1,
+                DB::table('performance_accounting_recognitions')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where('root_recognition_id', $recognitionId)
+                    ->count(),
+            );
+            self::assertSame(
+                1,
+                DB::table('journal_entries')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where('source_type', 'performance_accounting_recognition')
+                    ->where('source_id', $recognitionId)
+                    ->count(),
+            );
+
+            $after = DB::table('performance_accounting_recognitions')
+                ->where('id', $recognitionId)
+                ->first();
+
+            self::assertNotNull($after);
+            self::assertSame('posted', $after->status);
+            self::assertNull($after->reversal_operation_id);
+            self::assertNull($after->reversal_journal_entry_id);
+
+            self::assertSame(
+                1,
+                DB::table('accounting_position_consumptions')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where(
+                        'consuming_recognition_type',
+                        'PERFORMANCE_ACCOUNTING_RECOGNITION',
+                    )
+                    ->where('consuming_recognition_id', $recognitionId)
+                    ->where('status', 'effective')
                     ->count(),
             );
         }
@@ -1176,6 +1517,136 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                     ->count(),
             );
         }
+    }
+
+    private function assertRecordedPerformanceReversalIsProtected(
+        array $context,
+        string $reversalJournalId,
+    ): void {
+        $target = DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $reversalJournalId)
+            ->first();
+
+        self::assertNotNull($target);
+        self::assertSame('posted', $target->status);
+        self::assertSame('reversal', $target->origin);
+
+        try {
+            app(ReverseJournalAction::class)->execute(
+                $context['tenant_id'],
+                $reversalJournalId,
+                $context['actor'],
+                (string) $target->entry_date,
+                'Recorded Performance reversal must not be reversible',
+            );
+            self::fail(
+                'Generic reversal reactivated a reversed Performance Accounting effect.',
+            );
+        } catch (AccountingValidationFailed) {
+            self::assertSame(
+                0,
+                DB::table('journal_entries')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where('reverses_journal_entry_id', $reversalJournalId)
+                    ->count(),
+            );
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $now = now();
+
+            DB::table('journal_entries')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $context['tenant_id'],
+                'entry_date' => $target->entry_date,
+                'description' => 'Direct SQL reversal-of-reversal probe',
+                'status' => 'draft',
+                'origin' => 'reversal',
+                'source_type' => 'journal_entry',
+                'source_id' => $reversalJournalId,
+                'created_by' => $context['actor']->id,
+                'updated_by' => $context['actor']->id,
+                'created_at' => $now,
+                'updated_at' => $now,
+                'reverses_journal_entry_id' => $reversalJournalId,
+                'reversal_reason' =>
+                    'Direct SQL reversal-of-reversal must fail',
+            ]);
+
+            DB::statement(
+                'SET CONSTRAINTS performance_accounting_journal_final IMMEDIATE',
+            );
+
+            self::fail(
+                'PostgreSQL accepted reversal of a recorded Performance reversal Journal.',
+            );
+        } catch (QueryException $exception) {
+            self::assertSame(
+                '23514',
+                (string) ($exception->errorInfo[0] ?? ''),
+                $exception->getMessage(),
+            );
+            self::assertStringContainsString(
+                'recorded reversal Journal cannot itself be reversed',
+                $exception->getMessage(),
+            );
+        } finally {
+            DB::rollBack();
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+        }
+
+        self::assertSame(
+            0,
+            DB::table('journal_entries')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('reverses_journal_entry_id', $reversalJournalId)
+                ->count(),
+        );
+    }
+
+    private function sameTenantPerformanceContext(array $context): array
+    {
+        $project = $this->createIntegrityProject(
+            $context['tenant_id'],
+            $context['actor']->id,
+        );
+        $unit = $this->createIntegrityUnit(
+            $context['tenant_id'],
+            (string) $project->id,
+            $context['actor']->id,
+            'sold',
+        );
+        $customer = $this->createIntegrityCustomer(
+            $context['tenant_id'],
+            $context['actor']->id,
+        );
+        $reservation = $this->createIntegrityReservation(
+            $context['tenant_id'],
+            (string) $unit->id,
+            (string) $customer->id,
+            $context['actor']->id,
+            'converted',
+        );
+        $contract = $this->createIntegrityContract(
+            $context['tenant_id'],
+            (string) $reservation->id,
+            $context['actor']->id,
+            'active',
+            ['total_amount' => '1000.00'],
+        );
+
+        return [
+            'tenant_id' => $context['tenant_id'],
+            'actor' => $context['actor'],
+            'contract_id' => (string) $contract->id,
+            'customer_id' => (string) $customer->id,
+            'reservation_id' => (string) $reservation->id,
+            'unit_id' => (string) $unit->id,
+            'operation_id' => (string) Str::ulid(),
+        ];
     }
 
     private function commitDeferredState(): void
