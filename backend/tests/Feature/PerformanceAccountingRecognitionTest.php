@@ -936,8 +936,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $first['actor'],
             [
                 'contract_id' => $first['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -949,8 +948,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $second['actor'],
             [
                 'contract_id' => $second['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -1052,8 +1050,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $first['actor'],
             [
                 'unit_handover_acceptance_id' => $firstSource['id'],
-                'performance_accounting_correction_operation_id' =>
-                    $operationId,
+                'performance_accounting_correction_operation_id' => $operationId,
                 'correction_reason' => $reason,
                 'correction_reference' => $reference,
             ],
@@ -1073,8 +1070,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                 $second['actor'],
                 [
                     'unit_handover_acceptance_id' => $secondSource['id'],
-                    'performance_accounting_correction_operation_id' =>
-                        $operationId,
+                    'performance_accounting_correction_operation_id' => $operationId,
                     'correction_reason' => $reason,
                     'correction_reference' => $reference,
                 ],
@@ -1112,8 +1108,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             self::assertDatabaseHas('performance_accounting_recognitions', [
                 'id' => $firstSuccessor,
                 'root_recognition_id' => $firstRoot,
-                'performance_accounting_correction_operation_id' =>
-                    $operationId,
+                'performance_accounting_correction_operation_id' => $operationId,
             ]);
         }
     }
@@ -1159,8 +1154,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -1206,8 +1200,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                 $context['actor'],
                 [
                     'unit_handover_acceptance_id' => $handoverSource['id'],
-                    'performance_accounting_correction_operation_id' =>
-                        (string) Str::ulid(),
+                    'performance_accounting_correction_operation_id' => (string) Str::ulid(),
                     'correction_reason' => 'No actual mapping change',
                     'correction_reference' => 'PA-NOOP-FULLY-BILLED',
                 ],
@@ -1572,8 +1565,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
                 'created_at' => $now,
                 'updated_at' => $now,
                 'reverses_journal_entry_id' => $reversalJournalId,
-                'reversal_reason' =>
-                    'Direct SQL reversal-of-reversal must fail',
+                'reversal_reason' => 'Direct SQL reversal-of-reversal must fail',
             ]);
 
             DB::statement(
