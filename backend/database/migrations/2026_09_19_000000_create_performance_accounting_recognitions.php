@@ -663,6 +663,16 @@ return new class extends Migration
                 THEN
                   RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Performance Accounting reversal Journal is inconsistent';
                 END IF;
+
+                IF EXISTS (
+                  SELECT 1
+                  FROM public.journal_entries reversal_of_reversal
+                  WHERE reversal_of_reversal.tenant_id=r.tenant_id
+                    AND reversal_of_reversal.reverses_journal_entry_id=r.reversal_journal_entry_id
+                ) THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',
+                    MESSAGE='Performance Accounting recorded reversal Journal cannot itself be reversed';
+                END IF;
               END IF;
             END $$;
 
@@ -712,7 +722,12 @@ return new class extends Migration
                   SELECT id INTO recognition_id
                   FROM public.performance_accounting_recognitions
                   WHERE tenant_id=NEW.tenant_id
-                    AND journal_entry_id=NEW.reverses_journal_entry_id;
+                    AND (
+                      journal_entry_id=NEW.reverses_journal_entry_id
+                      OR reversal_journal_entry_id=NEW.reverses_journal_entry_id
+                    )
+                  ORDER BY id
+                  LIMIT 1;
                 END IF;
               ELSIF TG_TABLE_NAME='accounting_position_origins' THEN
                 IF NEW.origin_recognition_type='PERFORMANCE_ACCOUNTING_RECOGNITION' THEN
