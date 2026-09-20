@@ -60,10 +60,23 @@ final class ReverseJournalAction
                 ->where('tenant_id', $tenantId)
                 ->where('reversal_journal_entry_id', $targetId)
                 ->exists();
+            $receivableArOwned = $target->origin === 'business'
+                && $target->source_type === 'receivable_ar_recognition';
+            $receivableArReversal = DB::table(
+                'receivable_ar_recognitions',
+            )
+                ->where('tenant_id', $tenantId)
+                ->where('reversal_journal_entry_id', $targetId)
+                ->exists();
 
-            if ($performanceOwned || $performanceReversal) {
+            if (
+                $performanceOwned
+                || $performanceReversal
+                || $receivableArOwned
+                || $receivableArReversal
+            ) {
                 throw new AccountingValidationFailed(
-                    'Performance Accounting Journals and their recorded reversals must be reversed through the owning correction workflow.',
+                    'Recognition-owned Journals and their recorded reversals must be reversed through the owning workflow.',
                 );
             }
             if (DB::table('journal_entries')->where('tenant_id', $tenantId)->where('reverses_journal_entry_id', $targetId)->exists()) {
