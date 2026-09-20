@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\UnitHandover\Actions;
 
 use App\Models\User;
+use App\Modules\AccountingRecognition\Support\PerformanceAccountingSourceCorrectionCoordinator;
 use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverConflict;
 use App\Modules\UnitHandover\Exceptions\UnitHandoverValidationFailed;
@@ -24,6 +25,7 @@ final class ReverseUnitHandoverPerformanceSource
         private readonly UnitHandoverAuthorization $auth,
         private readonly UnitHandoverReversalRecoveryResolver $recovery,
         private readonly ContractConsiderationSourceCoordinator $consideration,
+        private readonly PerformanceAccountingSourceCorrectionCoordinator $performanceAccounting,
     ) {}
 
     public function execute(
@@ -257,6 +259,12 @@ final class ReverseUnitHandoverPerformanceSource
                 $reference,
             );
 
+            $this->performanceAccounting->assertSourceCorrectionReplay(
+                $tenantId,
+                $acceptance,
+                $reversalOperationId,
+            );
+
             $this->consideration->reverseUnitHandoverAcceptance(
                 $tenantId,
                 $acceptanceId,
@@ -311,6 +319,14 @@ final class ReverseUnitHandoverPerformanceSource
                 'Unit Handover reversal operation identity is already used by another Evidence record.',
             );
         }
+
+        $this->performanceAccounting->reverseForSourceCorrection(
+            $tenantId,
+            $acceptance,
+            $actor,
+            $reversalOperationId,
+            $reason,
+        );
 
         $now = CarbonImmutable::now('UTC');
 
