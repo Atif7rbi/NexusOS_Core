@@ -73,6 +73,18 @@ final class CorrectPerformanceAccounting
 
         $this->authorization->authorize($tenantId, $actor);
 
+        $committed = $this->resolveCommittedCorrectionOperation(
+            $tenantId,
+            $acceptanceId,
+            $operationId,
+            $reason,
+            $reference,
+        );
+
+        if ($committed !== null) {
+            return $committed;
+        }
+
         try {
             return $this->transaction->run(
                 fn (): string => $this->correct(
@@ -90,8 +102,74 @@ final class CorrectPerformanceAccounting
                 throw $exception;
             }
 
-            return $this->execute($tenantId, $actor, $input);
+            $committed = $this->resolveCommittedCorrectionOperation(
+                $tenantId,
+                $acceptanceId,
+                $operationId,
+                $reason,
+                $reference,
+            );
+
+            if ($committed !== null) {
+                return $committed;
+            }
+
+            throw new AccountingRecognitionConflict(
+                'Performance Accounting correction uniqueness conflict has no exact committed replay winner.',
+                previous: $exception,
+            );
         }
+    }
+
+    private function resolveCommittedCorrectionOperation(
+        string $tenantId,
+        string $acceptanceId,
+        string $operationId,
+        string $reason,
+        string $reference,
+    ): ?string {
+        $winner = DB::table('performance_accounting_recognitions')
+            ->where('tenant_id', $tenantId)
+            ->where(
+                'performance_accounting_correction_operation_id',
+                $operationId,
+            )
+            ->first();
+
+        if ($winner === null) {
+            return null;
+        }
+
+        if (
+            $winner->recognition_kind !== 'accounting_correction'
+            || $winner->unit_handover_acceptance_id !== $acceptanceId
+            || $winner->correction_reason !== $reason
+            || $winner->correction_reference !== $reference
+            || $winner->predecessor_recognition_id === null
+        ) {
+            throw new AccountingRecognitionConflict(
+                'Performance Accounting correction operation is already owned by different canonical truth.',
+            );
+        }
+
+        $predecessor = DB::table('performance_accounting_recognitions')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $winner->predecessor_recognition_id)
+            ->first();
+
+        if (
+            $predecessor === null
+            || $predecessor->unit_handover_acceptance_id !== $acceptanceId
+            || $predecessor->root_recognition_id !== $winner->root_recognition_id
+            || $predecessor->status !== 'reversed'
+            || $predecessor->reversal_operation_id !== $operationId
+        ) {
+            throw new AccountingRecognitionConflict(
+                'Performance Accounting correction committed replay has inconsistent predecessor reversal truth.',
+            );
+        }
+
+        return (string) $winner->id;
     }
 
     private function correct(
@@ -405,12 +483,9 @@ final class CorrectPerformanceAccounting
             $policy->id === $leaf->performance_accounting_policy_id
             && (int) $policy->policy_version
                 === (int) $leaf->performance_accounting_policy_version
-            && $policy->revenue_account_id === $leaf->revenue_account_id
-            && $policy->contract_asset_control_account_id
-                === $leaf->contract_asset_account_id
         ) {
             throw new AccountingRecognitionConflict(
-                'Performance Accounting correction requires a changed policy/accounting mapping.',
+                'Performance Accounting correction requires a changed immutable policy version or applicable accounting mapping.',
             );
         }
 
