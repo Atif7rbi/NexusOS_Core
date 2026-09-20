@@ -1018,10 +1018,6 @@ return new class extends Migration
             $restore,
         );
         DB::unprepared($restore);
-
-        DB::unprepared(
-            "REVOKE ALL ON TABLE public.receivable_ar_recognitions FROM {$identifier}",
-        );
     }
 
     private function hardenRuntimePrivileges(): void
