@@ -51,19 +51,15 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                     'tenant_id' => $context['tenant_id'],
                     'contract_id' => $context['contract_id'],
                     'position_type' => $origin->position_type,
-                    'origin_recognition_type' =>
-                        'RECEIVABLE_AR_RECOGNITION',
+                    'origin_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
                     'origin_recognition_id' => $fakeRecognitionId,
-                    'origin_journal_entry_id' =>
-                        $origin->origin_journal_entry_id,
+                    'origin_journal_entry_id' => $origin->origin_journal_entry_id,
                     'account_id' => $origin->account_id,
                     'economic_source_type' => $origin->economic_source_type,
                     'economic_source_id' => $origin->economic_source_id,
-                    'consideration_transition_id' =>
-                        $origin->consideration_transition_id,
+                    'consideration_transition_id' => $origin->consideration_transition_id,
                     'consideration_lot_id' => $origin->consideration_lot_id,
-                    'economic_leg_identity' =>
-                        'AR:FORGED:'.$fakeRecognitionId,
+                    'economic_leg_identity' => 'AR:FORGED:'.$fakeRecognitionId,
                     'origin_amount' => $origin->origin_amount,
                     'currency' => 'SAR',
                     'accounting_date' => $origin->accounting_date,
@@ -84,8 +80,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                     'journal_line_id' => $allocation->journal_line_id,
                     'amount' => $origin->origin_amount,
                     'currency' => 'SAR',
-                    'economic_leg_identity' =>
-                        'AR:FORGED:'.$fakeRecognitionId,
+                    'economic_leg_identity' => 'AR:FORGED:'.$fakeRecognitionId,
                     'created_at' => now(),
                 ]);
             });
@@ -217,8 +212,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
