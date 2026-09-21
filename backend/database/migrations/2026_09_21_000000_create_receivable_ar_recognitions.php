@@ -609,6 +609,71 @@ return new class extends Migration
                   MESSAGE='Receivable AR Journal grammar is inconsistent';
               END IF;
 
+              IF EXISTS (
+                SELECT 1
+                FROM public.journal_lines jl
+                LEFT JOIN (
+                  SELECT a.journal_line_id,sum(a.amount) AS mapped_amount
+                  FROM public.accounting_position_origin_journal_line_allocations a
+                  JOIN public.accounting_position_origins o
+                    ON o.tenant_id=a.tenant_id AND o.id=a.origin_id
+                  WHERE o.tenant_id=r.tenant_id
+                    AND o.origin_recognition_type='RECEIVABLE_AR_RECOGNITION'
+                    AND o.origin_recognition_id=r.id
+                  GROUP BY a.journal_line_id
+
+                  UNION ALL
+
+                  SELECT a.journal_line_id,sum(a.amount) AS mapped_amount
+                  FROM public.accounting_position_consumption_journal_line_allocations a
+                  JOIN public.accounting_position_consumptions pc
+                    ON pc.tenant_id=a.tenant_id
+                   AND pc.id=a.consumption_id
+                  WHERE pc.tenant_id=r.tenant_id
+                    AND pc.consuming_recognition_type='RECEIVABLE_AR_RECOGNITION'
+                    AND pc.consuming_recognition_id=r.id
+                  GROUP BY a.journal_line_id
+                ) mapping
+                  ON mapping.journal_line_id=jl.id
+                WHERE jl.tenant_id=r.tenant_id
+                  AND jl.journal_entry_id=r.journal_entry_id
+                  AND jl.credit>0
+                GROUP BY jl.id,jl.credit
+                HAVING COALESCE(sum(mapping.mapped_amount),0)<>jl.credit
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM (
+                  SELECT a.journal_line_id
+                  FROM public.accounting_position_origin_journal_line_allocations a
+                  JOIN public.accounting_position_origins o
+                    ON o.tenant_id=a.tenant_id AND o.id=a.origin_id
+                  WHERE o.tenant_id=r.tenant_id
+                    AND o.origin_recognition_type='RECEIVABLE_AR_RECOGNITION'
+                    AND o.origin_recognition_id=r.id
+
+                  UNION ALL
+
+                  SELECT a.journal_line_id
+                  FROM public.accounting_position_consumption_journal_line_allocations a
+                  JOIN public.accounting_position_consumptions pc
+                    ON pc.tenant_id=a.tenant_id
+                   AND pc.id=a.consumption_id
+                  WHERE pc.tenant_id=r.tenant_id
+                    AND pc.consuming_recognition_type='RECEIVABLE_AR_RECOGNITION'
+                    AND pc.consuming_recognition_id=r.id
+                ) mapped
+                JOIN public.journal_lines jl
+                  ON jl.tenant_id=r.tenant_id
+                 AND jl.id=mapped.journal_line_id
+                WHERE jl.journal_entry_id<>r.journal_entry_id
+                   OR jl.credit<=0
+              ) THEN
+                RAISE EXCEPTION USING
+                  ERRCODE='23514',
+                  MESSAGE='Receivable AR credit Journal lines require exact provenance allocation';
+              END IF;
+
               IF r.status='reversed' THEN
                 SELECT * INTO reversal
                 FROM public.journal_entries
@@ -927,6 +992,97 @@ return new class extends Migration
                 AND key='receivable_ar_recognition';
             ALTER TABLE public.accounting_source_types
               ENABLE TRIGGER accounting_source_types_immutable_delete;
+
+            ALTER TABLE public.accounting_audits
+              DROP CONSTRAINT accounting_audits_event_check;
+            ALTER TABLE public.accounting_audits
+              ADD CONSTRAINT accounting_audits_event_check CHECK(event IN (
+                'accounting.activated',
+                'account.created','account.updated','account.archived','account.restored',
+                'journal.draft_created','journal.draft_deleted','journal.posted','journal.reversed',
+                'period.created','period.boundaries_changed','period.closed','period.reopened',
+                'opening_balance.created','opening_balance.draft_deleted','opening_balance.posted',
+                'opening_balance.reversed','opening_balance.reactivated',
+                'performance_accounting.recognized',
+                'performance_accounting.reversed',
+                'performance_accounting.corrected'
+              ));
+
+            ALTER TABLE public.accounting_audits
+              DROP CONSTRAINT accounting_audits_subject_type_check;
+            ALTER TABLE public.accounting_audits
+              ADD CONSTRAINT accounting_audits_subject_type_check CHECK(
+                subject_type IN (
+                  'accounting_settings','account','journal_entry',
+                  'accounting_period','opening_balance_operation',
+                  'performance_accounting_recognition'
+                )
+              );
+
+            CREATE OR REPLACE FUNCTION public.validate_accounting_audit_subject()
+            RETURNS trigger
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $
+            DECLARE valid boolean:=false;
+            BEGIN
+              valid:=CASE NEW.subject_type
+                WHEN 'accounting_settings' THEN EXISTS(
+                  SELECT 1 FROM public.accounting_settings
+                  WHERE tenant_id=NEW.tenant_id AND id=NEW.subject_id
+                )
+                WHEN 'account' THEN EXISTS(
+                  SELECT 1 FROM public.accounts
+                  WHERE tenant_id=NEW.tenant_id AND id=NEW.subject_id
+                )
+                WHEN 'journal_entry' THEN EXISTS(
+                  SELECT 1 FROM public.journal_entries
+                  WHERE tenant_id=NEW.tenant_id AND id=NEW.subject_id
+                )
+                WHEN 'accounting_period' THEN EXISTS(
+                  SELECT 1 FROM public.accounting_periods
+                  WHERE tenant_id=NEW.tenant_id AND id=NEW.subject_id
+                )
+                WHEN 'opening_balance_operation' THEN EXISTS(
+                  SELECT 1 FROM public.opening_balance_operations
+                  WHERE tenant_id=NEW.tenant_id AND id=NEW.subject_id
+                )
+                WHEN 'performance_accounting_recognition' THEN EXISTS(
+                  SELECT 1 FROM public.performance_accounting_recognitions
+                  WHERE tenant_id=NEW.tenant_id AND id=NEW.subject_id
+                )
+                ELSE false
+              END;
+
+              IF NOT valid THEN
+                RAISE EXCEPTION USING
+                  ERRCODE='23503',
+                  MESSAGE='accounting audit subject missing or cross-tenant';
+              END IF;
+
+              IF NOT (
+                (NEW.event LIKE 'account.%' AND NEW.subject_type='account')
+                OR
+                (NEW.event LIKE 'journal.%'
+                  AND NEW.subject_type='journal_entry')
+                OR
+                (NEW.event LIKE 'period.%'
+                  AND NEW.subject_type='accounting_period')
+                OR
+                (NEW.event LIKE 'opening_balance.%'
+                  AND NEW.subject_type='opening_balance_operation')
+                OR
+                (NEW.event LIKE 'performance_accounting.%'
+                  AND NEW.subject_type='performance_accounting_recognition')
+                OR
+                (NEW.event='accounting.activated'
+                  AND NEW.subject_type='accounting_settings')
+              ) THEN
+                RAISE EXCEPTION USING
+                  ERRCODE='23514',
+                  MESSAGE='accounting audit event/subject mismatch';
+              END IF;
+
+              RETURN NEW;
+            END $;
             SQL);
 
         /*
