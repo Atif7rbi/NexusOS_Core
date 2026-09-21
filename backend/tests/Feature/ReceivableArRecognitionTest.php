@@ -156,6 +156,9 @@ final class ReceivableArRecognitionTest extends TestCase
             ],
         );
 
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
         [$handover, $performanceGraph] = DB::transaction(function () use (
             $context,
             $consideration,
