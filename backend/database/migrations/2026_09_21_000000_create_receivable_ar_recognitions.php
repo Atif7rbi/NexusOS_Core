@@ -908,8 +908,10 @@ return new class extends Migration
             CREATE OR REPLACE FUNCTION
               public.performance_accounting_runtime_provenance_guard()
             RETURNS trigger
-            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $
             DECLARE owner_type text;
+            DECLARE owner_id char(26);
+            DECLARE owner_exists boolean:=false;
             BEGIN
               IF current_user <> '__RUNTIME_LITERAL__' THEN
                 RETURN NEW;
@@ -917,35 +919,54 @@ return new class extends Migration
 
               IF TG_TABLE_NAME='accounting_position_origins' THEN
                 owner_type:=NEW.origin_recognition_type;
+                owner_id:=NEW.origin_recognition_id;
 
               ELSIF TG_TABLE_NAME='accounting_position_consumptions' THEN
                 owner_type:=NEW.consuming_recognition_type;
+                owner_id:=NEW.consuming_recognition_id;
 
               ELSIF TG_TABLE_NAME=
                 'accounting_position_origin_journal_line_allocations' THEN
-                SELECT origin_recognition_type
-                INTO owner_type
+                SELECT origin_recognition_type,origin_recognition_id
+                INTO owner_type,owner_id
                 FROM public.accounting_position_origins
                 WHERE tenant_id=NEW.tenant_id AND id=NEW.origin_id;
 
               ELSE
-                SELECT consuming_recognition_type
-                INTO owner_type
+                SELECT consuming_recognition_type,consuming_recognition_id
+                INTO owner_type,owner_id
                 FROM public.accounting_position_consumptions
                 WHERE tenant_id=NEW.tenant_id AND id=NEW.consumption_id;
               END IF;
 
-              IF owner_type NOT IN (
-                'PERFORMANCE_ACCOUNTING_RECOGNITION',
-                'RECEIVABLE_AR_RECOGNITION'
-              ) THEN
+              IF owner_type='PERFORMANCE_ACCOUNTING_RECOGNITION' THEN
+                SELECT EXISTS(
+                  SELECT 1
+                  FROM public.performance_accounting_recognitions
+                  WHERE tenant_id=NEW.tenant_id AND id=owner_id
+                ) INTO owner_exists;
+
+              ELSIF owner_type='RECEIVABLE_AR_RECOGNITION' THEN
+                SELECT EXISTS(
+                  SELECT 1
+                  FROM public.receivable_ar_recognitions
+                  WHERE tenant_id=NEW.tenant_id AND id=owner_id
+                ) INTO owner_exists;
+
+              ELSE
                 RAISE EXCEPTION USING
                   ERRCODE='42501',
                   MESSAGE='Runtime accounting provenance owner type is unsupported';
               END IF;
 
+              IF NOT owner_exists THEN
+                RAISE EXCEPTION USING
+                  ERRCODE='23503',
+                  MESSAGE='Runtime accounting provenance requires an exact Recognition owner';
+              END IF;
+
               RETURN NEW;
-            END $$;
+            END $;
 
             REVOKE ALL ON public.receivable_ar_recognitions FROM PUBLIC;
 
