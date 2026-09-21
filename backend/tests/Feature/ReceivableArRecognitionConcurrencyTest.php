@@ -153,7 +153,6 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
         );
     }
 
-
     public function test_recognition_first_then_ar_policy_supersession_preserves_historical_snapshot(): void
     {
         [$context, $source, $accounts] = $this->receivableArContext();
@@ -705,8 +704,7 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -738,10 +736,8 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
             'actor_id' => $context['actor']->id,
             'schedule_id' => $scheduleId,
             'entitlement_id' => $entitlementId,
-            'source_correction_operation_id' =>
-                $sourceCorrectionOperationId,
-            'entitlement_reversal_operation_id' =>
-                (string) Str::ulid(),
+            'source_correction_operation_id' => $sourceCorrectionOperationId,
+            'entitlement_reversal_operation_id' => (string) Str::ulid(),
             'reason' => 'Concurrent Receivable AR source correction',
             'reference' => 'AR-SOURCE-CORR/'.$sourceCorrectionOperationId,
         ];
