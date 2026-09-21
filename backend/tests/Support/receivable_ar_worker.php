@@ -106,10 +106,8 @@ try {
                     $payload['tenant_id'],
                     $actor,
                     [
-                        'contractual_billing_entitlement_id' =>
-                            $payload['entitlement_id'],
-                        'receivable_ar_operation_id' =>
-                            $payload['operation_id'],
+                        'contractual_billing_entitlement_id' => $payload['entitlement_id'],
+                        'receivable_ar_operation_id' => $payload['operation_id'],
                     ],
                 ),
             ],
@@ -151,13 +149,11 @@ try {
                     $payload['schedule_id'],
                     $actor,
                     [
-                        'source_correction_operation_id' =>
-                            $payload['source_correction_operation_id'],
+                        'source_correction_operation_id' => $payload['source_correction_operation_id'],
                         'source_correction_reason' => $payload['reason'],
                         'source_correction_reference' => $payload['reference'],
                         'entitlement_reversals' => [
-                            $payload['entitlement_id'] =>
-                                $payload['entitlement_reversal_operation_id'],
+                            $payload['entitlement_id'] => $payload['entitlement_reversal_operation_id'],
                         ],
                     ],
                 ),
