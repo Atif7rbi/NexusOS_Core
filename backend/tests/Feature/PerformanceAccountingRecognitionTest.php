@@ -370,6 +370,15 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billing[0]['graph'],
             $accounts['contract_liability'],
         );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->counterpart(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-08-19',
+            $accounts['contract_asset'],
+            $secondLiability,
+        );
+
         $this->createLiabilityOrigin(
             $context,
             $billing[1]['source'],
