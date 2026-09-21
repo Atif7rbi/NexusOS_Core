@@ -137,7 +137,7 @@ jobs:
       - name: Verified Bank Receipt Cash Posting concurrency tests
         run: php artisan migrate:fresh --force && php artisan test --filter='VerifiedBankReceiptCashPostingConcurrencyTest'
       - name: Core feature regressions
-        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:(?:Accounting(?:Schema|Application|Recognition)|PerformanceAccountingRecognition|Receivables|PaymentsAllocations|ReceiptEvidence|VerifiedBankReceiptCashPosting|ContractualBilling.*|ContractConsideration)ConcurrencyTest|ContractualBilling.*RecoveryTest|ContractConsiderationRecoveryTest))/'
+        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:(?:Accounting(?:Schema|Application|Recognition)|PerformanceAccountingRecognition|ReceivableArRecognition|Receivables|PaymentsAllocations|ReceiptEvidence|VerifiedBankReceiptCashPosting|ContractualBilling.*|ContractConsideration)ConcurrencyTest|ContractualBilling.*RecoveryTest|ContractConsiderationRecoveryTest))/'
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
