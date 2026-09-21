@@ -372,14 +372,6 @@ return new class extends Migration
                  OR cp.policy_version<>r.counterpart_policy_version
                  OR r.accounting_date<arp.effective_from
                  OR r.accounting_date<cp.effective_from
-                 OR (
-                    arp.effective_to IS NOT NULL
-                    AND r.accounting_date>arp.effective_to
-                 )
-                 OR (
-                    cp.effective_to IS NOT NULL
-                    AND r.accounting_date>cp.effective_to
-                 )
                  OR arp.ar_control_account_id<>r.ar_control_account_id
                  OR cp.contract_asset_control_account_id
                     <>r.counterpart_contract_asset_account_id
