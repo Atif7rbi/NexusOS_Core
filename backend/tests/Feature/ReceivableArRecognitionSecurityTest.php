@@ -1,0 +1,270 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Modules\Accounting\Actions\ActivateAccountingAction;
+use App\Modules\Accounting\Actions\ManageAccountAction;
+use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
+use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
+use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Tests\Support\CreatesContractConsiderationFixtures;
+use Tests\TestCase;
+
+final class ReceivableArRecognitionSecurityTest extends TestCase
+{
+    use CreatesContractConsiderationFixtures;
+    use RefreshDatabase;
+
+    public function test_runtime_role_cannot_forge_receivable_ar_provenance_without_exact_owner(): void
+    {
+        [$context, $recognition, $origin] = $this->recognizedContext();
+        $fakeRecognitionId = (string) Str::ulid();
+        $caught = null;
+
+        try {
+            $this->asRuntimeRole(function () use (
+                $context,
+                $origin,
+                $fakeRecognitionId,
+            ): void {
+                DB::table('accounting_position_origins')->insert([
+                    'id' => (string) Str::ulid(),
+                    'tenant_id' => $context['tenant_id'],
+                    'contract_id' => $context['contract_id'],
+                    'position_type' => $origin->position_type,
+                    'origin_recognition_type' =>
+                        'RECEIVABLE_AR_RECOGNITION',
+                    'origin_recognition_id' => $fakeRecognitionId,
+                    'origin_journal_entry_id' =>
+                        $origin->origin_journal_entry_id,
+                    'account_id' => $origin->account_id,
+                    'economic_source_type' => $origin->economic_source_type,
+                    'economic_source_id' => $origin->economic_source_id,
+                    'consideration_transition_id' =>
+                        $origin->consideration_transition_id,
+                    'consideration_lot_id' => $origin->consideration_lot_id,
+                    'economic_leg_identity' =>
+                        'AR:FORGED:'.$fakeRecognitionId,
+                    'origin_amount' => $origin->origin_amount,
+                    'currency' => 'SAR',
+                    'accounting_date' => $origin->accounting_date,
+                    'status' => 'effective',
+                    'created_at' => now(),
+                    'reversal_origin_operation_id' => null,
+                    'reversed_at' => null,
+                ]);
+            });
+        } catch (QueryException $exception) {
+            $caught = $exception;
+        }
+
+        self::assertNotNull($recognition);
+        self::assertInstanceOf(QueryException::class, $caught);
+        self::assertSame(
+            '23503',
+            (string) ($caught->errorInfo[0] ?? ''),
+            $caught->getMessage(),
+        );
+    }
+
+    public function test_runtime_role_cannot_mutate_canonical_receivable_ar_history(): void
+    {
+        [$context, $recognition] = $this->recognizedContext();
+        $caught = null;
+
+        try {
+            $this->asRuntimeRole(function () use (
+                $context,
+                $recognition,
+            ): void {
+                DB::table('receivable_ar_recognitions')
+                    ->where('tenant_id', $context['tenant_id'])
+                    ->where('id', $recognition->id)
+                    ->update([
+                        'receivable_amount' => '999.00',
+                    ]);
+            });
+        } catch (QueryException $exception) {
+            $caught = $exception;
+        }
+
+        self::assertInstanceOf(QueryException::class, $caught);
+        self::assertSame(
+            '55000',
+            (string) ($caught->errorInfo[0] ?? ''),
+            $caught->getMessage(),
+        );
+
+        self::assertSame(
+            '1000.00',
+            DB::table('receivable_ar_recognitions')
+                ->where('id', $recognition->id)
+                ->value('receivable_amount'),
+        );
+    }
+
+    private function recognizedContext(): array
+    {
+        $context = $this->considerationContext();
+        $obligationId = $this->billingObligations(
+            $context,
+            ['1000.00'],
+            '2026-08-21',
+        )[0];
+        $consideration = $this->adopt($context);
+
+        app(ActivateAccountingAction::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+        );
+
+        app(ManageAccountingPeriodAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            '2026-12-31',
+        );
+
+        $ar = $this->account(
+            $context,
+            'AR-SEC-CTRL',
+            'asset',
+            'current_asset',
+        );
+        $asset = $this->account(
+            $context,
+            'AR-SEC-ASSET',
+            'asset',
+            'current_asset',
+        );
+        $liability = $this->account(
+            $context,
+            'AR-SEC-LIAB',
+            'liability',
+            'current_liability',
+        );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->receivableAr(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            $ar,
+        );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->counterpart(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            $asset,
+            $liability,
+        );
+
+        [$source] = DB::transaction(function () use (
+            $context,
+            $consideration,
+            $obligationId,
+        ): array {
+            $source = $this->billingSource($context, $obligationId);
+
+            $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'BILLED_UNEARNED',
+            );
+
+            return [$source];
+        });
+
+        app(EstablishEntitlementReceivable::class)->execute(
+            $context['tenant_id'],
+            $source['id'],
+            $context['actor'],
+            [
+                'receivable_establishment_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+
+        $recognitionId = app(RecognizeReceivableAr::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contractual_billing_entitlement_id' => $source['id'],
+                'receivable_ar_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $recognition = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+        $origin = DB::table('accounting_position_origins')
+            ->where(
+                'origin_recognition_type',
+                'RECEIVABLE_AR_RECOGNITION',
+            )
+            ->where('origin_recognition_id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($recognition);
+        self::assertNotNull($origin);
+
+        return [$context, $recognition, $origin];
+    }
+
+    private function account(
+        array $context,
+        string $code,
+        string $type,
+        string $classification,
+    ): string {
+        return app(ManageAccountAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'code' => $code,
+                'name' => $code,
+                'description' => null,
+                'kind' => 'posting',
+                'account_type' => $type,
+                'classification' => $classification,
+                'parent_id' => null,
+            ],
+        );
+    }
+
+    private function asRuntimeRole(callable $callback): mixed
+    {
+        $role = (string) getenv('ACCOUNTING_RUNTIME_DB_ROLE');
+
+        if (! preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $role)) {
+            throw new \RuntimeException(
+                'Invalid ACCOUNTING_RUNTIME_DB_ROLE.',
+            );
+        }
+
+        $identifier = '"'.str_replace('"', '""', $role).'"';
+
+        return DB::transaction(function () use (
+            $identifier,
+            $callback,
+        ): mixed {
+            DB::statement("SET LOCAL ROLE {$identifier}");
+
+            $result = $callback();
+
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            DB::statement('SET CONSTRAINTS ALL DEFERRED');
+
+            return $result;
+        });
+    }
+}
