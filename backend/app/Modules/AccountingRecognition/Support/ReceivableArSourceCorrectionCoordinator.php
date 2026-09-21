@@ -238,8 +238,7 @@ final class ReceivableArSourceCorrectionCoordinator
                     ->where('id', $origin->id)
                     ->update([
                         'status' => 'reversed',
-                        'reversal_origin_operation_id' =>
-                            $reversalOperationId,
+                        'reversal_origin_operation_id' => $reversalOperationId,
                         'reversed_at' => $at,
                     ]);
             }
@@ -262,8 +261,7 @@ final class ReceivableArSourceCorrectionCoordinator
                 (string) $recognition->id,
                 (int) $actor->id,
                 [
-                    'contractual_billing_entitlement_id' =>
-                        $entitlementId,
+                    'contractual_billing_entitlement_id' => $entitlementId,
                     'reversal_operation_id' => $reversalOperationId,
                     'reversal_journal_entry_id' => $reversalJournalId,
                     'reason' => $reason,
