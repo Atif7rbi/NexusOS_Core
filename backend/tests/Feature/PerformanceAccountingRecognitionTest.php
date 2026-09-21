@@ -1849,8 +1849,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
