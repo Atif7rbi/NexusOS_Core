@@ -369,14 +369,12 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billing[0]['source'],
             $billing[0]['graph'],
             $accounts['contract_liability'],
-            $accounts['contract_asset'],
         );
         $this->createLiabilityOrigin(
             $context,
             $billing[1]['source'],
             $billing[1]['graph'],
             $secondLiability,
-            $accounts['contract_asset'],
         );
 
         app(AdoptPerformanceAccounting::class)->execute(
