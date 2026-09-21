@@ -22,7 +22,7 @@ final class PerformanceAccountingRecognitionSecurityTest extends TestCase
     use CreatesContractConsiderationFixtures;
     use RefreshDatabase;
 
-    public function test_runtime_role_cannot_create_receivable_ar_provenance_during_slice_two(): void
+    public function test_runtime_role_cannot_create_receivable_ar_provenance_without_exact_recognition_owner(): void
     {
         $caught = null;
 
@@ -56,7 +56,7 @@ final class PerformanceAccountingRecognitionSecurityTest extends TestCase
         }
 
         self::assertInstanceOf(QueryException::class, $caught);
-        self::assertSame('42501', (string) ($caught->errorInfo[0] ?? ''));
+        self::assertSame('23503', (string) ($caught->errorInfo[0] ?? ''));
     }
 
     public function test_runtime_role_cannot_create_performance_provenance_without_exact_recognition_owner(): void
