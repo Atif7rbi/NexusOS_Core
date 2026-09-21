@@ -153,6 +153,338 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
         );
     }
 
+
+    public function test_recognition_first_then_ar_policy_supersession_preserves_historical_snapshot(): void
+    {
+        [$context, $source, $accounts] = $this->receivableArContext();
+
+        $replacementAr = $this->account(
+            $context,
+            'AR-CX-CTRL-2',
+            'asset',
+            'current_asset',
+        );
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_policy_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $policy = $this->start([
+            'action' => 'ar_policy',
+            'application_name' => 'ar_policy_waiter',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'effective_from' => '2026-08-21',
+            'ar_control_account_id' => $replacementAr,
+        ]);
+
+        $this->blocked(
+            'ar_policy_waiter',
+            'ar_policy_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $policyResult = $this->finish($policy);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue($policyResult['ok'], json_encode($policyResult));
+
+        $row = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionResult['result']['recognition_id'])
+            ->first();
+
+        self::assertNotNull($row);
+        self::assertSame(1, (int) $row->receivable_ar_policy_version);
+        self::assertSame($accounts['ar'], $row->ar_control_account_id);
+        self::assertSame(
+            2,
+            (int) DB::table('receivable_ar_policies')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('status', 'active')
+                ->value('policy_version'),
+        );
+
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        DB::statement('SET CONSTRAINTS ALL DEFERRED');
+    }
+
+    public function test_ar_policy_supersession_first_then_recognition_uses_successor_snapshot(): void
+    {
+        [$context, $source] = $this->receivableArContext();
+
+        $replacementAr = $this->account(
+            $context,
+            'AR-CX-CTRL-3',
+            'asset',
+            'current_asset',
+        );
+
+        [$policy, $directory] = $this->hold([
+            'action' => 'ar_policy_hold',
+            'application_name' => 'ar_policy_first_holder',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'effective_from' => '2026-08-21',
+            'ar_control_account_id' => $replacementAr,
+        ]);
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_after_policy_waiter',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'ar_after_policy_waiter',
+            'ar_policy_first_holder',
+        );
+        touch($directory.'/release');
+
+        $policyResult = $this->finish($policy);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue($policyResult['ok'], json_encode($policyResult));
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+
+        $row = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionResult['result']['recognition_id'])
+            ->first();
+
+        self::assertNotNull($row);
+        self::assertSame(2, (int) $row->receivable_ar_policy_version);
+        self::assertSame($replacementAr, $row->ar_control_account_id);
+    }
+
+    public function test_recognition_first_then_period_close_preserves_posted_history(): void
+    {
+        [$context, $source, , $periodId] = $this->receivableArContext();
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_period_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $close = $this->start([
+            'action' => 'period_close',
+            'application_name' => 'ar_period_close_waiter',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'period_id' => $periodId,
+        ]);
+
+        $this->blocked(
+            'ar_period_close_waiter',
+            'ar_period_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $closeResult = $this->finish($close);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue($closeResult['ok'], json_encode($closeResult));
+        self::assertSame(
+            'closed',
+            DB::table('accounting_periods')
+                ->where('id', $periodId)
+                ->value('status'),
+        );
+        self::assertSame(
+            'posted',
+            DB::table('receivable_ar_recognitions')
+                ->where('id', $recognitionResult['result']['recognition_id'])
+                ->value('status'),
+        );
+    }
+
+    public function test_period_close_first_then_blocks_new_recognition_without_date_shift(): void
+    {
+        [$context, $source, , $periodId] = $this->receivableArContext();
+
+        [$close, $directory] = $this->hold([
+            'action' => 'period_close_hold',
+            'application_name' => 'ar_period_first_holder',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'period_id' => $periodId,
+        ]);
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_after_period_waiter',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'ar_after_period_waiter',
+            'ar_period_first_holder',
+        );
+        touch($directory.'/release');
+
+        $closeResult = $this->finish($close);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue($closeResult['ok'], json_encode($closeResult));
+        self::assertFalse(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertSame(
+            0,
+            DB::table('receivable_ar_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where(
+                    'contractual_billing_entitlement_id',
+                    $source['id'],
+                )
+                ->count(),
+        );
+    }
+
+    public function test_recognition_first_then_source_correction_reverses_ar_before_source(): void
+    {
+        [$context, $source, , , $scheduleId] =
+            $this->receivableArContext();
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_source_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $sourceCorrection = $this->start(
+            $this->sourceCorrectionPayload(
+                $context,
+                $source['id'],
+                $scheduleId,
+                'ar_source_correction_waiter',
+                'source_correct',
+            ),
+        );
+
+        $this->blocked(
+            'ar_source_correction_waiter',
+            'ar_source_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $correctionResult = $this->finish($sourceCorrection);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue(
+            $correctionResult['ok'],
+            json_encode($correctionResult),
+        );
+
+        self::assertSame(
+            'reversed',
+            DB::table('receivable_ar_recognitions')
+                ->where('id', $recognitionResult['result']['recognition_id'])
+                ->value('status'),
+        );
+        self::assertSame(
+            'reversed',
+            DB::table('contractual_billing_entitlements')
+                ->where('id', $source['id'])
+                ->value('status'),
+        );
+    }
+
+    public function test_source_correction_first_then_blocks_new_receivable_ar_recognition(): void
+    {
+        [$context, $source, , , $scheduleId] =
+            $this->receivableArContext();
+
+        [$sourceCorrection, $directory] = $this->hold(
+            $this->sourceCorrectionPayload(
+                $context,
+                $source['id'],
+                $scheduleId,
+                'ar_source_first_holder',
+                'source_correct_hold',
+            ),
+        );
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_after_source_waiter',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'ar_after_source_waiter',
+            'ar_source_first_holder',
+        );
+        touch($directory.'/release');
+
+        $correctionResult = $this->finish($sourceCorrection);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue(
+            $correctionResult['ok'],
+            json_encode($correctionResult),
+        );
+        self::assertFalse(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertSame(
+            AccountingRecognitionConflict::class,
+            $recognitionResult['class'],
+        );
+        self::assertSame(
+            0,
+            DB::table('receivable_ar_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where(
+                    'contractual_billing_entitlement_id',
+                    $source['id'],
+                )
+                ->count(),
+        );
+    }
+
     private function receivableArContext(): array
     {
         $context = $this->considerationContext();
@@ -168,7 +500,7 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
             $context['actor'],
         );
 
-        app(ManageAccountingPeriodAction::class)->create(
+        $periodId = app(ManageAccountingPeriodAction::class)->create(
             $context['tenant_id'],
             $context['actor'],
             '2026-01-01',
@@ -240,7 +572,41 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
             ],
         );
 
-        return [$context, $source];
+        $scheduleId = (string) DB::table('contractual_billing_entitlements')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $source['id'])
+            ->value('schedule_id');
+
+        return [$context, $source, [
+            'ar' => $ar,
+            'contract_asset' => $asset,
+            'contract_liability' => $liability,
+        ], $periodId, $scheduleId];
+    }
+
+    private function sourceCorrectionPayload(
+        array $context,
+        string $entitlementId,
+        string $scheduleId,
+        string $applicationName,
+        string $action,
+    ): array {
+        $sourceCorrectionOperationId = (string) Str::ulid();
+
+        return [
+            'action' => $action,
+            'application_name' => $applicationName,
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'schedule_id' => $scheduleId,
+            'entitlement_id' => $entitlementId,
+            'source_correction_operation_id' =>
+                $sourceCorrectionOperationId,
+            'entitlement_reversal_operation_id' =>
+                (string) Str::ulid(),
+            'reason' => 'Concurrent Receivable AR source correction',
+            'reference' => 'AR-SOURCE-CORR/'.$sourceCorrectionOperationId,
+        ];
     }
 
     private function account(
