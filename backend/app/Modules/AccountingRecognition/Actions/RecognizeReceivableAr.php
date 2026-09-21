@@ -435,8 +435,7 @@ final class RecognizeReceivableAr
             'counterpart_policy_id' => (string) $counterpartPolicy->id,
             'counterpart_policy_version' => (int) $counterpartPolicy->policy_version,
             'ar_control_account_id' => (string) $arPolicy->ar_control_account_id,
-            'counterpart_contract_asset_account_id' =>
-                (string) $counterpartPolicy->contract_asset_control_account_id,
+            'counterpart_contract_asset_account_id' => (string) $counterpartPolicy->contract_asset_control_account_id,
             'contract_liability_account_id' => $liabilityAmount->isZero()
                 ? null
                 : (string) $counterpartPolicy->contract_liability_control_account_id,
