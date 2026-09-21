@@ -323,6 +323,14 @@ final class RecognizeReceivableAr
             $assetEdges,
         );
 
+        DB::table('accounting_settings')
+            ->where('tenant_id', $tenantId)
+            ->lockForUpdate()
+            ->first()
+            ?? throw new AccountingRecognitionConflict(
+                'Accounting must be active before Receivable AR recognition.',
+            );
+
         $arPolicy = $this->lockPolicy(
             'receivable_ar_policies',
             $tenantId,
@@ -333,6 +341,31 @@ final class RecognizeReceivableAr
             $tenantId,
             (string) $entitlement->economic_date,
         );
+
+        $periods = DB::table('accounting_periods')
+            ->where('tenant_id', $tenantId)
+            ->whereDate(
+                'start_date',
+                '<=',
+                $entitlement->economic_date,
+            )
+            ->whereDate(
+                'end_date',
+                '>=',
+                $entitlement->economic_date,
+            )
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if (
+            $periods->count() !== 1
+            || $periods->first()->status !== 'open'
+        ) {
+            throw new AccountingRecognitionConflict(
+                'Receivable AR requires one containing open Accounting Period.',
+            );
+        }
 
         $assetCredits = $this->assetCredits($plans);
         $accountIds = array_values(array_unique(array_merge(
