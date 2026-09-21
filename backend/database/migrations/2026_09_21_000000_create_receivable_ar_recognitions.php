@@ -862,19 +862,19 @@ return new class extends Migration
               DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
-            CREATE CONSTRAINT TRIGGER receivable_ar_entitlement_final
+            CREATE TRIGGER receivable_ar_entitlement_final
               AFTER UPDATE ON public.contractual_billing_entitlements
-              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
-            CREATE CONSTRAINT TRIGGER receivable_ar_receivable_final
+            CREATE TRIGGER receivable_ar_receivable_final
               AFTER UPDATE ON public.receivables
-              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
-            CREATE CONSTRAINT TRIGGER receivable_ar_transition_final
+            CREATE TRIGGER receivable_ar_transition_final
               AFTER UPDATE ON public.contract_consideration_transitions
-              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
             CREATE CONSTRAINT TRIGGER receivable_ar_origin_final
