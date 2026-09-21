@@ -908,7 +908,7 @@ return new class extends Migration
             CREATE OR REPLACE FUNCTION
               public.performance_accounting_runtime_provenance_guard()
             RETURNS trigger
-            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE owner_type text;
             BEGIN
               IF current_user <> '__RUNTIME_LITERAL__' THEN
@@ -945,7 +945,7 @@ return new class extends Migration
               END IF;
 
               RETURN NEW;
-            END $;
+            END $$;
 
             REVOKE ALL ON public.receivable_ar_recognitions FROM PUBLIC;
 
@@ -1021,7 +1021,7 @@ return new class extends Migration
 
             CREATE OR REPLACE FUNCTION public.validate_accounting_audit_subject()
             RETURNS trigger
-            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
             DECLARE valid boolean:=false;
             BEGIN
               valid:=CASE NEW.subject_type
@@ -1082,7 +1082,7 @@ return new class extends Migration
               END IF;
 
               RETURN NEW;
-            END $;
+            END $$;
             SQL);
 
         /*
