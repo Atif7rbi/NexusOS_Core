@@ -8,9 +8,6 @@ use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
 use App\Modules\Accounting\Actions\ReverseJournalAction;
-use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
-use App\Modules\Accounting\DTOs\BusinessPostingRequest;
-use App\Modules\Accounting\DTOs\JournalLineData;
 use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
@@ -215,7 +212,6 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billingSource,
             $billingGraph,
             $accounts['historical_liability'],
-            $accounts['contract_asset'],
         );
 
         app(AdoptPerformanceAccounting::class)->execute(
@@ -1148,7 +1144,6 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billingSource,
             $billingGraph,
             $accounts['historical_liability'],
-            $accounts['contract_asset'],
         );
 
         app(AdoptPerformanceAccounting::class)->execute(
@@ -1841,7 +1836,6 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         array $source,
         array $graph,
         string $liabilityAccountId,
-        string $debitAccountId,
     ): string {
         $receivableId = app(EstablishEntitlementReceivable::class)->execute(
             $context['tenant_id'],
