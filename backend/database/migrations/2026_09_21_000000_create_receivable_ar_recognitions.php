@@ -908,7 +908,7 @@ return new class extends Migration
             CREATE OR REPLACE FUNCTION
               public.performance_accounting_runtime_provenance_guard()
             RETURNS trigger
-            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $
+            LANGUAGE plpgsql SET search_path=pg_catalog,public AS $receivable_ar_runtime$
             DECLARE owner_type text;
             DECLARE owner_id char(26);
             DECLARE owner_exists boolean:=false;
@@ -966,7 +966,7 @@ return new class extends Migration
               END IF;
 
               RETURN NEW;
-            END $;
+            END $receivable_ar_runtime$;
 
             REVOKE ALL ON public.receivable_ar_recognitions FROM PUBLIC;
 
