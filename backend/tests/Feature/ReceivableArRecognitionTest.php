@@ -59,8 +59,7 @@ final class ReceivableArRecognitionTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -151,8 +150,7 @@ final class ReceivableArRecognitionTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -181,8 +179,7 @@ final class ReceivableArRecognitionTest extends TestCase
                 $context['actor'],
                 [
                     'unit_handover_acceptance_id' => $handover['id'],
-                    'performance_accounting_operation_id' =>
-                        (string) Str::ulid(),
+                    'performance_accounting_operation_id' => (string) Str::ulid(),
                 ],
             );
 
@@ -225,8 +222,7 @@ final class ReceivableArRecognitionTest extends TestCase
             $billing['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -307,8 +303,7 @@ final class ReceivableArRecognitionTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -361,11 +356,9 @@ final class ReceivableArRecognitionTest extends TestCase
             (string) $entitlement->schedule_id,
             $context['actor'],
             [
-                'source_correction_operation_id' =>
-                    $sourceCorrectionOperationId,
+                'source_correction_operation_id' => $sourceCorrectionOperationId,
                 'source_correction_reason' => 'Correct billing source',
-                'source_correction_reference' =>
-                    'AR/CORRECTION/'.$sourceCorrectionOperationId,
+                'source_correction_reference' => 'AR/CORRECTION/'.$sourceCorrectionOperationId,
                 'entitlement_reversals' => [
                     $source['id'] => $entitlementReversalOperationId,
                 ],
@@ -423,15 +416,13 @@ final class ReceivableArRecognitionTest extends TestCase
             'origin_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
             'origin_recognition_id' => $recognitionId,
             'status' => 'reversed',
-            'reversal_origin_operation_id' =>
-                $entitlementReversalOperationId,
+            'reversal_origin_operation_id' => $entitlementReversalOperationId,
         ]);
 
         self::assertDatabaseHas('contractual_billing_entitlements', [
             'id' => $source['id'],
             'status' => 'reversed',
-            'source_correction_operation_id' =>
-                $sourceCorrectionOperationId,
+            'source_correction_operation_id' => $sourceCorrectionOperationId,
         ]);
     }
 
