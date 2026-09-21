@@ -272,6 +272,144 @@ final class ReceivableArRecognitionConcurrencyTest extends TestCase
         self::assertSame($replacementAr, $row->ar_control_account_id);
     }
 
+    public function test_recognition_first_then_counterpart_policy_supersession_preserves_historical_snapshot(): void
+    {
+        [$context, $source, $accounts] = $this->receivableArContext();
+
+        $replacementAsset = $this->account(
+            $context,
+            'AR-CX-ASSET-2',
+            'asset',
+            'current_asset',
+        );
+        $replacementLiability = $this->account(
+            $context,
+            'AR-CX-LIAB-2',
+            'liability',
+            'current_liability',
+        );
+
+        [$recognition, $directory] = $this->hold(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_counterpart_recognition_holder',
+                'recognize_hold',
+            ),
+        );
+
+        $policy = $this->start([
+            'action' => 'counterpart_policy',
+            'application_name' => 'ar_counterpart_waiter',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'effective_from' => '2026-08-21',
+            'contract_asset_account_id' => $replacementAsset,
+            'contract_liability_account_id' => $replacementLiability,
+        ]);
+
+        $this->blocked(
+            'ar_counterpart_waiter',
+            'ar_counterpart_recognition_holder',
+        );
+        touch($directory.'/release');
+
+        $recognitionResult = $this->finish($recognition);
+        $policyResult = $this->finish($policy);
+
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+        self::assertTrue($policyResult['ok'], json_encode($policyResult));
+
+        $row = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionResult['result']['recognition_id'])
+            ->first();
+
+        self::assertNotNull($row);
+        self::assertSame(1, (int) $row->counterpart_policy_version);
+        self::assertSame(
+            $accounts['contract_liability'],
+            $row->contract_liability_account_id,
+        );
+        self::assertSame(
+            2,
+            (int) DB::table('receivable_ar_counterpart_policies')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('status', 'active')
+                ->value('policy_version'),
+        );
+
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        DB::statement('SET CONSTRAINTS ALL DEFERRED');
+    }
+
+    public function test_counterpart_policy_supersession_first_then_recognition_uses_successor_snapshot(): void
+    {
+        [$context, $source] = $this->receivableArContext();
+
+        $replacementAsset = $this->account(
+            $context,
+            'AR-CX-ASSET-3',
+            'asset',
+            'current_asset',
+        );
+        $replacementLiability = $this->account(
+            $context,
+            'AR-CX-LIAB-3',
+            'liability',
+            'current_liability',
+        );
+
+        [$policy, $directory] = $this->hold([
+            'action' => 'counterpart_policy_hold',
+            'application_name' => 'ar_counterpart_first_holder',
+            'tenant_id' => $context['tenant_id'],
+            'actor_id' => $context['actor']->id,
+            'effective_from' => '2026-08-21',
+            'contract_asset_account_id' => $replacementAsset,
+            'contract_liability_account_id' => $replacementLiability,
+        ]);
+
+        $recognition = $this->start(
+            $this->recognitionPayload(
+                $context,
+                $source['id'],
+                (string) Str::ulid(),
+                'ar_after_counterpart_waiter',
+                'recognize',
+            ),
+        );
+
+        $this->blocked(
+            'ar_after_counterpart_waiter',
+            'ar_counterpart_first_holder',
+        );
+        touch($directory.'/release');
+
+        $policyResult = $this->finish($policy);
+        $recognitionResult = $this->finish($recognition);
+
+        self::assertTrue($policyResult['ok'], json_encode($policyResult));
+        self::assertTrue(
+            $recognitionResult['ok'],
+            json_encode($recognitionResult),
+        );
+
+        $row = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionResult['result']['recognition_id'])
+            ->first();
+
+        self::assertNotNull($row);
+        self::assertSame(2, (int) $row->counterpart_policy_version);
+        self::assertSame(
+            $replacementLiability,
+            $row->contract_liability_account_id,
+        );
+    }
+
     public function test_recognition_first_then_period_close_preserves_posted_history(): void
     {
         [$context, $source, , $periodId] = $this->receivableArContext();
