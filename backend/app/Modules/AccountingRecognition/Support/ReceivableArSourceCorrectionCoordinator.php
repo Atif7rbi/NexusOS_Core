@@ -136,6 +136,72 @@ final class ReceivableArSourceCorrectionCoordinator
                 ->lockForUpdate()
                 ->get();
 
+            $journalLines = DB::table('journal_lines')
+                ->where('tenant_id', $tenantId)
+                ->where('journal_entry_id', $journal->id)
+                ->orderBy('line_number')
+                ->lockForUpdate()
+                ->get();
+
+            if ($journalLines->count() < 2) {
+                throw new AccountingRecognitionConflict(
+                    'Receivable AR source correction found incomplete Journal lines.',
+                );
+            }
+
+            DB::table('accounting_settings')
+                ->where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->first()
+                ?? throw new AccountingRecognitionConflict(
+                    'Accounting settings are missing for Receivable AR source correction.',
+                );
+
+            $periods = DB::table('accounting_periods')
+                ->where('tenant_id', $tenantId)
+                ->whereDate(
+                    'start_date',
+                    '<=',
+                    $recognition->accounting_date,
+                )
+                ->whereDate(
+                    'end_date',
+                    '>=',
+                    $recognition->accounting_date,
+                )
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if (
+                $periods->count() !== 1
+                || $periods->first()->status !== 'open'
+            ) {
+                throw new AccountingRecognitionConflict(
+                    'Receivable AR source correction requires the original Accounting Period to remain open.',
+                );
+            }
+
+            $accountIds = $journalLines
+                ->pluck('account_id')
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+
+            $accounts = DB::table('accounts')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('id', $accountIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($accounts->count() !== count($accountIds)) {
+                throw new AccountingRecognitionConflict(
+                    'Receivable AR source correction is missing an exact historical Account.',
+                );
+            }
+
             $reversalJournalId = $this->journals->reverseExact(
                 $tenantId,
                 $actor,
