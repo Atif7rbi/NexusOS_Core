@@ -25,17 +25,29 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
     public function test_runtime_role_cannot_forge_receivable_ar_provenance_without_exact_owner(): void
     {
         [$context, $recognition, $origin] = $this->recognizedContext();
+        $allocation = DB::table(
+            'accounting_position_origin_journal_line_allocations',
+        )
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('origin_id', $origin->id)
+            ->first();
+
+        self::assertNotNull($allocation);
+
         $fakeRecognitionId = (string) Str::ulid();
+        $fakeOriginId = (string) Str::ulid();
         $caught = null;
 
         try {
             $this->asRuntimeRole(function () use (
                 $context,
                 $origin,
+                $allocation,
                 $fakeRecognitionId,
+                $fakeOriginId,
             ): void {
                 DB::table('accounting_position_origins')->insert([
-                    'id' => (string) Str::ulid(),
+                    'id' => $fakeOriginId,
                     'tenant_id' => $context['tenant_id'],
                     'contract_id' => $context['contract_id'],
                     'position_type' => $origin->position_type,
@@ -59,6 +71,22 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                     'created_at' => now(),
                     'reversal_origin_operation_id' => null,
                     'reversed_at' => null,
+                ]);
+
+                DB::table(
+                    'accounting_position_origin_journal_line_allocations',
+                )->insert([
+                    'id' => (string) Str::ulid(),
+                    'tenant_id' => $context['tenant_id'],
+                    'contract_id' => $context['contract_id'],
+                    'origin_id' => $fakeOriginId,
+                    'journal_entry_id' => $allocation->journal_entry_id,
+                    'journal_line_id' => $allocation->journal_line_id,
+                    'amount' => $origin->origin_amount,
+                    'currency' => 'SAR',
+                    'economic_leg_identity' =>
+                        'AR:FORGED:'.$fakeRecognitionId,
+                    'created_at' => now(),
                 ]);
             });
         } catch (QueryException $exception) {
