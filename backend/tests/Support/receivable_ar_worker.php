@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
+use App\Modules\ContractualBilling\Actions\CorrectFinalizedContractualBillingSchedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -107,6 +110,55 @@ try {
                             $payload['entitlement_id'],
                         'receivable_ar_operation_id' =>
                             $payload['operation_id'],
+                    ],
+                ),
+            ],
+            'ar_policy',
+            'ar_policy_hold' => app(
+                ConfigureAccountingRecognitionPolicies::class,
+            )->receivableAr(
+                $payload['tenant_id'],
+                $actor,
+                $payload['effective_from'],
+                $payload['ar_control_account_id'],
+            ),
+            'counterpart_policy',
+            'counterpart_policy_hold' => app(
+                ConfigureAccountingRecognitionPolicies::class,
+            )->counterpart(
+                $payload['tenant_id'],
+                $actor,
+                $payload['effective_from'],
+                $payload['contract_asset_account_id'],
+                $payload['contract_liability_account_id'],
+            ),
+            'period_close',
+            'period_close_hold' => (function () use ($payload, $actor): array {
+                app(ManageAccountingPeriodAction::class)->close(
+                    $payload['tenant_id'],
+                    $payload['period_id'],
+                    $actor,
+                );
+
+                return ['period_id' => $payload['period_id']];
+            })(),
+            'source_correct',
+            'source_correct_hold' => [
+                'schedule_id' => app(
+                    CorrectFinalizedContractualBillingSchedule::class,
+                )->execute(
+                    $payload['tenant_id'],
+                    $payload['schedule_id'],
+                    $actor,
+                    [
+                        'source_correction_operation_id' =>
+                            $payload['source_correction_operation_id'],
+                        'source_correction_reason' => $payload['reason'],
+                        'source_correction_reference' => $payload['reference'],
+                        'entitlement_reversals' => [
+                            $payload['entitlement_id'] =>
+                                $payload['entitlement_reversal_operation_id'],
+                        ],
                     ],
                 ),
             ],
