@@ -1118,8 +1118,8 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'origin' => 'business',
             'source_type' => 'receivable_ar_recognition',
             'source_id' => $recognitionId,
-            'created_by' => $actorId,
-            'updated_by' => $actorId,
+            'created_by' => $context['actor']->id,
+            'updated_by' => $context['actor']->id,
             'created_at' => $at,
             'updated_at' => $at,
         ]);
@@ -1172,9 +1172,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'journal_number' => $number,
                 'journal_number_year' => 2026,
                 'journal_sequence_number' => $sequence,
-                'posted_by' => $actorId,
+                'posted_by' => $context['actor']->id,
                 'posted_at' => $at,
-                'updated_by' => $actorId,
+                'updated_by' => $context['actor']->id,
                 'updated_at' => $at,
             ]);
 
@@ -1236,8 +1236,8 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'origin' => 'reversal',
             'source_type' => 'journal_entry',
             'source_id' => $target->id,
-            'created_by' => $context['actor']->id,
-            'updated_by' => $context['actor']->id,
+            'created_by' => $actorId,
+            'updated_by' => $actorId,
             'created_at' => $at,
             'updated_at' => $at,
             'reverses_journal_entry_id' => $target->id,
@@ -1279,9 +1279,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'journal_number' => $number,
                 'journal_number_year' => 2026,
                 'journal_sequence_number' => $sequence,
-                'posted_by' => $context['actor']->id,
+                'posted_by' => $actorId,
                 'posted_at' => $at,
-                'updated_by' => $context['actor']->id,
+                'updated_by' => $actorId,
                 'updated_at' => $at,
             ]);
 
