@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Tenant;
+use App\Models\TenantUser;
+use App\Models\User;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
@@ -11,9 +14,6 @@ use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
-use App\Models\Tenant;
-use App\Models\TenantUser;
-use App\Models\User;
 use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -715,8 +715,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('tenant_id', $context['tenant_id'])
             ->where('entitlement_id', $fixture['source']['id'])
             ->update([
-                'source_correction_operation_id' =>
-                    $variant === 'link_source_operation'
+                'source_correction_operation_id' => $variant === 'link_source_operation'
                         ? (string) Str::ulid()
                         : $sourceCorrectionOperationId,
                 'updated_at' => $at,
@@ -754,12 +753,10 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('id', $fixture['graph']['transition_id'])
             ->update([
                 'status' => 'reversed',
-                'reversal_operation_id' =>
-                    $variant === 'transition_operation'
+                'reversal_operation_id' => $variant === 'transition_operation'
                         ? (string) Str::ulid()
                         : $reversalOperationId,
-                'reversal_source_operation_id' =>
-                    $variant === 'transition_source_operation'
+                'reversal_source_operation_id' => $variant === 'transition_source_operation'
                         ? (string) Str::ulid()
                         : $sourceCorrectionOperationId,
                 'reversal_reason' => $variant === 'transition_reason'
@@ -897,22 +894,15 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
             'position_type' => 'CONTRACT_ASSET',
-            'origin_recognition_type' =>
-                'PERFORMANCE_ACCOUNTING_RECOGNITION',
-            'origin_recognition_id' =>
-                $originalOrigin->origin_recognition_id,
-            'origin_journal_entry_id' =>
-                $originalOrigin->origin_journal_entry_id,
+            'origin_recognition_type' => 'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            'origin_recognition_id' => $originalOrigin->origin_recognition_id,
+            'origin_journal_entry_id' => $originalOrigin->origin_journal_entry_id,
             'account_id' => $originalOrigin->account_id,
-            'economic_source_type' =>
-                $originalOrigin->economic_source_type,
+            'economic_source_type' => $originalOrigin->economic_source_type,
             'economic_source_id' => $originalOrigin->economic_source_id,
-            'consideration_transition_id' =>
-                $originalOrigin->consideration_transition_id,
-            'consideration_lot_id' =>
-                $fixture['non_consumed_lot_id'],
-            'economic_leg_identity' =>
-                'PERFORMANCE_ASSET:SUBSTITUTED:'.
+            'consideration_transition_id' => $originalOrigin->consideration_transition_id,
+            'consideration_lot_id' => $fixture['non_consumed_lot_id'],
+            'economic_leg_identity' => 'PERFORMANCE_ASSET:SUBSTITUTED:'.
                 $fixture['non_consumed_lot_id'],
             'origin_amount' => '1000.00',
             'currency' => 'SAR',
@@ -927,11 +917,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'id' => $recognitionId,
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
-            'contractual_billing_entitlement_id' =>
-                $fixture['source']['id'],
+            'contractual_billing_entitlement_id' => $fixture['source']['id'],
             'receivable_id' => $fixture['receivable_id'],
-            'billing_consideration_transition_id' =>
-                $fixture['billing_graph']['transition_id'],
+            'billing_consideration_transition_id' => $fixture['billing_graph']['transition_id'],
             'recognition_kind' => 'original',
             'receivable_ar_operation_id' => (string) Str::ulid(),
             'receivable_amount' => '1000.00',
@@ -940,15 +928,11 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'currency' => 'SAR',
             'accounting_date' => $fixture['entitlement']->economic_date,
             'receivable_ar_policy_id' => $fixture['ar_policy']->id,
-            'receivable_ar_policy_version' =>
-                $fixture['ar_policy']->policy_version,
-            'counterpart_policy_id' =>
-                $fixture['counterpart_policy']->id,
-            'counterpart_policy_version' =>
-                $fixture['counterpart_policy']->policy_version,
+            'receivable_ar_policy_version' => $fixture['ar_policy']->policy_version,
+            'counterpart_policy_id' => $fixture['counterpart_policy']->id,
+            'counterpart_policy_version' => $fixture['counterpart_policy']->policy_version,
             'ar_control_account_id' => $fixture['accounts']['ar'],
-            'counterpart_contract_asset_account_id' =>
-                $fixture['accounts']['asset'],
+            'counterpart_contract_asset_account_id' => $fixture['accounts']['asset'],
             'contract_liability_account_id' => null,
             'journal_entry_id' => $journalId,
             'status' => 'posted',
@@ -968,12 +952,10 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
             'origin_id' => $substitutedOriginId,
-            'consuming_recognition_type' =>
-                'RECEIVABLE_AR_RECOGNITION',
+            'consuming_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
             'consuming_recognition_id' => $recognitionId,
             'consuming_journal_entry_id' => $journalId,
-            'consideration_transition_id' =>
-                $fixture['billing_graph']['transition_id'],
+            'consideration_transition_id' => $fixture['billing_graph']['transition_id'],
             'consideration_lot_id' => $successorLotId,
             'economic_leg_identity' => $leg,
             'amount' => '1000.00',
