@@ -11,6 +11,9 @@ use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
+use App\Models\Tenant;
+use App\Models\TenantUser;
+use App\Models\User;
 use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -195,8 +198,18 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         foreach ([
             'recognition_operation',
             'origin_operation',
+            'link_source_operation',
+            'transition_operation',
+            'transition_source_operation',
+            'recognition_actor',
+            'transition_actor',
+            'journal_actor',
             'recognition_timestamp',
+            'origin_timestamp',
+            'transition_timestamp',
             'receivable_reason',
+            'transition_reason',
+            'transition_reference',
             'journal_reason',
         ] as $variant) {
             $fixture = $this->recognizedEarlyBillingFixture();
@@ -220,6 +233,21 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         $this->assertDirectSqlRejected(function () use ($fixture): void {
             $this->insertDirectAssetRecognitionWithWrongEdgeIdentity(
                 $fixture,
+            );
+        });
+    }
+
+    public function test_direct_sql_rejects_substitution_of_nonconsumed_contract_asset_origin(): void
+    {
+        $fixture = $this->unrecognizedAssetBillingContext();
+
+        $this->assertDirectSqlRejected(function () use ($fixture): void {
+            $this->insertDirectAssetRecognitionWithSubstitutedOrigin(
+                $fixture,
+            );
+
+            DB::statement(
+                'SET CONSTRAINTS receivable_ar_consumption_final IMMEDIATE',
             );
         });
     }
@@ -476,6 +504,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'source' => $source,
             'billing_graph' => $billingGraph,
             'performance_origin' => $performanceOrigin,
+            'non_consumed_lot_id' => $consideration['genesis_lot_id'],
             'receivable_id' => $receivableId,
             'entitlement' => $entitlement,
             'ar_policy' => $arPolicy,
@@ -618,6 +647,27 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         $reference = 'AR/DIRECT/'.$sourceCorrectionOperationId;
         $at = now();
 
+        $alternateActorId = null;
+
+        if (in_array($variant, [
+            'recognition_actor',
+            'transition_actor',
+            'journal_actor',
+        ], true)) {
+            $tenant = Tenant::query()->findOrFail(
+                $context['tenant_id'],
+            );
+            $alternateActor = User::factory()->create([
+                'status' => User::STATUS_ACTIVE,
+            ]);
+            TenantUser::factory()
+                ->forTenant($tenant)
+                ->forUser($alternateActor)
+                ->active()
+                ->create();
+            $alternateActorId = $alternateActor->id;
+        }
+
         $journalReason = $variant === 'journal_reason'
             ? 'Mismatched Journal reversal reason'
             : $reason;
@@ -626,6 +676,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $context,
             $recognition,
             $journalReason,
+            $variant === 'journal_actor'
+                ? $alternateActorId
+                : null,
         );
 
         DB::table('accounting_position_origins')
@@ -636,7 +689,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'reversal_origin_operation_id' => $variant === 'origin_operation'
                         ? (string) Str::ulid()
                         : $reversalOperationId,
-                'reversed_at' => $at,
+                'reversed_at' => $variant === 'origin_timestamp'
+                        ? $at->copy()->addSecond()
+                        : $at,
             ]);
 
         DB::table('receivable_ar_recognitions')
@@ -648,7 +703,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                         ? (string) Str::ulid()
                         : $reversalOperationId,
                 'reversal_journal_entry_id' => $reversalJournalId,
-                'reversed_by' => $context['actor']->id,
+                'reversed_by' => $variant === 'recognition_actor'
+                        ? $alternateActorId
+                        : $context['actor']->id,
                 'reversed_at' => $variant === 'recognition_timestamp'
                         ? $at->copy()->addSecond()
                         : $at,
@@ -658,7 +715,10 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('tenant_id', $context['tenant_id'])
             ->where('entitlement_id', $fixture['source']['id'])
             ->update([
-                'source_correction_operation_id' => $sourceCorrectionOperationId,
+                'source_correction_operation_id' =>
+                    $variant === 'link_source_operation'
+                        ? (string) Str::ulid()
+                        : $sourceCorrectionOperationId,
                 'updated_at' => $at,
             ]);
 
@@ -694,12 +754,26 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('id', $fixture['graph']['transition_id'])
             ->update([
                 'status' => 'reversed',
-                'reversal_operation_id' => $reversalOperationId,
-                'reversal_source_operation_id' => $sourceCorrectionOperationId,
-                'reversal_reason' => $reason,
-                'reversal_reference' => $reference,
-                'reversed_by' => $context['actor']->id,
-                'reversed_at' => $at,
+                'reversal_operation_id' =>
+                    $variant === 'transition_operation'
+                        ? (string) Str::ulid()
+                        : $reversalOperationId,
+                'reversal_source_operation_id' =>
+                    $variant === 'transition_source_operation'
+                        ? (string) Str::ulid()
+                        : $sourceCorrectionOperationId,
+                'reversal_reason' => $variant === 'transition_reason'
+                        ? 'Mismatched Transition reversal reason'
+                        : $reason,
+                'reversal_reference' => $variant === 'transition_reference'
+                        ? 'AR/DIRECT/MISMATCHED'
+                        : $reference,
+                'reversed_by' => $variant === 'transition_actor'
+                        ? $alternateActorId
+                        : $context['actor']->id,
+                'reversed_at' => $variant === 'transition_timestamp'
+                        ? $at->copy()->addSecond()
+                        : $at,
             ]);
 
         DB::table('contractual_billing_schedules')
@@ -794,6 +868,132 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'amount' => '1000.00',
             'currency' => 'SAR',
             'economic_leg_identity' => $wrongLeg,
+            'created_at' => $now,
+        ]);
+    }
+
+    private function insertDirectAssetRecognitionWithSubstitutedOrigin(
+        array $fixture,
+    ): void {
+        $context = $fixture['context'];
+        $recognitionId = (string) Str::ulid();
+
+        [$journalId, $lineIds] = $this->createDirectBusinessJournal(
+            $context,
+            $recognitionId,
+            (string) $fixture['entitlement']->economic_date,
+            [
+                [$fixture['accounts']['ar'], '1000.00', '0.00'],
+                [$fixture['accounts']['asset'], '0.00', '1000.00'],
+            ],
+        );
+
+        $now = now();
+        $originalOrigin = $fixture['performance_origin'];
+        $substitutedOriginId = (string) Str::ulid();
+
+        DB::table('accounting_position_origins')->insert([
+            'id' => $substitutedOriginId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'position_type' => 'CONTRACT_ASSET',
+            'origin_recognition_type' =>
+                'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            'origin_recognition_id' =>
+                $originalOrigin->origin_recognition_id,
+            'origin_journal_entry_id' =>
+                $originalOrigin->origin_journal_entry_id,
+            'account_id' => $originalOrigin->account_id,
+            'economic_source_type' =>
+                $originalOrigin->economic_source_type,
+            'economic_source_id' => $originalOrigin->economic_source_id,
+            'consideration_transition_id' =>
+                $originalOrigin->consideration_transition_id,
+            'consideration_lot_id' =>
+                $fixture['non_consumed_lot_id'],
+            'economic_leg_identity' =>
+                'PERFORMANCE_ASSET:SUBSTITUTED:'.
+                $fixture['non_consumed_lot_id'],
+            'origin_amount' => '1000.00',
+            'currency' => 'SAR',
+            'accounting_date' => $originalOrigin->accounting_date,
+            'status' => 'effective',
+            'created_at' => $now,
+            'reversal_origin_operation_id' => null,
+            'reversed_at' => null,
+        ]);
+
+        DB::table('receivable_ar_recognitions')->insert([
+            'id' => $recognitionId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'contractual_billing_entitlement_id' =>
+                $fixture['source']['id'],
+            'receivable_id' => $fixture['receivable_id'],
+            'billing_consideration_transition_id' =>
+                $fixture['billing_graph']['transition_id'],
+            'recognition_kind' => 'original',
+            'receivable_ar_operation_id' => (string) Str::ulid(),
+            'receivable_amount' => '1000.00',
+            'contract_asset_release_amount' => '1000.00',
+            'contract_liability_creation_amount' => '0.00',
+            'currency' => 'SAR',
+            'accounting_date' => $fixture['entitlement']->economic_date,
+            'receivable_ar_policy_id' => $fixture['ar_policy']->id,
+            'receivable_ar_policy_version' =>
+                $fixture['ar_policy']->policy_version,
+            'counterpart_policy_id' =>
+                $fixture['counterpart_policy']->id,
+            'counterpart_policy_version' =>
+                $fixture['counterpart_policy']->policy_version,
+            'ar_control_account_id' => $fixture['accounts']['ar'],
+            'counterpart_contract_asset_account_id' =>
+                $fixture['accounts']['asset'],
+            'contract_liability_account_id' => null,
+            'journal_entry_id' => $journalId,
+            'status' => 'posted',
+            'created_by' => $context['actor']->id,
+            'created_at' => $now,
+        ]);
+
+        $consumptionId = (string) Str::ulid();
+        $successorLotId = $fixture['billing_graph']['lot_id'];
+        $leg = 'AR:CONSUME:'.
+            $fixture['billing_graph']['transition_id'].':'.
+            $fixture['non_consumed_lot_id'].':'.
+            $successorLotId;
+
+        DB::table('accounting_position_consumptions')->insert([
+            'id' => $consumptionId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'origin_id' => $substitutedOriginId,
+            'consuming_recognition_type' =>
+                'RECEIVABLE_AR_RECOGNITION',
+            'consuming_recognition_id' => $recognitionId,
+            'consuming_journal_entry_id' => $journalId,
+            'consideration_transition_id' =>
+                $fixture['billing_graph']['transition_id'],
+            'consideration_lot_id' => $successorLotId,
+            'economic_leg_identity' => $leg,
+            'amount' => '1000.00',
+            'currency' => 'SAR',
+            'status' => 'effective',
+            'created_at' => $now,
+        ]);
+
+        DB::table(
+            'accounting_position_consumption_journal_line_allocations',
+        )->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'consumption_id' => $consumptionId,
+            'journal_entry_id' => $journalId,
+            'journal_line_id' => $lineIds[1],
+            'amount' => '1000.00',
+            'currency' => 'SAR',
+            'economic_leg_identity' => $leg,
             'created_at' => $now,
         ]);
     }
@@ -918,8 +1118,8 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'origin' => 'business',
             'source_type' => 'receivable_ar_recognition',
             'source_id' => $recognitionId,
-            'created_by' => $context['actor']->id,
-            'updated_by' => $context['actor']->id,
+            'created_by' => $actorId,
+            'updated_by' => $actorId,
             'created_at' => $at,
             'updated_at' => $at,
         ]);
@@ -972,9 +1172,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'journal_number' => $number,
                 'journal_number_year' => 2026,
                 'journal_sequence_number' => $sequence,
-                'posted_by' => $context['actor']->id,
+                'posted_by' => $actorId,
                 'posted_at' => $at,
-                'updated_by' => $context['actor']->id,
+                'updated_by' => $actorId,
                 'updated_at' => $at,
             ]);
 
@@ -1006,7 +1206,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         array $context,
         object $recognition,
         string $reason,
+        ?int $actorId = null,
     ): string {
+        $actorId ??= $context['actor']->id;
         $target = DB::table('journal_entries')
             ->where('tenant_id', $context['tenant_id'])
             ->where('id', $recognition->journal_entry_id)
