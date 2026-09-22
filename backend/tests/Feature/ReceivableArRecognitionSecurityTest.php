@@ -133,6 +133,61 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         );
     }
 
+    public function test_direct_sql_exact_reversal_cannot_commit_while_recognition_remains_posted(): void
+    {
+        [$context, $recognition] = $this->recognizedContext();
+
+        $this->assertDirectSqlRejected(function () use (
+            $context,
+            $recognition,
+        ): void {
+            $this->createDirectReversalJournal(
+                $context,
+                $recognition,
+                'Forged direct reversal',
+            );
+        });
+    }
+
+    public function test_direct_sql_standalone_recognition_reversal_cannot_commit_without_source_reversal(): void
+    {
+        [$context, $recognition, $origin] = $this->recognizedContext();
+
+        $this->assertDirectSqlRejected(function () use (
+            $context,
+            $recognition,
+            $origin,
+        ): void {
+            $operationId = (string) Str::ulid();
+            $reversedAt = now();
+            $reversalJournalId = $this->createDirectReversalJournal(
+                $context,
+                $recognition,
+                'Standalone AR reversal',
+            );
+
+            DB::table('accounting_position_origins')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('id', $origin->id)
+                ->update([
+                    'status' => 'reversed',
+                    'reversal_origin_operation_id' => $operationId,
+                    'reversed_at' => $reversedAt,
+                ]);
+
+            DB::table('receivable_ar_recognitions')
+                ->where('tenant_id', $context['tenant_id'])
+                ->where('id', $recognition->id)
+                ->update([
+                    'status' => 'reversed',
+                    'reversal_operation_id' => $operationId,
+                    'reversal_journal_entry_id' => $reversalJournalId,
+                    'reversed_by' => $context['actor']->id,
+                    'reversed_at' => $reversedAt,
+                ]);
+        });
+    }
+
     private function recognizedContext(): array
     {
         $context = $this->considerationContext();
@@ -240,6 +295,111 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         self::assertNotNull($origin);
 
         return [$context, $recognition, $origin];
+    }
+
+    private function assertDirectSqlRejected(callable $callback): void
+    {
+        DB::beginTransaction();
+
+        try {
+            $callback();
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            self::fail(
+                'PostgreSQL accepted inconsistent Receivable AR final state.',
+            );
+        } catch (QueryException $exception) {
+            self::assertContains(
+                (string) ($exception->errorInfo[0] ?? ''),
+                ['23514', '23503', '55000'],
+                $exception->getMessage(),
+            );
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    private function createDirectReversalJournal(
+        array $context,
+        object $recognition,
+        string $reason,
+    ): string {
+        $target = DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $recognition->journal_entry_id)
+            ->first();
+
+        self::assertNotNull($target);
+
+        $lines = DB::table('journal_lines')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('journal_entry_id', $target->id)
+            ->orderBy('line_number')
+            ->get();
+
+        self::assertGreaterThanOrEqual(2, $lines->count());
+
+        $id = (string) Str::ulid();
+        $at = now();
+
+        DB::table('journal_entries')->insert([
+            'id' => $id,
+            'tenant_id' => $context['tenant_id'],
+            'entry_date' => $target->entry_date,
+            'description' => 'Direct SQL reversal fixture',
+            'status' => 'draft',
+            'origin' => 'reversal',
+            'source_type' => 'journal_entry',
+            'source_id' => $target->id,
+            'created_by' => $context['actor']->id,
+            'updated_by' => $context['actor']->id,
+            'created_at' => $at,
+            'updated_at' => $at,
+            'reverses_journal_entry_id' => $target->id,
+            'reversal_reason' => $reason,
+        ]);
+
+        foreach ($lines as $line) {
+            DB::table('journal_lines')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $context['tenant_id'],
+                'journal_entry_id' => $id,
+                'line_number' => $line->line_number,
+                'account_id' => $line->account_id,
+                'debit' => $line->credit,
+                'credit' => $line->debit,
+                'memo' => $line->memo,
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+        }
+
+        $sequence = ((int) DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('journal_number_year', 2026)
+            ->max('journal_sequence_number')) + 1;
+        $number = 'JRN-2026-'.str_pad(
+            (string) $sequence,
+            max(3, strlen((string) $sequence)),
+            '0',
+            STR_PAD_LEFT,
+        );
+
+        DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $id)
+            ->update([
+                'status' => 'posted',
+                'accounting_period_id' => $target->accounting_period_id,
+                'journal_number' => $number,
+                'journal_number_year' => 2026,
+                'journal_sequence_number' => $sequence,
+                'posted_by' => $context['actor']->id,
+                'posted_at' => $at,
+                'updated_by' => $context['actor']->id,
+                'updated_at' => $at,
+            ]);
+
+        return $id;
     }
 
     private function account(
