@@ -190,6 +190,29 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         });
     }
 
+    public function test_direct_sql_rejects_mismatched_receivable_ar_source_reversal_provenance(): void
+    {
+        foreach ([
+            'recognition_operation',
+            'origin_operation',
+            'recognition_timestamp',
+            'receivable_reason',
+            'journal_reason',
+        ] as $variant) {
+            $fixture = $this->recognizedEarlyBillingFixture();
+
+            $this->assertDirectSqlRejected(function () use (
+                $fixture,
+                $variant,
+            ): void {
+                $this->applyDirectPairedReversal(
+                    $fixture,
+                    $variant,
+                );
+            });
+        }
+    }
+
     public function test_direct_sql_rejects_receivable_ar_consumption_with_noncanonical_edge_identity(): void
     {
         $fixture = $this->unrecognizedAssetBillingContext();
@@ -247,6 +270,42 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         self::assertNotNull($origin);
 
         return [$fixture['context'], $recognition, $origin];
+    }
+
+    private function recognizedEarlyBillingFixture(): array
+    {
+        $fixture = $this->unrecognizedEarlyBillingContext();
+
+        $recognitionId = app(RecognizeReceivableAr::class)->execute(
+            $fixture['context']['tenant_id'],
+            $fixture['context']['actor'],
+            [
+                'contractual_billing_entitlement_id' =>
+                    $fixture['source']['id'],
+                'receivable_ar_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $recognition = DB::table('receivable_ar_recognitions')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where('id', $recognitionId)
+            ->first();
+        $origin = DB::table('accounting_position_origins')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where(
+                'origin_recognition_type',
+                'RECEIVABLE_AR_RECOGNITION',
+            )
+            ->where('origin_recognition_id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($recognition);
+        self::assertNotNull($origin);
+
+        $fixture['recognition'] = $recognition;
+        $fixture['origin'] = $origin;
+
+        return $fixture;
     }
 
     private function unrecognizedAssetBillingContext(): array
@@ -547,6 +606,125 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'liability' => $liability,
             ],
         ];
+    }
+
+    private function applyDirectPairedReversal(
+        array $fixture,
+        string $variant,
+    ): void {
+        $context = $fixture['context'];
+        $recognition = $fixture['recognition'];
+        $origin = $fixture['origin'];
+        $reversalOperationId = (string) Str::ulid();
+        $sourceCorrectionOperationId = (string) Str::ulid();
+        $reason = 'Direct SQL source correction';
+        $reference = 'AR/DIRECT/'.$sourceCorrectionOperationId;
+        $at = now();
+
+        $journalReason = $variant === 'journal_reason'
+            ? 'Mismatched Journal reversal reason'
+            : $reason;
+
+        $reversalJournalId = $this->createDirectReversalJournal(
+            $context,
+            $recognition,
+            $journalReason,
+        );
+
+        DB::table('accounting_position_origins')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $origin->id)
+            ->update([
+                'status' => 'reversed',
+                'reversal_origin_operation_id' =>
+                    $variant === 'origin_operation'
+                        ? (string) Str::ulid()
+                        : $reversalOperationId,
+                'reversed_at' => $at,
+            ]);
+
+        DB::table('receivable_ar_recognitions')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $recognition->id)
+            ->update([
+                'status' => 'reversed',
+                'reversal_operation_id' =>
+                    $variant === 'recognition_operation'
+                        ? (string) Str::ulid()
+                        : $reversalOperationId,
+                'reversal_journal_entry_id' => $reversalJournalId,
+                'reversed_by' => $context['actor']->id,
+                'reversed_at' =>
+                    $variant === 'recognition_timestamp'
+                        ? $at->copy()->addSecond()
+                        : $at,
+            ]);
+
+        DB::table('entitlement_receivable_links')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('entitlement_id', $fixture['source']['id'])
+            ->update([
+                'source_correction_operation_id' =>
+                    $sourceCorrectionOperationId,
+                'updated_at' => $at,
+            ]);
+
+        DB::table('receivables')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $fixture['receivable_id'])
+            ->update([
+                'status' => 'cancelled',
+                'cancelled_at' => $at,
+                'cancelled_by' => $context['actor']->id,
+                'cancellation_reason' =>
+                    $variant === 'receivable_reason'
+                        ? 'Mismatched Receivable cancellation reason'
+                        : $reason,
+                'updated_at' => $at,
+            ]);
+
+        DB::table('contractual_billing_entitlements')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $fixture['source']['id'])
+            ->update([
+                'status' => 'reversed',
+                'reversal_operation_id' => $reversalOperationId,
+                'reversed_by' => $context['actor']->id,
+                'reversed_at' => $at,
+                'reversal_reason' => $reason,
+                'source_correction_operation_id' =>
+                    $sourceCorrectionOperationId,
+                'source_rescission_reference' => $reference,
+                'updated_at' => $at,
+            ]);
+
+        DB::table('contract_consideration_transitions')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $fixture['graph']['transition_id'])
+            ->update([
+                'status' => 'reversed',
+                'reversal_operation_id' => $reversalOperationId,
+                'reversal_source_operation_id' =>
+                    $sourceCorrectionOperationId,
+                'reversal_reason' => $reason,
+                'reversal_reference' => $reference,
+                'reversed_by' => $context['actor']->id,
+                'reversed_at' => $at,
+            ]);
+
+        DB::table('contractual_billing_schedules')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $fixture['entitlement']->schedule_id)
+            ->update([
+                'status' => 'cancelled',
+                'source_correction_operation_id' =>
+                    $sourceCorrectionOperationId,
+                'source_corrected_by' => $context['actor']->id,
+                'source_corrected_at' => $at,
+                'source_correction_reason' => $reason,
+                'source_correction_reference' => $reference,
+                'updated_at' => $at,
+            ]);
     }
 
     private function insertDirectAssetRecognitionWithWrongEdgeIdentity(
