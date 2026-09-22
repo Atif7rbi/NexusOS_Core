@@ -8,16 +8,15 @@ use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
 use App\Modules\Accounting\Actions\ReverseJournalAction;
-use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
-use App\Modules\Accounting\DTOs\BusinessPostingRequest;
-use App\Modules\Accounting\DTOs\JournalLineData;
 use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\CorrectPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
+use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
 use App\Modules\AccountingRecognition\Exceptions\AccountingRecognitionConflict;
 use App\Modules\AccountingRecognition\Support\PerformanceAccountingJournalWriter;
+use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use App\Modules\UnitHandover\Actions\ReverseUnitHandoverPerformanceSource;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\QueryException;
@@ -213,7 +212,6 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billingSource,
             $billingGraph,
             $accounts['historical_liability'],
-            $accounts['contract_asset'],
         );
 
         app(AdoptPerformanceAccounting::class)->execute(
@@ -371,14 +369,21 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billing[0]['source'],
             $billing[0]['graph'],
             $accounts['contract_liability'],
-            $accounts['contract_asset'],
         );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->counterpart(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-08-19',
+            $accounts['contract_asset'],
+            $secondLiability,
+        );
+
         $this->createLiabilityOrigin(
             $context,
             $billing[1]['source'],
             $billing[1]['graph'],
             $secondLiability,
-            $accounts['contract_asset'],
         );
 
         app(AdoptPerformanceAccounting::class)->execute(
@@ -1146,7 +1151,6 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             $billingSource,
             $billingGraph,
             $accounts['historical_liability'],
-            $accounts['contract_asset'],
         );
 
         app(AdoptPerformanceAccounting::class)->execute(
@@ -1681,6 +1685,11 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             ],
         );
 
+        $accountsReceivable = $create(
+            'PA-AR',
+            'asset',
+            'current_asset',
+        );
         $contractAsset = $create(
             'PA-CA',
             'asset',
@@ -1704,6 +1713,13 @@ final class PerformanceAccountingRecognitionTest extends TestCase
             'operating_revenue',
         );
 
+        app(ConfigureAccountingRecognitionPolicies::class)->receivableAr(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            $accountsReceivable,
+        );
+
         app(ConfigureAccountingRecognitionPolicies::class)->counterpart(
             $context['tenant_id'],
             $context['actor'],
@@ -1723,6 +1739,7 @@ final class PerformanceAccountingRecognitionTest extends TestCase
 
         return [
             'period' => $period,
+            'accounts_receivable' => $accountsReceivable,
             'contract_asset' => $contractAsset,
             'contract_liability' => $contractLiability,
             'historical_liability' => $historicalLiability,
@@ -1826,100 +1843,63 @@ final class PerformanceAccountingRecognitionTest extends TestCase
         array $source,
         array $graph,
         string $liabilityAccountId,
-        string $debitAccountId,
     ): string {
-        $result = DB::transaction(
-            fn () => app(BusinessPostingServiceInterface::class)->post(
-                new BusinessPostingRequest(
-                    $context['tenant_id'],
-                    $context['actor']->id,
-                    'receivable_recognition',
-                    (string) Str::ulid(),
-                    'SAR',
-                    $source['economic_date'],
-                    'Early billing Contract Liability provenance fixture',
-                    [
-                        new JournalLineData(
-                            $debitAccountId,
-                            $source['amount'],
-                            '0.00',
-                        ),
-                        new JournalLineData(
-                            $liabilityAccountId,
-                            '0.00',
-                            $source['amount'],
-                        ),
-                    ],
-                ),
-            ),
+        $receivableId = app(EstablishEntitlementReceivable::class)->execute(
+            $context['tenant_id'],
+            $source['id'],
+            $context['actor'],
+            [
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
+            ],
         );
 
-        $liabilityLine = DB::table('journal_lines')
+        $recognitionId = app(RecognizeReceivableAr::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contractual_billing_entitlement_id' => $source['id'],
+                'receivable_ar_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $recognition = DB::table('receivable_ar_recognitions')
             ->where('tenant_id', $context['tenant_id'])
-            ->where('journal_entry_id', $result->journalEntryId)
-            ->where('account_id', $liabilityAccountId)
+            ->where('id', $recognitionId)
             ->first();
 
-        if ($liabilityLine === null) {
-            throw new \LogicException('Missing Contract Liability Journal line fixture.');
+        if (
+            $recognition === null
+            || $recognition->receivable_id !== $receivableId
+            || $recognition->billing_consideration_transition_id
+                !== $graph['transition_id']
+            || $recognition->contract_liability_account_id
+                !== $liabilityAccountId
+        ) {
+            throw new \LogicException(
+                'Missing canonical Receivable AR Contract Liability fixture.',
+            );
         }
 
-        $originId = (string) Str::ulid();
-        $recognitionId = (string) Str::ulid();
-        $leg = 'AR:ORIGIN:'.$graph['transition_id'].':'.$graph['lot_id'];
-        $now = now();
+        $origin = DB::table('accounting_position_origins')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where(
+                'origin_recognition_type',
+                'RECEIVABLE_AR_RECOGNITION',
+            )
+            ->where('origin_recognition_id', $recognitionId)
+            ->where('consideration_lot_id', $graph['lot_id'])
+            ->first();
 
-        DB::transaction(function () use (
-            $context,
-            $source,
-            $graph,
-            $liabilityAccountId,
-            $result,
-            $liabilityLine,
-            $originId,
-            $recognitionId,
-            $leg,
-            $now,
-        ): void {
-            DB::table('accounting_position_origins')->insert([
-                'id' => $originId,
-                'tenant_id' => $context['tenant_id'],
-                'contract_id' => $context['contract_id'],
-                'position_type' => 'CONTRACT_LIABILITY',
-                'origin_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
-                'origin_recognition_id' => $recognitionId,
-                'origin_journal_entry_id' => $result->journalEntryId,
-                'account_id' => $liabilityAccountId,
-                'economic_source_type' => 'CONTRACTUAL_BILLING_ENTITLEMENT',
-                'economic_source_id' => $source['id'],
-                'consideration_transition_id' => $graph['transition_id'],
-                'consideration_lot_id' => $graph['lot_id'],
-                'economic_leg_identity' => $leg,
-                'origin_amount' => $source['amount'],
-                'currency' => 'SAR',
-                'accounting_date' => $source['economic_date'],
-                'status' => 'effective',
-                'created_at' => $now,
-                'reversal_origin_operation_id' => null,
-                'reversed_at' => null,
-            ]);
+        if (
+            $origin === null
+            || $origin->account_id !== $liabilityAccountId
+            || $origin->origin_amount !== $source['amount']
+        ) {
+            throw new \LogicException(
+                'Missing canonical Receivable AR liability origin fixture.',
+            );
+        }
 
-            DB::table(
-                'accounting_position_origin_journal_line_allocations',
-            )->insert([
-                'id' => (string) Str::ulid(),
-                'tenant_id' => $context['tenant_id'],
-                'contract_id' => $context['contract_id'],
-                'origin_id' => $originId,
-                'journal_entry_id' => $result->journalEntryId,
-                'journal_line_id' => $liabilityLine->id,
-                'amount' => $source['amount'],
-                'currency' => 'SAR',
-                'economic_leg_identity' => $leg,
-                'created_at' => $now,
-            ]);
-        });
-
-        return $originId;
+        return (string) $origin->id;
     }
 }

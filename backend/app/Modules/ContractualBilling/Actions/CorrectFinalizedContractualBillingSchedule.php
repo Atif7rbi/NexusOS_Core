@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\ContractualBilling\Actions;
 
 use App\Models\User;
+use App\Modules\AccountingRecognition\Support\ReceivableArSourceCorrectionCoordinator;
 use App\Modules\ContractConsideration\Support\ContractConsiderationSourceCoordinator;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingConflict;
 use App\Modules\ContractualBilling\Exceptions\ContractualBillingValidationFailed;
@@ -23,6 +24,7 @@ final class CorrectFinalizedContractualBillingSchedule
         private readonly ContractualBillingTransaction $tx,
         private readonly ContractualBillingAuthorization $auth,
         private readonly EntitlementReceivableSourceCorrection $receivableCorrection,
+        private readonly ReceivableArSourceCorrectionCoordinator $receivableArCorrection,
         private readonly ContractConsiderationSourceCoordinator $consideration,
     ) {}
 
@@ -177,6 +179,20 @@ final class CorrectFinalizedContractualBillingSchedule
                 ->lockForFirstCorrection($tenantId, $entitlements);
 
             $now = CarbonImmutable::now('UTC');
+
+            /*
+             * Accounting-owned downstream truth is reversed before the
+             * Receivable and economic source are cancelled. The AR coordinator
+             * uses the already-locked Entitlement/Link/Receivable corridor and
+             * fails closed if dependent accounting consumption is still effective.
+             */
+            $this->receivableArCorrection->reverseLockedSet(
+                $tenantId,
+                $facts['entitlement_reversals'],
+                $actor,
+                $facts['source_correction_reason'],
+                $now,
+            );
 
             $this->receivableCorrection->cancelLinkedReceivables(
                 $tenantId,
@@ -360,6 +376,11 @@ final class CorrectFinalizedContractualBillingSchedule
             $tenantId,
             $entitlements,
             $facts['source_correction_operation_id'],
+        );
+
+        $this->receivableArCorrection->assertReplay(
+            $tenantId,
+            $facts['entitlement_reversals'],
         );
 
         $this->consideration->reverseBillingEntitlements(
