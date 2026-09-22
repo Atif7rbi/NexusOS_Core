@@ -296,6 +296,10 @@ return new class extends Migration
               ar_debit numeric(19,2);
               journal_debits numeric(19,2);
               journal_credits numeric(19,2);
+              ar_line_count integer;
+              journal_line_count integer;
+              asset_credit_account_count integer;
+              expected_line_count integer;
             BEGIN
               SELECT * INTO r
               FROM public.receivable_ar_recognitions
@@ -391,15 +395,55 @@ return new class extends Migration
                   MESSAGE='Receivable AR source, policy or Journal ownership is inconsistent';
               END IF;
 
-              IF r.status='posted' AND (
-                e.status<>'effective'
-                OR rec.status<>'recognized'
-                OR l.source_correction_operation_id IS NOT NULL
-                OR t.status<>'effective'
-              ) THEN
-                RAISE EXCEPTION USING
-                  ERRCODE='23514',
-                  MESSAGE='Effective Receivable AR requires effective source truth';
+              IF r.status='posted' THEN
+                IF e.status<>'effective'
+                   OR rec.status<>'recognized'
+                   OR l.source_correction_operation_id IS NOT NULL
+                   OR t.status<>'effective'
+                THEN
+                  RAISE EXCEPTION USING
+                    ERRCODE='23514',
+                    MESSAGE='Effective Receivable AR requires effective source truth';
+                END IF;
+
+                IF EXISTS (
+                  SELECT 1
+                  FROM public.journal_entries direct_reversal
+                  WHERE direct_reversal.tenant_id=r.tenant_id
+                    AND direct_reversal.reverses_journal_entry_id=r.journal_entry_id
+                ) THEN
+                  RAISE EXCEPTION USING
+                    ERRCODE='23514',
+                    MESSAGE='Posted Receivable AR cannot retain a reversed owned Journal';
+                END IF;
+              ELSE
+                IF e.status<>'reversed'
+                   OR rec.status<>'cancelled'
+                   OR t.status<>'reversed'
+                   OR e.reversal_operation_id IS DISTINCT FROM
+                      r.reversal_operation_id
+                   OR t.reversal_operation_id IS DISTINCT FROM
+                      r.reversal_operation_id
+                   OR l.source_correction_operation_id IS DISTINCT FROM
+                      e.source_correction_operation_id
+                   OR t.reversal_source_operation_id IS DISTINCT FROM
+                      e.source_correction_operation_id
+                   OR rec.cancelled_by IS DISTINCT FROM e.reversed_by
+                   OR r.reversed_by IS DISTINCT FROM e.reversed_by
+                   OR t.reversed_by IS DISTINCT FROM e.reversed_by
+                   OR rec.cancelled_at IS DISTINCT FROM e.reversed_at
+                   OR r.reversed_at IS DISTINCT FROM e.reversed_at
+                   OR t.reversed_at IS DISTINCT FROM e.reversed_at
+                   OR rec.cancellation_reason IS DISTINCT FROM
+                      e.reversal_reason
+                   OR t.reversal_reason IS DISTINCT FROM e.reversal_reason
+                   OR t.reversal_reference IS DISTINCT FROM
+                      e.source_rescission_reference
+                THEN
+                  RAISE EXCEPTION USING
+                    ERRCODE='23514',
+                    MESSAGE='Reversed Receivable AR must match authoritative source reversal truth';
+                END IF;
               END IF;
 
               SELECT
@@ -494,7 +538,15 @@ return new class extends Migration
                            ':'||o.consideration_lot_id)
                        OR o.accounting_date<>r.accounting_date
                        OR (r.status='posted' AND o.status<>'effective')
-                       OR (r.status='reversed' AND o.status<>'reversed')
+                       OR (
+                         r.status='reversed'
+                         AND (
+                           o.status<>'reversed'
+                           OR o.reversal_origin_operation_id IS DISTINCT FROM
+                              r.reversal_operation_id
+                           OR o.reversed_at IS DISTINCT FROM r.reversed_at
+                         )
+                       )
                      )
                  )
               THEN
@@ -516,9 +568,9 @@ return new class extends Migration
                    FROM public.accounting_position_consumptions c
                    JOIN public.accounting_position_origins o
                      ON o.tenant_id=c.tenant_id AND o.id=c.origin_id
-                   JOIN public.contract_consideration_lots lot
-                     ON lot.tenant_id=c.tenant_id
-                    AND lot.id=c.consideration_lot_id
+                   JOIN public.contract_consideration_lots successor_lot
+                     ON successor_lot.tenant_id=c.tenant_id
+                    AND successor_lot.id=c.consideration_lot_id
                    WHERE c.tenant_id=r.tenant_id
                      AND c.consuming_recognition_type='RECEIVABLE_AR_RECOGNITION'
                      AND c.consuming_recognition_id=r.id
@@ -529,13 +581,65 @@ return new class extends Migration
                        OR c.consuming_journal_entry_id<>r.journal_entry_id
                        OR c.consideration_transition_id
                           <>r.billing_consideration_transition_id
-                       OR lot.semantic_position<>'BILLED_EARNED'
-                       OR c.economic_leg_identity NOT LIKE
+                       OR successor_lot.semantic_position<>'BILLED_EARNED'
+                       OR NOT EXISTS (
+                         SELECT 1
+                         FROM public.contract_consideration_transition_lots edge
+                         JOIN public.contract_consideration_lots predecessor_lot
+                           ON predecessor_lot.tenant_id=edge.tenant_id
+                          AND predecessor_lot.id=edge.lot_id
+                         WHERE edge.tenant_id=c.tenant_id
+                           AND edge.transition_id=
+                              r.billing_consideration_transition_id
+                           AND edge.lot_id=o.consideration_lot_id
+                           AND edge.successor_lot_id=c.consideration_lot_id
+                           AND predecessor_lot.semantic_position=
+                              'EARNED_UNBILLED'
+                       )
+                       OR c.economic_leg_identity<>
                           ('AR:CONSUME:'||
-                           r.billing_consideration_transition_id||':%')
+                           r.billing_consideration_transition_id||':'||
+                           o.consideration_lot_id||':'||
+                           c.consideration_lot_id)
                        OR (r.status='posted' AND c.status<>'effective')
-                       OR (r.status='reversed' AND c.status<>'reversed')
+                       OR (
+                         r.status='reversed'
+                         AND (
+                           c.status<>'reversed'
+                           OR c.reversal_operation_id IS DISTINCT FROM
+                              r.reversal_operation_id
+                           OR c.reversed_at IS DISTINCT FROM r.reversed_at
+                         )
+                       )
                      )
+                 )
+                 OR EXISTS (
+                   SELECT 1
+                   FROM public.contract_consideration_transition_lots edge
+                   JOIN public.contract_consideration_lots predecessor_lot
+                     ON predecessor_lot.tenant_id=edge.tenant_id
+                    AND predecessor_lot.id=edge.lot_id
+                   JOIN public.contract_consideration_lots successor_lot
+                     ON successor_lot.tenant_id=edge.tenant_id
+                    AND successor_lot.id=edge.successor_lot_id
+                   WHERE edge.tenant_id=r.tenant_id
+                     AND edge.transition_id=
+                        r.billing_consideration_transition_id
+                     AND predecessor_lot.semantic_position='EARNED_UNBILLED'
+                     AND successor_lot.semantic_position='BILLED_EARNED'
+                     AND edge.consumed_amount IS DISTINCT FROM COALESCE((
+                       SELECT sum(c.amount)
+                       FROM public.accounting_position_consumptions c
+                       JOIN public.accounting_position_origins o
+                         ON o.tenant_id=c.tenant_id
+                        AND o.id=c.origin_id
+                       WHERE c.tenant_id=r.tenant_id
+                         AND c.consuming_recognition_type=
+                            'RECEIVABLE_AR_RECOGNITION'
+                         AND c.consuming_recognition_id=r.id
+                         AND o.consideration_lot_id=edge.lot_id
+                         AND c.consideration_lot_id=edge.successor_lot_id
+                     ),0)
                  )
               THEN
                 RAISE EXCEPTION USING
@@ -587,26 +691,105 @@ return new class extends Migration
                   MESSAGE='Receivable AR Journal-line provenance allocation is inconsistent';
               END IF;
 
-              SELECT COALESCE(sum(debit),0)
-              INTO ar_debit
-              FROM public.journal_lines
-              WHERE tenant_id=r.tenant_id
-                AND journal_entry_id=r.journal_entry_id
-                AND account_id=r.ar_control_account_id;
-
-              SELECT COALESCE(sum(debit),0),COALESCE(sum(credit),0)
-              INTO journal_debits,journal_credits
+              SELECT
+                COALESCE(sum(debit),0),
+                count(*) FILTER (
+                  WHERE account_id=r.ar_control_account_id
+                    AND debit=r.receivable_amount
+                    AND credit=0
+                ),
+                count(*),
+                COALESCE(sum(debit),0),
+                COALESCE(sum(credit),0)
+              INTO
+                ar_debit,
+                ar_line_count,
+                journal_line_count,
+                journal_debits,
+                journal_credits
               FROM public.journal_lines
               WHERE tenant_id=r.tenant_id
                 AND journal_entry_id=r.journal_entry_id;
 
-              IF ar_debit IS DISTINCT FROM r.receivable_amount
+              SELECT count(DISTINCT o.account_id)
+              INTO asset_credit_account_count
+              FROM public.accounting_position_consumptions c
+              JOIN public.accounting_position_origins o
+                ON o.tenant_id=c.tenant_id AND o.id=c.origin_id
+              WHERE c.tenant_id=r.tenant_id
+                AND c.consuming_recognition_type=
+                   'RECEIVABLE_AR_RECOGNITION'
+                AND c.consuming_recognition_id=r.id;
+
+              expected_line_count:=1+asset_credit_account_count+
+                CASE WHEN liability_amount>0 THEN 1 ELSE 0 END;
+
+              IF ar_line_count<>1
+                 OR EXISTS (
+                   SELECT 1
+                   FROM public.journal_lines jl
+                   WHERE jl.tenant_id=r.tenant_id
+                     AND jl.journal_entry_id=r.journal_entry_id
+                     AND jl.debit>0
+                     AND (
+                       jl.account_id<>r.ar_control_account_id
+                       OR jl.debit<>r.receivable_amount
+                     )
+                 )
+                 OR journal_line_count<>expected_line_count
                  OR journal_debits<>r.receivable_amount
                  OR journal_credits<>r.receivable_amount
+                 OR EXISTS (
+                   SELECT 1
+                   FROM (
+                     SELECT o.account_id,sum(c.amount) AS expected_credit
+                     FROM public.accounting_position_consumptions c
+                     JOIN public.accounting_position_origins o
+                       ON o.tenant_id=c.tenant_id AND o.id=c.origin_id
+                     WHERE c.tenant_id=r.tenant_id
+                       AND c.consuming_recognition_type=
+                          'RECEIVABLE_AR_RECOGNITION'
+                       AND c.consuming_recognition_id=r.id
+                     GROUP BY o.account_id
+                   ) expected
+                   WHERE (
+                     SELECT count(*)
+                     FROM public.journal_lines jl
+                     WHERE jl.tenant_id=r.tenant_id
+                       AND jl.journal_entry_id=r.journal_entry_id
+                       AND jl.account_id=expected.account_id
+                       AND jl.debit=0
+                       AND jl.credit=expected.expected_credit
+                   )<>1
+                 )
+                 OR (
+                   liability_amount>0
+                   AND (
+                     SELECT count(*)
+                     FROM public.journal_lines jl
+                     WHERE jl.tenant_id=r.tenant_id
+                       AND jl.journal_entry_id=r.journal_entry_id
+                       AND jl.account_id=r.contract_liability_account_id
+                       AND jl.debit=0
+                       AND jl.credit=liability_amount
+                   )<>1
+                 )
+                 OR (
+                   liability_amount=0
+                   AND EXISTS (
+                     SELECT 1
+                     FROM public.journal_lines jl
+                     WHERE jl.tenant_id=r.tenant_id
+                       AND jl.journal_entry_id=r.journal_entry_id
+                       AND jl.account_id IS NOT DISTINCT FROM
+                          r.contract_liability_account_id
+                       AND jl.credit>0
+                   )
+                 )
               THEN
                 RAISE EXCEPTION USING
                   ERRCODE='23514',
-                  MESSAGE='Receivable AR Journal grammar is inconsistent';
+                  MESSAGE='Receivable AR Journal grammar is noncanonical';
               END IF;
 
               IF EXISTS (
@@ -687,6 +870,10 @@ return new class extends Migration
                    OR reversal.source_id<>r.journal_entry_id
                    OR reversal.reverses_journal_entry_id<>r.journal_entry_id
                    OR reversal.entry_date<>r.accounting_date
+                   OR reversal.reversal_reason IS DISTINCT FROM
+                      e.reversal_reason
+                   OR reversal.created_by IS DISTINCT FROM e.reversed_by
+                   OR reversal.posted_by IS DISTINCT FROM e.reversed_by
                 THEN
                   RAISE EXCEPTION USING
                     ERRCODE='23514',
@@ -862,19 +1049,19 @@ return new class extends Migration
               DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
-            CREATE TRIGGER receivable_ar_entitlement_final
+            CREATE CONSTRAINT TRIGGER receivable_ar_entitlement_final
               AFTER UPDATE ON public.contractual_billing_entitlements
-              FOR EACH ROW
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
-            CREATE TRIGGER receivable_ar_receivable_final
+            CREATE CONSTRAINT TRIGGER receivable_ar_receivable_final
               AFTER UPDATE ON public.receivables
-              FOR EACH ROW
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
-            CREATE TRIGGER receivable_ar_transition_final
+            CREATE CONSTRAINT TRIGGER receivable_ar_transition_final
               AFTER UPDATE ON public.contract_consideration_transitions
-              FOR EACH ROW
+              DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
             CREATE CONSTRAINT TRIGGER receivable_ar_origin_final
