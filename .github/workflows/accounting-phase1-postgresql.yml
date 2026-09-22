@@ -65,6 +65,15 @@ jobs:
           extensions: pdo_pgsql
           coverage: none
       - run: composer install --no-interaction --prefer-dist
+      - name: Pint AR remediation diagnostic
+        env:
+          COLUMNS: 300
+        run: |
+          vendor/bin/pint tests/Feature/ReceivableArRecognitionSecurityTest.php
+          echo '=== PINT AR DIFF ==='
+          git diff -- tests/Feature/ReceivableArRecognitionSecurityTest.php
+          git diff --exit-code
+
       - name: PostgreSQL preflight
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
