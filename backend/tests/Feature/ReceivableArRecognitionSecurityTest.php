@@ -7,7 +7,9 @@ namespace Tests\Feature;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\AccountingRecognition\Actions\AdoptPerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
+use App\Modules\AccountingRecognition\Actions\RecognizePerformanceAccounting;
 use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
 use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
 use Illuminate\Database\QueryException;
@@ -188,6 +190,17 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         });
     }
 
+    public function test_direct_sql_rejects_receivable_ar_consumption_with_noncanonical_edge_identity(): void
+    {
+        $fixture = $this->unrecognizedAssetBillingContext();
+
+        $this->assertDirectSqlRejected(function () use ($fixture): void {
+            $this->insertDirectAssetRecognitionWithWrongEdgeIdentity(
+                $fixture,
+            );
+        });
+    }
+
     public function test_direct_sql_rejects_split_receivable_ar_journal_grammar(): void
     {
         foreach (['split_ar', 'split_liability'] as $variant) {
@@ -234,6 +247,188 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         self::assertNotNull($origin);
 
         return [$fixture['context'], $recognition, $origin];
+    }
+
+    private function unrecognizedAssetBillingContext(): array
+    {
+        $context = $this->considerationContext();
+        $consideration = $this->adopt($context);
+
+        app(ActivateAccountingAction::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+        );
+
+        app(ManageAccountingPeriodAction::class)->create(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            '2026-12-31',
+        );
+
+        $ar = $this->account(
+            $context,
+            'AR-SEC-ASSET-CTRL',
+            'asset',
+            'current_asset',
+        );
+        $asset = $this->account(
+            $context,
+            'AR-SEC-ASSET-CA',
+            'asset',
+            'current_asset',
+        );
+        $liability = $this->account(
+            $context,
+            'AR-SEC-ASSET-CL',
+            'liability',
+            'current_liability',
+        );
+        $revenue = $this->account(
+            $context,
+            'AR-SEC-ASSET-REV',
+            'revenue',
+            'operating_revenue',
+        );
+
+        app(ConfigureAccountingRecognitionPolicies::class)->receivableAr(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            $ar,
+        );
+        app(ConfigureAccountingRecognitionPolicies::class)->counterpart(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            $asset,
+            $liability,
+        );
+        app(ConfigureAccountingRecognitionPolicies::class)->performance(
+            $context['tenant_id'],
+            $context['actor'],
+            '2026-01-01',
+            $revenue,
+            $asset,
+            $liability,
+        );
+
+        app(AdoptPerformanceAccounting::class)->execute(
+            $context['tenant_id'],
+            $context['actor'],
+            [
+                'contract_id' => $context['contract_id'],
+                'performance_accounting_adoption_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+
+        [$handover, $performanceGraph] = DB::transaction(function () use (
+            $context,
+            $consideration,
+        ): array {
+            $source = $this->handoverSource($context);
+            $graph = $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $consideration['genesis_lot_id'],
+                'EARNED_UNBILLED',
+            );
+
+            return [$source, $graph];
+        });
+
+        $performanceRecognitionId =
+            app(RecognizePerformanceAccounting::class)->execute(
+                $context['tenant_id'],
+                $context['actor'],
+                [
+                    'unit_handover_acceptance_id' => $handover['id'],
+                    'performance_accounting_operation_id' =>
+                        (string) Str::ulid(),
+                ],
+            );
+
+        $performanceOrigin = DB::table('accounting_position_origins')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where(
+                'origin_recognition_type',
+                'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            )
+            ->where('origin_recognition_id', $performanceRecognitionId)
+            ->first();
+
+        self::assertNotNull($performanceOrigin);
+
+        $obligationId = $this->billingObligations(
+            $context,
+            ['1000.00'],
+            '2026-08-21',
+        )[0];
+
+        [$source, $billingGraph] = DB::transaction(function () use (
+            $context,
+            $consideration,
+            $obligationId,
+            $performanceGraph,
+        ): array {
+            $source = $this->billingSource($context, $obligationId);
+            $graph = $this->transition(
+                $context,
+                $consideration,
+                $source,
+                $performanceGraph['lot_id'],
+                'BILLED_EARNED',
+            );
+
+            return [$source, $graph];
+        });
+
+        $receivableId = app(EstablishEntitlementReceivable::class)->execute(
+            $context['tenant_id'],
+            $source['id'],
+            $context['actor'],
+            [
+                'receivable_establishment_operation_id' =>
+                    (string) Str::ulid(),
+            ],
+        );
+
+        $entitlement = DB::table('contractual_billing_entitlements')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $source['id'])
+            ->first();
+        $arPolicy = DB::table('receivable_ar_policies')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('status', 'active')
+            ->first();
+        $counterpartPolicy = DB::table(
+            'receivable_ar_counterpart_policies',
+        )
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('status', 'active')
+            ->first();
+
+        self::assertNotNull($entitlement);
+        self::assertNotNull($arPolicy);
+        self::assertNotNull($counterpartPolicy);
+
+        return [
+            'context' => $context,
+            'source' => $source,
+            'billing_graph' => $billingGraph,
+            'performance_origin' => $performanceOrigin,
+            'receivable_id' => $receivableId,
+            'entitlement' => $entitlement,
+            'ar_policy' => $arPolicy,
+            'counterpart_policy' => $counterpartPolicy,
+            'accounts' => [
+                'ar' => $ar,
+                'asset' => $asset,
+                'liability' => $liability,
+            ],
+        ];
     }
 
     private function unrecognizedEarlyBillingContext(): array
@@ -352,6 +547,97 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'liability' => $liability,
             ],
         ];
+    }
+
+    private function insertDirectAssetRecognitionWithWrongEdgeIdentity(
+        array $fixture,
+    ): void {
+        $context = $fixture['context'];
+        $recognitionId = (string) Str::ulid();
+
+        [$journalId, $lineIds] = $this->createDirectBusinessJournal(
+            $context,
+            $recognitionId,
+            (string) $fixture['entitlement']->economic_date,
+            [
+                [$fixture['accounts']['ar'], '1000.00', '0.00'],
+                [$fixture['accounts']['asset'], '0.00', '1000.00'],
+            ],
+        );
+
+        $now = now();
+
+        DB::table('receivable_ar_recognitions')->insert([
+            'id' => $recognitionId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'contractual_billing_entitlement_id' =>
+                $fixture['source']['id'],
+            'receivable_id' => $fixture['receivable_id'],
+            'billing_consideration_transition_id' =>
+                $fixture['billing_graph']['transition_id'],
+            'recognition_kind' => 'original',
+            'receivable_ar_operation_id' => (string) Str::ulid(),
+            'receivable_amount' => '1000.00',
+            'contract_asset_release_amount' => '1000.00',
+            'contract_liability_creation_amount' => '0.00',
+            'currency' => 'SAR',
+            'accounting_date' => $fixture['entitlement']->economic_date,
+            'receivable_ar_policy_id' => $fixture['ar_policy']->id,
+            'receivable_ar_policy_version' =>
+                $fixture['ar_policy']->policy_version,
+            'counterpart_policy_id' =>
+                $fixture['counterpart_policy']->id,
+            'counterpart_policy_version' =>
+                $fixture['counterpart_policy']->policy_version,
+            'ar_control_account_id' => $fixture['accounts']['ar'],
+            'counterpart_contract_asset_account_id' =>
+                $fixture['accounts']['asset'],
+            'contract_liability_account_id' => null,
+            'journal_entry_id' => $journalId,
+            'status' => 'posted',
+            'created_by' => $context['actor']->id,
+            'created_at' => $now,
+        ]);
+
+        $consumptionId = (string) Str::ulid();
+        $wrongLeg = 'AR:CONSUME:'.
+            $fixture['billing_graph']['transition_id'].':FORGED';
+
+        DB::table('accounting_position_consumptions')->insert([
+            'id' => $consumptionId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'origin_id' => $fixture['performance_origin']->id,
+            'consuming_recognition_type' =>
+                'RECEIVABLE_AR_RECOGNITION',
+            'consuming_recognition_id' => $recognitionId,
+            'consuming_journal_entry_id' => $journalId,
+            'consideration_transition_id' =>
+                $fixture['billing_graph']['transition_id'],
+            'consideration_lot_id' =>
+                $fixture['billing_graph']['lot_id'],
+            'economic_leg_identity' => $wrongLeg,
+            'amount' => '1000.00',
+            'currency' => 'SAR',
+            'status' => 'effective',
+            'created_at' => $now,
+        ]);
+
+        DB::table(
+            'accounting_position_consumption_journal_line_allocations',
+        )->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'consumption_id' => $consumptionId,
+            'journal_entry_id' => $journalId,
+            'journal_line_id' => $lineIds[1],
+            'amount' => '1000.00',
+            'currency' => 'SAR',
+            'economic_leg_identity' => $wrongLeg,
+            'created_at' => $now,
+        ]);
     }
 
     private function insertDirectEarlyBillingRecognition(
