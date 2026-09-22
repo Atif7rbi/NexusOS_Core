@@ -1057,6 +1057,7 @@ return new class extends Migration
             CREATE CONSTRAINT TRIGGER receivable_ar_receivable_final
               AFTER UPDATE ON public.receivables
               DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+              WHEN (NEW.collection_id IS NULL)
               EXECUTE FUNCTION public.receivable_ar_recognition_final_state();
 
             CREATE CONSTRAINT TRIGGER receivable_ar_transition_final
