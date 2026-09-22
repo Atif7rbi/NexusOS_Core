@@ -249,8 +249,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $fixture['context']['tenant_id'],
             $fixture['context']['actor'],
             [
-                'contractual_billing_entitlement_id' =>
-                    $fixture['source']['id'],
+                'contractual_billing_entitlement_id' => $fixture['source']['id'],
                 'receivable_ar_operation_id' => (string) Str::ulid(),
             ],
         );
@@ -280,8 +279,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $fixture['context']['tenant_id'],
             $fixture['context']['actor'],
             [
-                'contractual_billing_entitlement_id' =>
-                    $fixture['source']['id'],
+                'contractual_billing_entitlement_id' => $fixture['source']['id'],
                 'receivable_ar_operation_id' => (string) Str::ulid(),
             ],
         );
@@ -377,8 +375,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -407,8 +404,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 $context['actor'],
                 [
                     'unit_handover_acceptance_id' => $handover['id'],
-                    'performance_accounting_operation_id' =>
-                        (string) Str::ulid(),
+                    'performance_accounting_operation_id' => (string) Str::ulid(),
                 ],
             );
 
@@ -452,8 +448,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -571,8 +566,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -639,8 +633,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('id', $origin->id)
             ->update([
                 'status' => 'reversed',
-                'reversal_origin_operation_id' =>
-                    $variant === 'origin_operation'
+                'reversal_origin_operation_id' => $variant === 'origin_operation'
                         ? (string) Str::ulid()
                         : $reversalOperationId,
                 'reversed_at' => $at,
@@ -651,14 +644,12 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('id', $recognition->id)
             ->update([
                 'status' => 'reversed',
-                'reversal_operation_id' =>
-                    $variant === 'recognition_operation'
+                'reversal_operation_id' => $variant === 'recognition_operation'
                         ? (string) Str::ulid()
                         : $reversalOperationId,
                 'reversal_journal_entry_id' => $reversalJournalId,
                 'reversed_by' => $context['actor']->id,
-                'reversed_at' =>
-                    $variant === 'recognition_timestamp'
+                'reversed_at' => $variant === 'recognition_timestamp'
                         ? $at->copy()->addSecond()
                         : $at,
             ]);
@@ -667,8 +658,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('tenant_id', $context['tenant_id'])
             ->where('entitlement_id', $fixture['source']['id'])
             ->update([
-                'source_correction_operation_id' =>
-                    $sourceCorrectionOperationId,
+                'source_correction_operation_id' => $sourceCorrectionOperationId,
                 'updated_at' => $at,
             ]);
 
@@ -679,8 +669,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'status' => 'cancelled',
                 'cancelled_at' => $at,
                 'cancelled_by' => $context['actor']->id,
-                'cancellation_reason' =>
-                    $variant === 'receivable_reason'
+                'cancellation_reason' => $variant === 'receivable_reason'
                         ? 'Mismatched Receivable cancellation reason'
                         : $reason,
                 'updated_at' => $at,
@@ -695,8 +684,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'reversed_by' => $context['actor']->id,
                 'reversed_at' => $at,
                 'reversal_reason' => $reason,
-                'source_correction_operation_id' =>
-                    $sourceCorrectionOperationId,
+                'source_correction_operation_id' => $sourceCorrectionOperationId,
                 'source_rescission_reference' => $reference,
                 'updated_at' => $at,
             ]);
@@ -707,8 +695,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->update([
                 'status' => 'reversed',
                 'reversal_operation_id' => $reversalOperationId,
-                'reversal_source_operation_id' =>
-                    $sourceCorrectionOperationId,
+                'reversal_source_operation_id' => $sourceCorrectionOperationId,
                 'reversal_reason' => $reason,
                 'reversal_reference' => $reference,
                 'reversed_by' => $context['actor']->id,
@@ -720,8 +707,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             ->where('id', $fixture['entitlement']->schedule_id)
             ->update([
                 'status' => 'cancelled',
-                'source_correction_operation_id' =>
-                    $sourceCorrectionOperationId,
+                'source_correction_operation_id' => $sourceCorrectionOperationId,
                 'source_corrected_by' => $context['actor']->id,
                 'source_corrected_at' => $at,
                 'source_correction_reason' => $reason,
@@ -752,11 +738,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'id' => $recognitionId,
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
-            'contractual_billing_entitlement_id' =>
-                $fixture['source']['id'],
+            'contractual_billing_entitlement_id' => $fixture['source']['id'],
             'receivable_id' => $fixture['receivable_id'],
-            'billing_consideration_transition_id' =>
-                $fixture['billing_graph']['transition_id'],
+            'billing_consideration_transition_id' => $fixture['billing_graph']['transition_id'],
             'recognition_kind' => 'original',
             'receivable_ar_operation_id' => (string) Str::ulid(),
             'receivable_amount' => '1000.00',
@@ -765,15 +749,11 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'currency' => 'SAR',
             'accounting_date' => $fixture['entitlement']->economic_date,
             'receivable_ar_policy_id' => $fixture['ar_policy']->id,
-            'receivable_ar_policy_version' =>
-                $fixture['ar_policy']->policy_version,
-            'counterpart_policy_id' =>
-                $fixture['counterpart_policy']->id,
-            'counterpart_policy_version' =>
-                $fixture['counterpart_policy']->policy_version,
+            'receivable_ar_policy_version' => $fixture['ar_policy']->policy_version,
+            'counterpart_policy_id' => $fixture['counterpart_policy']->id,
+            'counterpart_policy_version' => $fixture['counterpart_policy']->policy_version,
             'ar_control_account_id' => $fixture['accounts']['ar'],
-            'counterpart_contract_asset_account_id' =>
-                $fixture['accounts']['asset'],
+            'counterpart_contract_asset_account_id' => $fixture['accounts']['asset'],
             'contract_liability_account_id' => null,
             'journal_entry_id' => $journalId,
             'status' => 'posted',
@@ -790,14 +770,11 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
             'origin_id' => $fixture['performance_origin']->id,
-            'consuming_recognition_type' =>
-                'RECEIVABLE_AR_RECOGNITION',
+            'consuming_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
             'consuming_recognition_id' => $recognitionId,
             'consuming_journal_entry_id' => $journalId,
-            'consideration_transition_id' =>
-                $fixture['billing_graph']['transition_id'],
-            'consideration_lot_id' =>
-                $fixture['billing_graph']['lot_id'],
+            'consideration_transition_id' => $fixture['billing_graph']['transition_id'],
+            'consideration_lot_id' => $fixture['billing_graph']['lot_id'],
             'economic_leg_identity' => $wrongLeg,
             'amount' => '1000.00',
             'currency' => 'SAR',
@@ -853,11 +830,9 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'id' => $recognitionId,
             'tenant_id' => $context['tenant_id'],
             'contract_id' => $context['contract_id'],
-            'contractual_billing_entitlement_id' =>
-                $fixture['source']['id'],
+            'contractual_billing_entitlement_id' => $fixture['source']['id'],
             'receivable_id' => $fixture['receivable_id'],
-            'billing_consideration_transition_id' =>
-                $fixture['graph']['transition_id'],
+            'billing_consideration_transition_id' => $fixture['graph']['transition_id'],
             'recognition_kind' => 'original',
             'receivable_ar_operation_id' => (string) Str::ulid(),
             'receivable_amount' => '1000.00',
@@ -866,17 +841,12 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'currency' => 'SAR',
             'accounting_date' => $fixture['entitlement']->economic_date,
             'receivable_ar_policy_id' => $fixture['ar_policy']->id,
-            'receivable_ar_policy_version' =>
-                $fixture['ar_policy']->policy_version,
-            'counterpart_policy_id' =>
-                $fixture['counterpart_policy']->id,
-            'counterpart_policy_version' =>
-                $fixture['counterpart_policy']->policy_version,
+            'receivable_ar_policy_version' => $fixture['ar_policy']->policy_version,
+            'counterpart_policy_id' => $fixture['counterpart_policy']->id,
+            'counterpart_policy_version' => $fixture['counterpart_policy']->policy_version,
             'ar_control_account_id' => $fixture['accounts']['ar'],
-            'counterpart_contract_asset_account_id' =>
-                $fixture['accounts']['asset'],
-            'contract_liability_account_id' =>
-                $fixture['accounts']['liability'],
+            'counterpart_contract_asset_account_id' => $fixture['accounts']['asset'],
+            'contract_liability_account_id' => $fixture['accounts']['liability'],
             'journal_entry_id' => $journalId,
             'status' => 'posted',
             'created_by' => $context['actor']->id,
@@ -898,8 +868,7 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             'account_id' => $fixture['accounts']['liability'],
             'economic_source_type' => 'CONTRACTUAL_BILLING_ENTITLEMENT',
             'economic_source_id' => $fixture['source']['id'],
-            'consideration_transition_id' =>
-                $fixture['graph']['transition_id'],
+            'consideration_transition_id' => $fixture['graph']['transition_id'],
             'consideration_lot_id' => $fixture['graph']['lot_id'],
             'economic_leg_identity' => $leg,
             'origin_amount' => '1000.00',
