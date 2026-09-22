@@ -188,7 +188,55 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
         });
     }
 
+    public function test_direct_sql_rejects_split_receivable_ar_journal_grammar(): void
+    {
+        foreach (['split_ar', 'split_liability'] as $variant) {
+            $fixture = $this->unrecognizedEarlyBillingContext();
+
+            $this->assertDirectSqlRejected(function () use (
+                $fixture,
+                $variant,
+            ): void {
+                $this->insertDirectEarlyBillingRecognition(
+                    $fixture,
+                    $variant,
+                );
+            });
+        }
+    }
+
     private function recognizedContext(): array
+    {
+        $fixture = $this->unrecognizedEarlyBillingContext();
+
+        $recognitionId = app(RecognizeReceivableAr::class)->execute(
+            $fixture['context']['tenant_id'],
+            $fixture['context']['actor'],
+            [
+                'contractual_billing_entitlement_id' =>
+                    $fixture['source']['id'],
+                'receivable_ar_operation_id' => (string) Str::ulid(),
+            ],
+        );
+
+        $recognition = DB::table('receivable_ar_recognitions')
+            ->where('id', $recognitionId)
+            ->first();
+        $origin = DB::table('accounting_position_origins')
+            ->where(
+                'origin_recognition_type',
+                'RECEIVABLE_AR_RECOGNITION',
+            )
+            ->where('origin_recognition_id', $recognitionId)
+            ->first();
+
+        self::assertNotNull($recognition);
+        self::assertNotNull($origin);
+
+        return [$fixture['context'], $recognition, $origin];
+    }
+
+    private function unrecognizedEarlyBillingContext(): array
     {
         $context = $this->considerationContext();
         $obligationId = $this->billingObligations(
@@ -244,14 +292,13 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
             $liability,
         );
 
-        [$source] = DB::transaction(function () use (
+        [$source, $graph] = DB::transaction(function () use (
             $context,
             $consideration,
             $obligationId,
         ): array {
             $source = $this->billingSource($context, $obligationId);
-
-            $this->transition(
+            $graph = $this->transition(
                 $context,
                 $consideration,
                 $source,
@@ -259,42 +306,243 @@ final class ReceivableArRecognitionSecurityTest extends TestCase
                 'BILLED_UNEARNED',
             );
 
-            return [$source];
+            return [$source, $graph];
         });
 
-        app(EstablishEntitlementReceivable::class)->execute(
+        $receivableId = app(EstablishEntitlementReceivable::class)->execute(
             $context['tenant_id'],
             $source['id'],
             $context['actor'],
             [
-                'receivable_establishment_operation_id' => (string) Str::ulid(),
+                'receivable_establishment_operation_id' =>
+                    (string) Str::ulid(),
             ],
         );
 
-        $recognitionId = app(RecognizeReceivableAr::class)->execute(
-            $context['tenant_id'],
-            $context['actor'],
-            [
-                'contractual_billing_entitlement_id' => $source['id'],
-                'receivable_ar_operation_id' => (string) Str::ulid(),
+        $entitlement = DB::table('contractual_billing_entitlements')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $source['id'])
+            ->first();
+        $arPolicy = DB::table('receivable_ar_policies')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('status', 'active')
+            ->first();
+        $counterpartPolicy = DB::table(
+            'receivable_ar_counterpart_policies',
+        )
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('status', 'active')
+            ->first();
+
+        self::assertNotNull($entitlement);
+        self::assertNotNull($arPolicy);
+        self::assertNotNull($counterpartPolicy);
+
+        return [
+            'context' => $context,
+            'source' => $source,
+            'graph' => $graph,
+            'receivable_id' => $receivableId,
+            'entitlement' => $entitlement,
+            'ar_policy' => $arPolicy,
+            'counterpart_policy' => $counterpartPolicy,
+            'accounts' => [
+                'ar' => $ar,
+                'asset' => $asset,
+                'liability' => $liability,
             ],
+        ];
+    }
+
+    private function insertDirectEarlyBillingRecognition(
+        array $fixture,
+        string $variant,
+    ): void {
+        $context = $fixture['context'];
+        $recognitionId = (string) Str::ulid();
+
+        $lines = $variant === 'split_ar'
+            ? [
+                [$fixture['accounts']['ar'], '500.00', '0.00'],
+                [$fixture['accounts']['ar'], '500.00', '0.00'],
+                [$fixture['accounts']['liability'], '0.00', '1000.00'],
+            ]
+            : [
+                [$fixture['accounts']['ar'], '1000.00', '0.00'],
+                [$fixture['accounts']['liability'], '0.00', '500.00'],
+                [$fixture['accounts']['liability'], '0.00', '500.00'],
+            ];
+
+        [$journalId, $lineIds] = $this->createDirectBusinessJournal(
+            $context,
+            $recognitionId,
+            (string) $fixture['entitlement']->economic_date,
+            $lines,
         );
 
-        $recognition = DB::table('receivable_ar_recognitions')
-            ->where('id', $recognitionId)
-            ->first();
-        $origin = DB::table('accounting_position_origins')
-            ->where(
-                'origin_recognition_type',
-                'RECEIVABLE_AR_RECOGNITION',
-            )
-            ->where('origin_recognition_id', $recognitionId)
+        $now = now();
+
+        DB::table('receivable_ar_recognitions')->insert([
+            'id' => $recognitionId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'contractual_billing_entitlement_id' =>
+                $fixture['source']['id'],
+            'receivable_id' => $fixture['receivable_id'],
+            'billing_consideration_transition_id' =>
+                $fixture['graph']['transition_id'],
+            'recognition_kind' => 'original',
+            'receivable_ar_operation_id' => (string) Str::ulid(),
+            'receivable_amount' => '1000.00',
+            'contract_asset_release_amount' => '0.00',
+            'contract_liability_creation_amount' => '1000.00',
+            'currency' => 'SAR',
+            'accounting_date' => $fixture['entitlement']->economic_date,
+            'receivable_ar_policy_id' => $fixture['ar_policy']->id,
+            'receivable_ar_policy_version' =>
+                $fixture['ar_policy']->policy_version,
+            'counterpart_policy_id' =>
+                $fixture['counterpart_policy']->id,
+            'counterpart_policy_version' =>
+                $fixture['counterpart_policy']->policy_version,
+            'ar_control_account_id' => $fixture['accounts']['ar'],
+            'counterpart_contract_asset_account_id' =>
+                $fixture['accounts']['asset'],
+            'contract_liability_account_id' =>
+                $fixture['accounts']['liability'],
+            'journal_entry_id' => $journalId,
+            'status' => 'posted',
+            'created_by' => $context['actor']->id,
+            'created_at' => $now,
+        ]);
+
+        $originId = (string) Str::ulid();
+        $leg = 'AR:ORIGIN:'.$fixture['graph']['transition_id'].':'.
+            $fixture['graph']['lot_id'];
+
+        DB::table('accounting_position_origins')->insert([
+            'id' => $originId,
+            'tenant_id' => $context['tenant_id'],
+            'contract_id' => $context['contract_id'],
+            'position_type' => 'CONTRACT_LIABILITY',
+            'origin_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
+            'origin_recognition_id' => $recognitionId,
+            'origin_journal_entry_id' => $journalId,
+            'account_id' => $fixture['accounts']['liability'],
+            'economic_source_type' => 'CONTRACTUAL_BILLING_ENTITLEMENT',
+            'economic_source_id' => $fixture['source']['id'],
+            'consideration_transition_id' =>
+                $fixture['graph']['transition_id'],
+            'consideration_lot_id' => $fixture['graph']['lot_id'],
+            'economic_leg_identity' => $leg,
+            'origin_amount' => '1000.00',
+            'currency' => 'SAR',
+            'accounting_date' => $fixture['entitlement']->economic_date,
+            'status' => 'effective',
+            'created_at' => $now,
+        ]);
+
+        foreach ($lineIds as $index => $lineId) {
+            if ($lines[$index][0] !== $fixture['accounts']['liability']) {
+                continue;
+            }
+
+            DB::table(
+                'accounting_position_origin_journal_line_allocations',
+            )->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $context['tenant_id'],
+                'contract_id' => $context['contract_id'],
+                'origin_id' => $originId,
+                'journal_entry_id' => $journalId,
+                'journal_line_id' => $lineId,
+                'amount' => $lines[$index][2],
+                'currency' => 'SAR',
+                'economic_leg_identity' => $leg,
+                'created_at' => $now,
+            ]);
+        }
+    }
+
+    private function createDirectBusinessJournal(
+        array $context,
+        string $recognitionId,
+        string $entryDate,
+        array $lines,
+    ): array {
+        $id = (string) Str::ulid();
+        $at = now();
+
+        DB::table('journal_entries')->insert([
+            'id' => $id,
+            'tenant_id' => $context['tenant_id'],
+            'entry_date' => $entryDate,
+            'description' => 'Direct SQL Receivable AR fixture',
+            'status' => 'draft',
+            'origin' => 'business',
+            'source_type' => 'receivable_ar_recognition',
+            'source_id' => $recognitionId,
+            'created_by' => $context['actor']->id,
+            'updated_by' => $context['actor']->id,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+
+        $lineIds = [];
+
+        foreach ($lines as $index => [$accountId, $debit, $credit]) {
+            $lineId = (string) Str::ulid();
+            $lineIds[$index] = $lineId;
+
+            DB::table('journal_lines')->insert([
+                'id' => $lineId,
+                'tenant_id' => $context['tenant_id'],
+                'journal_entry_id' => $id,
+                'line_number' => $index + 1,
+                'account_id' => $accountId,
+                'debit' => $debit,
+                'credit' => $credit,
+                'memo' => 'Direct SQL Receivable AR fixture line',
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+        }
+
+        $period = DB::table('accounting_periods')
+            ->where('tenant_id', $context['tenant_id'])
+            ->whereDate('start_date', '<=', $entryDate)
+            ->whereDate('end_date', '>=', $entryDate)
             ->first();
 
-        self::assertNotNull($recognition);
-        self::assertNotNull($origin);
+        self::assertNotNull($period);
 
-        return [$context, $recognition, $origin];
+        $sequence = ((int) DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('journal_number_year', 2026)
+            ->max('journal_sequence_number')) + 1;
+        $number = 'JRN-2026-'.str_pad(
+            (string) $sequence,
+            max(3, strlen((string) $sequence)),
+            '0',
+            STR_PAD_LEFT,
+        );
+
+        DB::table('journal_entries')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('id', $id)
+            ->update([
+                'status' => 'posted',
+                'accounting_period_id' => $period->id,
+                'journal_number' => $number,
+                'journal_number_year' => 2026,
+                'journal_sequence_number' => $sequence,
+                'posted_by' => $context['actor']->id,
+                'posted_at' => $at,
+                'updated_by' => $context['actor']->id,
+                'updated_at' => $at,
+            ]);
+
+        return [$id, $lineIds];
     }
 
     private function assertDirectSqlRejected(callable $callback): void
