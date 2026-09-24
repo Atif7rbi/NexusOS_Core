@@ -477,7 +477,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
 
     private function billingFirstContext(): array
     {
-        $fixture = $this->baseContext();
+        $fixture = $this->baseContext('2026-08-19');
 
         [$billing, $billingGraph] = DB::transaction(function () use (
             $fixture,
@@ -539,7 +539,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
 
     private function performanceFirstContext(): array
     {
-        $fixture = $this->baseContext();
+        $fixture = $this->baseContext('2026-08-21');
 
         [$handover, $handoverGraph] = DB::transaction(function () use (
             $fixture,
@@ -592,13 +592,13 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
         ];
     }
 
-    private function baseContext(): array
+    private function baseContext(string $billingDate): array
     {
         $context = $this->considerationContext();
         $obligationId = $this->billingObligations(
             $context,
             ['1000.00'],
-            '2026-08-21',
+            $billingDate,
         )[0];
         $consideration = $this->adopt($context);
 
