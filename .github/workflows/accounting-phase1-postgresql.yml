@@ -121,13 +121,13 @@ jobs:
       - name: Performance Accounting Recognition focused tests
         run: php artisan migrate:fresh --force && php artisan test --filter='/PerformanceAccountingRecognition(?:Test|SecurityTest)/'
       - name: Performance Accounting Recognition concurrency tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='/^Tests\\\\Feature\\\\PerformanceAccountingRecognitionConcurrencyTest::/'
+        run: php artisan migrate:fresh --force && php artisan test --filter='PerformanceAccountingRecognitionConcurrencyTest' --fail-on-empty-test-suite
       - name: Receivable AR Recognition focused tests
         run: php artisan migrate:fresh --force && php artisan test --filter='/ReceivableArRecognition(?:Test|SecurityTest)/'
       - name: Receivable AR Recognition concurrency tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='/^Tests\\\\Feature\\\\ReceivableArRecognitionConcurrencyTest::/'
+        run: php artisan migrate:fresh --force && php artisan test --filter='ReceivableArRecognitionConcurrencyTest' --fail-on-empty-test-suite
       - name: GL AR cross-slice integration concurrency tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='/^Tests\\\\Feature\\\\GlArCrossSliceIntegrationConcurrencyTest::/'
+        run: php artisan migrate:fresh --force && php artisan test --filter='GlArCrossSliceIntegrationConcurrencyTest' --fail-on-empty-test-suite
       - name: Contract Consideration recovery tests
         run: php artisan migrate:fresh --force && php artisan test --filter='ContractConsiderationRecoveryTest'
       - name: Contract Consideration concurrency tests
