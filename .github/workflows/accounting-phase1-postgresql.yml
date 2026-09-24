@@ -65,15 +65,6 @@ jobs:
           extensions: pdo_pgsql
           coverage: none
       - run: composer install --no-interaction --prefer-dist
-      - name: Pint cross-slice remediation diagnostic
-        env:
-          COLUMNS: 300
-        run: |
-          vendor/bin/pint tests/Feature/GlArCrossSliceIntegrationConcurrencyTest.php
-          echo '=== PINT CROSS-SLICE DIFF ==='
-          git diff -- tests/Feature/GlArCrossSliceIntegrationConcurrencyTest.php
-          git diff --exit-code
-
       - name: PostgreSQL preflight
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
