@@ -109,10 +109,8 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
         self::assertDatabaseHas('accounting_position_consumptions', [
             'tenant_id' => $fixture['context']['tenant_id'],
             'origin_id' => $origin->id,
-            'consuming_recognition_type' =>
-                'PERFORMANCE_ACCOUNTING_RECOGNITION',
-            'consuming_recognition_id' =>
-                $performanceResult['result']['recognition_id'],
+            'consuming_recognition_type' => 'PERFORMANCE_ACCOUNTING_RECOGNITION',
+            'consuming_recognition_id' => $performanceResult['result']['recognition_id'],
             'amount' => '1000.00',
             'status' => 'effective',
         ]);
@@ -174,8 +172,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             'tenant_id' => $fixture['context']['tenant_id'],
             'origin_id' => $origin->id,
             'consuming_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
-            'consuming_recognition_id' =>
-                $arResult['result']['recognition_id'],
+            'consuming_recognition_id' => $arResult['result']['recognition_id'],
             'amount' => '1000.00',
             'status' => 'effective',
         ]);
@@ -189,8 +186,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             $fixture['context']['tenant_id'],
             $fixture['context']['actor'],
             [
-                'contractual_billing_entitlement_id' =>
-                    $fixture['billing']['id'],
+                'contractual_billing_entitlement_id' => $fixture['billing']['id'],
                 'receivable_ar_operation_id' => (string) Str::ulid(),
             ],
         );
@@ -266,10 +262,8 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
                 $fixture['context']['tenant_id'],
                 $fixture['context']['actor'],
                 [
-                    'unit_handover_acceptance_id' =>
-                        $fixture['handover']['id'],
-                    'performance_accounting_operation_id' =>
-                        (string) Str::ulid(),
+                    'unit_handover_acceptance_id' => $fixture['handover']['id'],
+                    'performance_accounting_operation_id' => (string) Str::ulid(),
                 ],
             );
 
@@ -337,10 +331,8 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             $fixture['context']['tenant_id'],
             $fixture['context']['actor'],
             [
-                'unit_handover_acceptance_id' =>
-                    $fixture['handover']['id'],
-                'performance_accounting_operation_id' =>
-                    (string) Str::ulid(),
+                'unit_handover_acceptance_id' => $fixture['handover']['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -405,10 +397,8 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             $fixture['context']['tenant_id'],
             $fixture['context']['actor'],
             [
-                'unit_handover_acceptance_id' =>
-                    $fixture['handover']['id'],
-                'performance_accounting_operation_id' =>
-                    (string) Str::ulid(),
+                'unit_handover_acceptance_id' => $fixture['handover']['id'],
+                'performance_accounting_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -479,8 +469,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             'tenant_id' => $fixture['context']['tenant_id'],
             'origin_id' => $origin->id,
             'consuming_recognition_type' => 'RECEIVABLE_AR_RECOGNITION',
-            'consuming_recognition_id' =>
-                $arResult['result']['recognition_id'],
+            'consuming_recognition_id' => $arResult['result']['recognition_id'],
             'status' => 'effective',
             'amount' => '1000.00',
         ]);
@@ -513,8 +502,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             $billing['id'],
             $fixture['context']['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -592,8 +580,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             $billing['id'],
             $fixture['context']['actor'],
             [
-                'receivable_establishment_operation_id' =>
-                    (string) Str::ulid(),
+                'receivable_establishment_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -683,8 +670,7 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             $context['actor'],
             [
                 'contract_id' => $context['contract_id'],
-                'performance_accounting_adoption_operation_id' =>
-                    (string) Str::ulid(),
+                'performance_accounting_adoption_operation_id' => (string) Str::ulid(),
             ],
         );
 
@@ -788,10 +774,8 @@ final class GlArCrossSliceIntegrationConcurrencyTest extends TestCase
             'actor_id' => $fixture['context']['actor']->id,
             'schedule_id' => $fixture['schedule_id'],
             'entitlement_id' => $fixture['billing']['id'],
-            'source_correction_operation_id' =>
-                $sourceCorrectionOperationId,
-            'entitlement_reversal_operation_id' =>
-                (string) Str::ulid(),
+            'source_correction_operation_id' => $sourceCorrectionOperationId,
+            'entitlement_reversal_operation_id' => (string) Str::ulid(),
             'reason' => 'Cross-slice billing source correction',
             'reference' => 'XSI/BILLING/'.$sourceCorrectionOperationId,
         ];
