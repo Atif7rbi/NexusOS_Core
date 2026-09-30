@@ -53,7 +53,8 @@ final class AccountingApiBoundaryTest extends AccountingApiTestCase
 
         self::assertNotEmpty($routes);
         self::assertFalse(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'business-post')));
-        self::assertFalse(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'trial-balance') || str_contains($uri, 'balance-sheet') || str_contains($uri, 'income-statement')));
+        self::assertTrue(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'trial-balance')));
+        self::assertFalse(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'balance-sheet') || str_contains($uri, 'income-statement')));
     }
 
     public function test_controllers_contain_no_database_mutation_or_transaction_ownership(): void
