@@ -59,6 +59,15 @@ final class ReversePostedBankReceiptCashAndInvalidate
         if ($receipt->status !== 'effective') {
             throw new ReceiptEvidenceConflict('Only an effective receipt can be reversed and invalidated.');
         }
+        if (DB::table('receivable_settlements')
+            ->where('tenant_id', $tenantId)
+            ->where('bank_receipt_cash_posting_id', $postingId)
+            ->where('status', 'posted')
+            ->exists()) {
+            throw new ReceiptEvidenceConflict(
+                'A Cash Posting with a Posted Settlement cannot be reversed.',
+            );
+        }
         $this->associations->assertNoneForReceipt($tenantId, $receiptId);
         $reversal = $this->reverse->execute($tenantId, (string) $posting->journal_entry_id, $actor, $facts['reversal_date'], $facts['reversal_reason'], participating: true);
         $now = now();
