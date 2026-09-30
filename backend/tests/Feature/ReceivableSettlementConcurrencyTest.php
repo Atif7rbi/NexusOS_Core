@@ -7,7 +7,9 @@ namespace Tests\Feature;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Modules\Payments\Actions\AllocatePaymentAction;
+use App\Modules\Payments\Actions\RecordPaymentAction;
 use App\Modules\Settlement\Actions\SettlePaymentAllocation;
+use App\Modules\Settlement\Support\SettlementJournalWriter;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -88,17 +90,23 @@ final class ReceivableSettlementConcurrencyTest extends TestCase
 
     public function test_c4_c5_competing_double_consumption_preserves_ar_and_cash_capacity(): void
     {
-        $fixture = $this->settlementContext();
+        $fixture = $this->settlementContext('500.00');
+        $secondAllocation = $this->secondAllocation($fixture, '500.00');
         [$holder, $waiter] = $this->heldRace(
             $this->settlePayload($fixture, (string) Str::ulid(), 'settle_hold'),
-            $this->settlePayload($fixture, (string) Str::ulid()),
+            $this->settlePayload($fixture, (string) Str::ulid(), 'settle', $secondAllocation),
             'set_c45_holder', 'set_c45_waiter',
         );
         self::assertTrue($holder['ok'], json_encode($holder));
-        self::assertFalse($waiter['ok'], json_encode($waiter));
-        $sum = (string) DB::table('receivable_settlements')->where('tenant_id', $fixture['context']['tenant_id'])->where('status', 'posted')->sum('amount');
-        self::assertSame('1000.00', $sum);
-        self::assertLessThanOrEqual(1000.0, (float) $sum);
+        self::assertTrue($waiter['ok'], json_encode($waiter));
+        self::assertNotSame($holder['result']['settlement_id'], $waiter['result']['settlement_id']);
+        $settlements = DB::table('receivable_settlements')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where('receivable_id', $fixture['receivableId'])
+            ->where('bank_receipt_cash_posting_id', $fixture['cashPosting']['posting_id'])
+            ->where('status', 'posted');
+        self::assertSame(2, (clone $settlements)->count());
+        self::assertSame('1000.00', (string) $settlements->sum('amount'));
     }
 
     public function test_c6_settlement_vs_allocation_cancellation_serializes(): void
@@ -200,16 +208,59 @@ final class ReceivableSettlementConcurrencyTest extends TestCase
         self::assertSame('cancelled', DB::table('payment_allocations')->where('id', $fixture['allocationId'])->value('status'));
     }
 
-    public function test_c11_c12_direct_sql_over_settlement_is_rejected(): void
+    public function test_c11_c12_direct_sql_capacity_composition_reaches_exact_limits_and_blocks_upstream_overage(): void
     {
-        $fixture = $this->settlementContext();
-        $posted = app(SettlePaymentAllocation::class)->execute(
+        $fixture = $this->settlementContext('600.00');
+        $secondAllocation = $this->secondAllocation($fixture, '400.00');
+        app(SettlePaymentAllocation::class)->execute(
             $fixture['context']['tenant_id'], $fixture['context']['actor'],
             ['payment_allocation_id' => $fixture['allocationId'], 'settlement_operation_id' => (string) Str::ulid()],
         );
-        $this->assertSqlRejected(fn () => DB::table('receivable_settlements')
-            ->where('id', $posted['settlement_id'])->update(['amount' => '1000.01']));
-        self::assertSame('1000.00', DB::table('receivable_settlements')->where('id', $posted['settlement_id'])->value('amount'));
+        $this->insertDirectSettlement($fixture, $secondAllocation);
+
+        $settlements = DB::table('receivable_settlements')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where('status', 'posted');
+        self::assertSame(2, (clone $settlements)->count());
+        self::assertSame('1000.00', (string) (clone $settlements)
+            ->where('receivable_id', $fixture['receivableId'])->sum('amount'));
+        self::assertSame('1000.00', (string) (clone $settlements)
+            ->where('bank_receipt_cash_posting_id', $fixture['cashPosting']['posting_id'])->sum('amount'));
+
+        $this->assertSqlRejected(
+            fn () => $this->insertDirectAllocation(
+                $fixture,
+                $fixture['paymentId'],
+                '0.01',
+            ),
+            'payment allocation exceeds payment capacity',
+        );
+
+        $overflowPayment = app(RecordPaymentAction::class)->execute(
+            $fixture['context']['tenant_id'],
+            $fixture['context']['actor'],
+            [
+                'payment_operation_id' => (string) Str::ulid(),
+                'customer_id' => $fixture['context']['customer_id'],
+                'amount' => '1.00',
+                'currency' => 'SAR',
+                'received_on' => '2026-08-22',
+            ],
+        );
+        $this->assertSqlRejected(
+            fn () => $this->insertDirectAllocation(
+                $fixture,
+                $overflowPayment,
+                '0.01',
+            ),
+            'payment allocation exceeds receivable capacity',
+        );
+
+        self::assertSame('1000.00', (string) DB::table('payment_allocations')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where('receivable_id', $fixture['receivableId'])
+            ->where('status', 'effective')
+            ->sum('amount'));
     }
 
     public function test_c13_direct_sql_provenance_and_lifecycle_bypass_is_rejected(): void
@@ -271,6 +322,75 @@ final class ReceivableSettlementConcurrencyTest extends TestCase
                 'allocation_operation_id' => (string) Str::ulid(), 'amount' => $amount,
             ],
         );
+    }
+
+    private function insertDirectSettlement(array $fixture, string $allocationId): string
+    {
+        return DB::transaction(function () use ($fixture, $allocationId): string {
+            $allocation = DB::table('payment_allocations')->where('id', $allocationId)->firstOrFail();
+            $cashPosting = DB::table('bank_receipt_cash_postings')
+                ->where('id', $fixture['cashPosting']['posting_id'])
+                ->firstOrFail();
+            $recognition = DB::table('receivable_ar_recognitions')
+                ->where('id', $fixture['recognitionId'])
+                ->firstOrFail();
+            $settlementId = (string) Str::ulid();
+            $accountingDate = max(
+                (string) $cashPosting->accounting_date,
+                (string) $recognition->accounting_date,
+            );
+            $journalId = app(SettlementJournalWriter::class)->post(
+                $fixture['context']['tenant_id'],
+                $fixture['context']['actor'],
+                $settlementId,
+                $accountingDate,
+                $cashPosting->clearing_account_id,
+                $recognition->ar_control_account_id,
+                (string) $allocation->amount,
+            );
+            DB::table('receivable_settlements')->insert([
+                'id' => $settlementId,
+                'tenant_id' => $fixture['context']['tenant_id'],
+                'settlement_operation_id' => (string) Str::ulid(),
+                'payment_allocation_id' => $allocationId,
+                'payment_id' => $fixture['paymentId'],
+                'receivable_id' => $fixture['receivableId'],
+                'receipt_payment_association_id' => $fixture['associationId'],
+                'receipt_id' => $fixture['receiptId'],
+                'bank_receipt_cash_posting_id' => $cashPosting->id,
+                'receivable_ar_recognition_id' => $recognition->id,
+                'amount' => $allocation->amount,
+                'currency' => 'SAR',
+                'accounting_date' => $accountingDate,
+                'clearing_account_id' => $cashPosting->clearing_account_id,
+                'ar_control_account_id' => $recognition->ar_control_account_id,
+                'journal_entry_id' => $journalId,
+                'status' => 'posted',
+                'created_by' => $fixture['context']['actor']->id,
+                'created_at' => now(),
+            ]);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+
+            return $settlementId;
+        });
+    }
+
+    private function insertDirectAllocation(array $fixture, string $paymentId, string $amount): void
+    {
+        $now = now();
+        DB::table('payment_allocations')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $fixture['context']['tenant_id'],
+            'payment_id' => $paymentId,
+            'receivable_id' => $fixture['receivableId'],
+            'allocation_operation_id' => (string) Str::ulid(),
+            'amount' => $amount,
+            'status' => 'effective',
+            'allocated_at' => $now,
+            'allocated_by' => $fixture['context']['actor']->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private function settlePayload(array $fixture, string $operation, string $action = 'settle', ?string $allocation = null): array
@@ -373,7 +493,7 @@ final class ReceivableSettlementConcurrencyTest extends TestCase
         return $path;
     }
 
-    private function assertSqlRejected(callable $operation): void
+    private function assertSqlRejected(callable $operation, ?string $message = null): void
     {
         DB::beginTransaction();
         try {
@@ -382,6 +502,9 @@ final class ReceivableSettlementConcurrencyTest extends TestCase
             self::fail('PostgreSQL accepted concurrent Settlement bypass.');
         } catch (QueryException $exception) {
             self::assertContains((string) ($exception->errorInfo[0] ?? ''), ['23503', '23514', '23505', '55000', '42501']);
+            if ($message !== null) {
+                self::assertStringContainsString($message, $exception->getMessage());
+            }
         } finally {
             DB::rollBack();
         }

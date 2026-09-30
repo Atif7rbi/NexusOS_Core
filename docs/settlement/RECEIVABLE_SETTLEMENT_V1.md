@@ -97,7 +97,19 @@ The database enforces tenant provenance, operation uniqueness, one Settlement pe
 Allocation, immutable history, exact Journal grammar, final reversal coupling,
 parent lifecycle guards, AR capacity, Cash Clearing capacity, no deletion, and
 runtime-role least privilege. Deferred final-state triggers couple Settlement and
-Journal commits. Direct SQL cannot create a contradictory final state.
+Journal commits in both directions: a Settlement requires its exact Journal and a
+Settlement-source Journal requires its exact same-tenant owner. The recorded
+Settlement reversal Journal is terminal and cannot itself be reversed.
+
+Settlement capacity is composed from authoritative PostgreSQL invariants. Payment
+Allocation locks and capacity guards limit distinct effective Allocations to both
+Payment and Receivable capacity; one historical Settlement is allowed per
+Allocation; every Settlement must equal its exact Allocation amount; and deferred
+Settlement validation locks and sums the shared AR Recognition and Cash Posting.
+Consequently an over-capacity Settlement cannot be constructed without an
+upstream Allocation first being rejected. Tests exercise distinct Allocations at
+the exact shared capacity boundary and the direct-SQL upstream rejection without
+disabling any authoritative trigger.
 
 ## Exclusions
 

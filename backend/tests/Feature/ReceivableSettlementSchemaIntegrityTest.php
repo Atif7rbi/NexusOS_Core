@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Modules\Accounting\Actions\ReverseJournalAction;
 use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
+use App\Modules\Settlement\Actions\ReverseReceivableSettlement;
 use App\Modules\Settlement\Actions\SettlePaymentAllocation;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -110,6 +111,79 @@ final class ReceivableSettlementSchemaIntegrityTest extends TestCase
         );
     }
 
+    public function test_direct_sql_orphan_settlement_source_journal_cannot_commit(): void
+    {
+        $fixture = $this->settlementContext();
+        $orphanSettlementId = (string) Str::ulid();
+
+        $this->assertSqlRejected(function () use ($fixture, $orphanSettlementId): void {
+            $this->createDirectPostedJournal(
+                $fixture,
+                'business',
+                'receivable_settlement',
+                $orphanSettlementId,
+                '2026-08-22',
+                [
+                    [$fixture['accounts']['clearing'], '1000.00', '0.00'],
+                    [$fixture['accounts']['ar'], '0.00', '1000.00'],
+                ],
+            );
+        }, ['23503']);
+
+        self::assertFalse(DB::table('journal_entries')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where('source_type', 'receivable_settlement')
+            ->where('source_id', $orphanSettlementId)
+            ->exists());
+    }
+
+    public function test_direct_sql_cannot_reverse_recorded_settlement_reversal_journal(): void
+    {
+        [$fixture, $settlement] = $this->postedSettlement();
+        app(ReverseReceivableSettlement::class)->execute(
+            $fixture['context']['tenant_id'],
+            $settlement->id,
+            $fixture['context']['actor'],
+            [
+                'reversal_operation_id' => (string) Str::ulid(),
+                'reversal_date' => '2026-08-23',
+                'reversal_reason' => 'Authoritative Settlement correction',
+            ],
+        );
+        $settlement = DB::table('receivable_settlements')
+            ->where('id', $settlement->id)
+            ->firstOrFail();
+        $target = DB::table('journal_entries')
+            ->where('id', $settlement->reversal_journal_entry_id)
+            ->firstOrFail();
+        $targetLines = DB::table('journal_lines')
+            ->where('journal_entry_id', $target->id)
+            ->orderBy('line_number')
+            ->get();
+
+        $this->assertSqlRejected(function () use ($fixture, $target, $targetLines): void {
+            $this->createDirectPostedJournal(
+                $fixture,
+                'reversal',
+                'journal_entry',
+                $target->id,
+                '2026-08-24',
+                $targetLines->map(fn (object $line): array => [
+                    $line->account_id,
+                    (string) $line->credit,
+                    (string) $line->debit,
+                ])->all(),
+                $target->id,
+                'Forbidden reversal of Settlement reversal',
+            );
+        }, ['23514']);
+
+        self::assertFalse(DB::table('journal_entries')
+            ->where('tenant_id', $fixture['context']['tenant_id'])
+            ->where('reverses_journal_entry_id', $target->id)
+            ->exists());
+    }
+
     public function test_database_registered_exact_source_audit_and_trigger_contract(): void
     {
         [, $settlement] = $this->postedSettlement();
@@ -147,6 +221,79 @@ final class ReceivableSettlementSchemaIntegrityTest extends TestCase
         );
 
         return [$fixture, DB::table('receivable_settlements')->where('id', $result['settlement_id'])->firstOrFail()];
+    }
+
+    private function createDirectPostedJournal(
+        array $fixture,
+        string $origin,
+        string $sourceType,
+        string $sourceId,
+        string $entryDate,
+        array $lines,
+        ?string $reversesJournalEntryId = null,
+        ?string $reversalReason = null,
+    ): string {
+        $journalId = (string) Str::ulid();
+        $tenantId = $fixture['context']['tenant_id'];
+        $actorId = $fixture['context']['actor']->id;
+        $at = now();
+        DB::table('journal_entries')->insert([
+            'id' => $journalId,
+            'tenant_id' => $tenantId,
+            'entry_date' => $entryDate,
+            'description' => 'Direct SQL Settlement ownership fixture',
+            'status' => 'draft',
+            'origin' => $origin,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'created_by' => $actorId,
+            'updated_by' => $actorId,
+            'created_at' => $at,
+            'updated_at' => $at,
+            'reverses_journal_entry_id' => $reversesJournalEntryId,
+            'reversal_reason' => $reversalReason,
+        ]);
+        foreach ($lines as $index => [$accountId, $debit, $credit]) {
+            DB::table('journal_lines')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $tenantId,
+                'journal_entry_id' => $journalId,
+                'line_number' => $index + 1,
+                'account_id' => $accountId,
+                'debit' => $debit,
+                'credit' => $credit,
+                'memo' => 'Direct SQL Settlement ownership fixture line',
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+        }
+
+        $period = DB::table('accounting_periods')
+            ->where('tenant_id', $tenantId)
+            ->whereDate('start_date', '<=', $entryDate)
+            ->whereDate('end_date', '>=', $entryDate)
+            ->firstOrFail();
+        $year = (int) substr($entryDate, 0, 4);
+        $sequence = ((int) DB::table('journal_entries')
+            ->where('tenant_id', $tenantId)
+            ->where('journal_number_year', $year)
+            ->max('journal_sequence_number')) + 1;
+        DB::table('journal_entries')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $journalId)
+            ->update([
+                'status' => 'posted',
+                'accounting_period_id' => $period->id,
+                'journal_number' => 'JRN-'.$year.'-'.str_pad((string) $sequence, 3, '0', STR_PAD_LEFT),
+                'journal_number_year' => $year,
+                'journal_sequence_number' => $sequence,
+                'posted_by' => $actorId,
+                'posted_at' => $at,
+                'updated_by' => $actorId,
+                'updated_at' => $at,
+            ]);
+
+        return $journalId;
     }
 
     private function assertSqlRejected(callable $operation, array $states = ['23503', '23514', '23505', '55000', '42501']): void

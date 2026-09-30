@@ -353,6 +353,16 @@ return new class extends Migration
                   RAISE EXCEPTION USING ERRCODE='23514',
                     MESSAGE='Settlement reversal Journal provenance is invalid';
                 END IF;
+
+                IF EXISTS(
+                  SELECT 1 FROM public.journal_entries q
+                  WHERE q.tenant_id=s.tenant_id
+                    AND q.reverses_journal_entry_id=
+                      s.reversal_journal_entry_id
+                ) THEN
+                  RAISE EXCEPTION USING ERRCODE='23514',
+                    MESSAGE='Settlement reversal Journal is terminal';
+                END IF;
               END IF;
             END $$;
 
@@ -372,9 +382,24 @@ return new class extends Migration
                 SELECT s.id INTO settlement_id
                 FROM public.receivable_settlements s
                 WHERE s.tenant_id=NEW.tenant_id
-                  AND s.journal_entry_id=NEW.reverses_journal_entry_id;
+                  AND (
+                    s.journal_entry_id=NEW.reverses_journal_entry_id
+                    OR s.reversal_journal_entry_id=
+                      NEW.reverses_journal_entry_id
+                  )
+                ORDER BY s.id
+                LIMIT 1;
               END IF;
               IF settlement_id IS NOT NULL THEN
+                IF NOT EXISTS(
+                  SELECT 1 FROM public.receivable_settlements s
+                  WHERE s.tenant_id=COALESCE(NEW.tenant_id,OLD.tenant_id)
+                    AND s.id=settlement_id
+                ) THEN
+                  RAISE EXCEPTION USING ERRCODE='23503',
+                    MESSAGE='Settlement Journal requires an exact owner';
+                END IF;
+
                 PERFORM public.validate_receivable_settlement(
                   tenant_id,settlement_id
                 );

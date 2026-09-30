@@ -78,7 +78,12 @@ jobs:
           SQL
       - run: php artisan migrate:fresh --force
       - name: Receivables Foundations focused tests
-        run: php artisan test --filter='Receivables|CollectionBackedReceivable'
+        run: >-
+          php artisan test
+          tests/Feature/CollectionBackedReceivableTest.php
+          tests/Feature/ReceivablesApiTest.php
+          tests/Feature/ReceivablesSchemaIntegrityTest.php
+          tests/Feature/ReceivablesConcurrencyTest.php
       - name: Payments and Allocations focused tests
         run: php artisan test --filter='PaymentsAllocationsTest'
       - name: Receipt Evidence focused tests
