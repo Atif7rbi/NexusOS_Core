@@ -148,7 +148,7 @@ jobs:
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force
-          php artisan migrate:rollback --step=24 --force
+          php artisan migrate:rollback --step=25 --force
           psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_accounting_testing" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
@@ -191,6 +191,7 @@ jobs:
                OR to_regclass('public.accounting_position_consumption_journal_line_allocations') IS NOT NULL
                OR to_regclass('public.performance_accounting_recognitions') IS NOT NULL
                OR to_regclass('public.receivable_ar_recognitions') IS NOT NULL
+               OR to_regclass('public.receivable_settlements') IS NOT NULL
                OR to_regprocedure('public.validate_opening_balance_operation(character,character)') IS NOT NULL
                OR to_regprocedure('public.enforce_payment_history()') IS NOT NULL
                OR to_regprocedure('public.enforce_payment_allocation_history()') IS NOT NULL
@@ -234,8 +235,12 @@ jobs:
                OR to_regprocedure('public.performance_accounting_runtime_provenance_guard()') IS NOT NULL
                OR to_regprocedure('public.validate_receivable_ar_recognition(character,character)') IS NOT NULL
                OR to_regprocedure('public.receivable_ar_recognition_final_state()') IS NOT NULL
+               OR to_regprocedure('public.receivable_settlement_history_guard()') IS NOT NULL
+               OR to_regprocedure('public.validate_receivable_settlement(character,character)') IS NOT NULL
+               OR to_regprocedure('public.receivable_settlement_final_state()') IS NOT NULL
+               OR to_regprocedure('public.receivable_settlement_parent_lifecycle_guard()') IS NOT NULL
             THEN
-              RAISE EXCEPTION 'Receivables, Accounting, and Unit Handover migration stack was not fully rolled back';
+              RAISE EXCEPTION 'Receivables, Accounting, Unit Handover, and Settlement migration stack was not fully rolled back';
             END IF;
           END $$;
           SQL
