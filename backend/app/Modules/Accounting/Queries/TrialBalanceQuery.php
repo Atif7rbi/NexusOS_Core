@@ -11,7 +11,7 @@ final class TrialBalanceQuery
     /** @return array{as_of_date:string,rows:list<array<string,mixed>>,debit_total:string,credit_total:string,is_balanced:bool} */
     public function execute(string $tenantId, string $asOfDate, ?string $accountType = null, ?string $classification = null, bool $includeZero = false): array
     {
-        $bindings = [$asOfDate, $tenantId];
+        $bindings = [$tenantId, $asOfDate, $tenantId, $asOfDate, $tenantId];
         $filters = '';
         if ($accountType !== null) {
             $filters .= ' AND account.account_type=?';
@@ -21,40 +21,69 @@ final class TrialBalanceQuery
             $filters .= ' AND account.classification=?';
             $bindings[] = $classification;
         }
+        $bindings[] = $includeZero;
 
-        $rows = DB::select(<<<SQL
-            SELECT account.id AS account_id, account.code, account.name,
-                   account.account_type, account.classification, account.status,
-                   round(COALESCE(SUM(line.debit) FILTER (WHERE journal.id IS NOT NULL),0),2)::text AS debit_total,
-                   round(COALESCE(SUM(line.credit) FILTER (WHERE journal.id IS NOT NULL),0),2)::text AS credit_total,
-                   round(COALESCE(SUM(line.debit-line.credit) FILTER (WHERE journal.id IS NOT NULL),0),2)::text AS signed_balance,
-                   round(COALESCE(SUM(CASE WHEN account.account_type IN ('asset','expense') THEN line.debit-line.credit ELSE line.credit-line.debit END) FILTER (WHERE journal.id IS NOT NULL),0),2)::text AS normal_balance
-            FROM public.accounts account
-            LEFT JOIN public.journal_lines line
-              ON line.tenant_id=account.tenant_id AND line.account_id=account.id
-            LEFT JOIN public.journal_entries journal
-              ON journal.tenant_id=line.tenant_id AND journal.id=line.journal_entry_id
-             AND journal.status='posted' AND journal.entry_date<=?
-            WHERE account.tenant_id=? AND account.kind='posting'{$filters}
-            GROUP BY account.id,account.code,account.name,account.account_type,account.classification,account.status
-            ORDER BY account.code,account.id
+        $result = DB::selectOne(<<<SQL
+            WITH activity AS (
+                SELECT line.tenant_id, line.account_id,
+                       COALESCE(SUM(line.debit), 0) AS debit_total,
+                       COALESCE(SUM(line.credit), 0) AS credit_total
+                FROM public.journal_entries journal
+                JOIN public.journal_lines line
+                  ON line.tenant_id=journal.tenant_id AND line.journal_entry_id=journal.id
+                WHERE journal.tenant_id=? AND journal.status='posted' AND journal.entry_date<=?
+                GROUP BY line.tenant_id, line.account_id
+            ), totals AS (
+                SELECT COALESCE(SUM(line.debit), 0) AS debit_total,
+                       COALESCE(SUM(line.credit), 0) AS credit_total
+                FROM public.journal_entries journal
+                JOIN public.journal_lines line
+                  ON line.tenant_id=journal.tenant_id AND line.journal_entry_id=journal.id
+                WHERE journal.tenant_id=? AND journal.status='posted' AND journal.entry_date<=?
+            ), report_rows AS (
+                SELECT account.id AS account_id, account.code, account.name,
+                       account.account_type, account.classification, account.status,
+                       COALESCE(activity.debit_total, 0) AS debit_total,
+                       COALESCE(activity.credit_total, 0) AS credit_total
+                FROM public.accounts account
+                LEFT JOIN activity
+                  ON activity.tenant_id=account.tenant_id AND activity.account_id=account.id
+                WHERE account.tenant_id=? AND account.kind='posting'{$filters}
+            ), displayed_rows AS (
+                SELECT * FROM report_rows
+                WHERE ?::boolean OR debit_total<>0 OR credit_total<>0
+            ), payload AS (
+                SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                    'account_id', account_id,
+                    'code', code,
+                    'name', name,
+                    'account_type', account_type,
+                    'classification', classification,
+                    'status', status,
+                    'debit_total', round(debit_total, 2)::text,
+                    'credit_total', round(credit_total, 2)::text,
+                    'signed_balance', round(debit_total-credit_total, 2)::text,
+                    'normal_balance', round(CASE WHEN account_type IN ('asset','expense') THEN debit_total-credit_total ELSE credit_total-debit_total END, 2)::text
+                ) ORDER BY code, account_id), '[]'::jsonb) AS rows
+                FROM displayed_rows
+            )
+            SELECT payload.rows::text AS rows,
+                   round(totals.debit_total, 2)::text AS debit_total,
+                   round(totals.credit_total, 2)::text AS credit_total,
+                   totals.debit_total=totals.credit_total AS is_balanced
+            FROM payload CROSS JOIN totals
             SQL, $bindings);
 
-        $result = array_values(array_filter(array_map(static fn (object $row): array => (array) $row, $rows), static fn (array $row): bool => $includeZero || $row['debit_total'] !== '0.00' || $row['credit_total'] !== '0.00'));
-        $totals = DB::selectOne(<<<'SQL'
-            SELECT round(COALESCE(SUM(line.debit),0),2)::text AS debit_total,
-                   round(COALESCE(SUM(line.credit),0),2)::text AS credit_total
-            FROM public.journal_entries journal
-            JOIN public.journal_lines line ON line.tenant_id=journal.tenant_id AND line.journal_entry_id=journal.id
-            WHERE journal.tenant_id=? AND journal.status='posted' AND journal.entry_date<=?
-            SQL, [$tenantId, $asOfDate]);
+        if ($result === null) {
+            throw new \RuntimeException('Trial Balance query did not return a result.');
+        }
 
         return [
             'as_of_date' => $asOfDate,
-            'rows' => $result,
-            'debit_total' => $totals->debit_total,
-            'credit_total' => $totals->credit_total,
-            'is_balanced' => $totals->debit_total === $totals->credit_total,
+            'rows' => json_decode((string) $result->rows, true, 512, JSON_THROW_ON_ERROR),
+            'debit_total' => (string) $result->debit_total,
+            'credit_total' => (string) $result->credit_total,
+            'is_balanced' => $result->is_balanced === true || $result->is_balanced === 't' || $result->is_balanced === '1',
         ];
     }
 }

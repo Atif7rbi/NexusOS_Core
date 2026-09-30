@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SystemSettingController;
 use App\Modules\Accounting\Controllers\AccountController;
 use App\Modules\Accounting\Controllers\AccountingPeriodController;
+use App\Modules\Accounting\Controllers\AccountingReportController;
 use App\Modules\Accounting\Controllers\AccountingSettingsController;
 use App\Modules\Accounting\Controllers\JournalController;
 use App\Modules\Accounting\Controllers\OpeningBalanceController;
@@ -34,6 +35,7 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
     Route::prefix('accounting')->name('accounting.')->group(function (): void {
         Route::post('/activation', [AccountingSettingsController::class, 'activate'])->name('activation.store');
         Route::get('/settings', [AccountingSettingsController::class, 'show'])->name('settings.show');
+        Route::get('/reports/trial-balance', [AccountingReportController::class, 'trialBalance'])->name('reports.trial-balance');
 
         Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');

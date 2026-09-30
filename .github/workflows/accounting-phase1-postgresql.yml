@@ -11,6 +11,7 @@ on:
       - 'feat/accounting-application-core-v1'
       - 'feat/accounting-api-v1'
       - 'feat/accounting-reporting-readiness-v1'
+      - 'feat/accounting-read-model-trial-balance-v1'
       - 'feat/receivables-foundations-v1'
       - 'feat/receivable-accounting-integration-v1'
       - 'feat/collection-backed-receivable-v1'
@@ -106,6 +107,8 @@ jobs:
         run: php artisan migrate:fresh --force && php artisan test --filter='Customer'
       - name: Accounting Phase 4 reporting reference tests
         run: php artisan test --filter='AccountingReportingQueriesTest'
+      - name: Trial Balance read model focused tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingTrialBalance'
       - name: Accounting Phase 3 API tests
         run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
