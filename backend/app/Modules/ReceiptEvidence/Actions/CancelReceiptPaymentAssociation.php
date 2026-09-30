@@ -36,6 +36,15 @@ final class CancelReceiptPaymentAssociation
             if ($operation !== null) {
                 throw new ReceiptEvidenceConflict('Association cancellation operation identity was reused with different facts.');
             }
+            if (DB::table('receivable_settlements')
+                ->where('tenant_id', $tenantId)
+                ->where('receipt_payment_association_id', $associationId)
+                ->where('status', 'posted')
+                ->exists()) {
+                throw new ReceiptEvidenceConflict(
+                    'A Receipt association with a Posted Settlement cannot be cancelled.',
+                );
+            }
             $now = now();
             DB::table('receipt_payment_associations')->where('tenant_id', $tenantId)->where('id', $associationId)->update([...$facts, 'status' => 'cancelled', 'cancelled_by' => $actor->id, 'cancelled_at' => $now, 'updated_at' => $now]);
         });

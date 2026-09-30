@@ -1,0 +1,114 @@
+name: Receivable Settlement v1
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/Modules/Settlement/**'
+      - 'backend/app/Modules/Payments/Actions/CancelPaymentAllocationAction.php'
+      - 'backend/app/Modules/ReceiptEvidence/Actions/CancelReceiptPaymentAssociation.php'
+      - 'backend/app/Modules/ReceiptEvidence/Actions/ReversePostedBankReceiptCashAndInvalidate.php'
+      - 'backend/app/Modules/AccountingRecognition/Support/ReceivableArSourceCorrectionCoordinator.php'
+      - 'backend/app/Modules/Accounting/Actions/ReverseJournalAction.php'
+      - 'backend/database/migrations/2026_09_30_000000_create_receivable_settlements.php'
+      - 'backend/tests/Feature/ReceivableSettlement*Test.php'
+      - 'backend/tests/Support/CreatesReceivableSettlementFixtures.php'
+      - 'backend/tests/Support/receivable_settlement_worker.php'
+      - 'docs/settlement/**'
+      - '.github/workflows/receivable-settlement-v1.yml'
+  push:
+    branches:
+      - 'feat/settlement-receivable-lifecycle-v1'
+
+jobs:
+  settlement-postgresql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexusos_settlement_testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexusos_settlement_testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_CONFIG_CACHE: /tmp/nexusos-settlement-config.php
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: nexusos_settlement_testing
+      NEXUSOS_TEST_DATABASE: nexusos_settlement_testing
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      ACCOUNTING_RUNTIME_DB_ROLE: nexusos_runtime
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - name: PostgreSQL preflight
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/nexusos_settlement_testing" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE nexusos_runtime NOLOGIN
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          GRANT nexusos_runtime TO postgres;
+          SELECT current_database();
+          SHOW server_version;
+          SQL
+      - name: Fresh PostgreSQL schema
+        run: php artisan migrate:fresh --force
+      - name: Settlement focused, schema, and security
+        run: >-
+          php artisan test
+          tests/Feature/ReceivableSettlementTest.php
+          tests/Feature/ReceivableSettlementSchemaIntegrityTest.php
+          tests/Feature/ReceivableSettlementSecurityTest.php
+      - name: Settlement concurrency
+        run: >-
+          php artisan test
+          tests/Feature/ReceivableSettlementConcurrencyTest.php
+      - name: Reset schema before legacy regressions
+        run: php artisan migrate:fresh --force
+      - name: Non-concurrency regressions
+        run: >-
+          php artisan test
+          tests/Feature/PaymentsAllocationsTest.php
+          tests/Feature/ReceiptEvidenceTest.php
+          tests/Feature/VerifiedBankReceiptCashPostingTest.php
+          tests/Feature/VerifiedBankReceiptCashPostingSchemaIntegrityTest.php
+          tests/Feature/ReceivablesApiTest.php
+          tests/Feature/ReceivablesSchemaIntegrityTest.php
+          tests/Feature/ContractualBillingEntitlementReceivableAllocationGuardTest.php
+          tests/Feature/ReceivableArRecognitionTest.php
+          tests/Feature/ReceivableArRecognitionSecurityTest.php
+      - name: Concurrency regressions
+        run: >-
+          php artisan test
+          tests/Feature/PaymentsAllocationsConcurrencyTest.php
+          tests/Feature/ReceiptEvidenceConcurrencyTest.php
+          tests/Feature/VerifiedBankReceiptCashPostingConcurrencyTest.php
+          tests/Feature/ReceivablesConcurrencyTest.php
+          tests/Feature/ContractualBillingEntitlementReceivableConcurrencyTest.php
+          tests/Feature/ReceivableArRecognitionConcurrencyTest.php
+          tests/Feature/GlArCrossSliceIntegrationConcurrencyTest.php
+      - name: Formatting
+        env:
+          COLUMNS: 300
+        run: vendor/bin/pint --test app/Modules/Settlement tests/Feature/ReceivableSettlementTest.php tests/Feature/ReceivableSettlementSchemaIntegrityTest.php tests/Feature/ReceivableSettlementSecurityTest.php tests/Feature/ReceivableSettlementConcurrencyTest.php tests/Support/CreatesReceivableSettlementFixtures.php tests/Support/receivable_settlement_worker.php

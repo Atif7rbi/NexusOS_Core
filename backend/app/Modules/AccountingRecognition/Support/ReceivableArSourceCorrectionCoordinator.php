@@ -80,6 +80,16 @@ final class ReceivableArSourceCorrectionCoordinator
                 );
             }
 
+            if (DB::table('receivable_settlements')
+                ->where('tenant_id', $tenantId)
+                ->where('receivable_ar_recognition_id', $recognition->id)
+                ->where('status', 'posted')
+                ->exists()) {
+                throw new AccountingRecognitionConflict(
+                    'Receivable AR source correction requires dependent Settlements to be reversed first.',
+                );
+            }
+
             $journal = DB::table('journal_entries')
                 ->where('tenant_id', $tenantId)
                 ->where('id', $recognition->journal_entry_id)

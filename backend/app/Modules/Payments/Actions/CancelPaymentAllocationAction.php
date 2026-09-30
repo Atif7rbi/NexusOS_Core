@@ -40,6 +40,15 @@ final class CancelPaymentAllocationAction
             if ($allocation->status !== 'effective') {
                 throw new PaymentsConflict('Only an effective Payment Allocation can be cancelled.');
             }
+            if (DB::table('receivable_settlements')
+                ->where('tenant_id', $tenantId)
+                ->where('payment_allocation_id', $allocationId)
+                ->where('status', 'posted')
+                ->exists()) {
+                throw new PaymentsConflict(
+                    'A Payment Allocation with a Posted Settlement cannot be cancelled.',
+                );
+            }
             $now = now();
             DB::table('payment_allocations')->where('tenant_id', $tenantId)->where('id', $allocationId)->update(['status' => 'cancelled', 'cancelled_at' => $now, 'cancelled_by' => $actor->id, 'cancellation_reason' => $reason, 'updated_at' => $now]);
             $this->audit->write($tenantId, 'payment_allocation.cancelled', 'payment_allocation', $allocationId, $actor->id, ['reason' => $reason]);
