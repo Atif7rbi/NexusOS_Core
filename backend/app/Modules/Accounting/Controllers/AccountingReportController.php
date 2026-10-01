@@ -5,15 +5,25 @@ declare(strict_types=1);
 namespace App\Modules\Accounting\Controllers;
 
 use App\Modules\Accounting\Queries\GeneralLedgerQuery;
+use App\Modules\Accounting\Queries\IncomeStatementQuery;
 use App\Modules\Accounting\Queries\TrialBalanceQuery;
 use App\Modules\Accounting\Requests\ClassificationCatalogRequest;
 use App\Modules\Accounting\Requests\GeneralLedgerRequest;
+use App\Modules\Accounting\Requests\IncomeStatementRequest;
 use App\Modules\Accounting\Requests\TrialBalanceRequest;
 use App\Modules\Accounting\Support\FinancialStatementClassificationCatalog;
 use Illuminate\Http\JsonResponse;
 
 final class AccountingReportController extends AccountingController
 {
+    public function incomeStatement(IncomeStatementRequest $request, IncomeStatementQuery $query): JsonResponse
+    {
+        [$tenantId] = $this->context($request, 'view_ledger');
+        $filters = $request->validated();
+
+        return response()->json(['data' => ['income_statement' => $query->execute($tenantId, $filters['from_date'], $filters['to_date'])]]);
+    }
+
     public function classifications(ClassificationCatalogRequest $request): JsonResponse
     {
         $this->context($request, 'view_ledger');
