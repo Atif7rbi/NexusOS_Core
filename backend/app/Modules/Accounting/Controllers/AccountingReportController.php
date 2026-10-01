@@ -6,12 +6,21 @@ namespace App\Modules\Accounting\Controllers;
 
 use App\Modules\Accounting\Queries\GeneralLedgerQuery;
 use App\Modules\Accounting\Queries\TrialBalanceQuery;
+use App\Modules\Accounting\Requests\ClassificationCatalogRequest;
 use App\Modules\Accounting\Requests\GeneralLedgerRequest;
 use App\Modules\Accounting\Requests\TrialBalanceRequest;
+use App\Modules\Accounting\Support\FinancialStatementClassificationCatalog;
 use Illuminate\Http\JsonResponse;
 
 final class AccountingReportController extends AccountingController
 {
+    public function classifications(ClassificationCatalogRequest $request): JsonResponse
+    {
+        $this->context($request, 'view_ledger');
+
+        return response()->json(['data' => ['classifications' => FinancialStatementClassificationCatalog::entries()]]);
+    }
+
     public function generalLedger(GeneralLedgerRequest $request, string $account, GeneralLedgerQuery $query): JsonResponse
     {
         [$tenantId] = $this->context($request, 'view_ledger');

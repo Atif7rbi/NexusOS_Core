@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Accounting\Requests;
 
+use App\Modules\Accounting\Support\FinancialStatementClassificationCatalog;
 use Illuminate\Validation\Rule;
 
 final class UpdateAccountRequest extends AccountingRequest
@@ -15,8 +16,8 @@ final class UpdateAccountRequest extends AccountingRequest
             'name' => ['sometimes', 'string', 'max:160'],
             'description' => ['sometimes', 'nullable', 'string'],
             'kind' => ['sometimes', Rule::in(['group', 'posting'])],
-            'account_type' => ['sometimes', Rule::in(['asset', 'liability', 'equity', 'revenue', 'expense'])],
-            'classification' => ['sometimes', 'nullable', Rule::in(['current_asset', 'non_current_asset', 'current_liability', 'non_current_liability', 'equity', 'operating_revenue', 'other_revenue', 'cost_of_revenue', 'operating_expense', 'finance_cost', 'other_expense'])],
+            'account_type' => ['sometimes', Rule::in(FinancialStatementClassificationCatalog::accountTypes())],
+            'classification' => ['sometimes', 'nullable', Rule::in(FinancialStatementClassificationCatalog::classifications())],
             'parent_id' => ['sometimes', 'nullable', 'ulid'],
             'status' => ['prohibited'],
         ];
