@@ -11,6 +11,7 @@ on:
       - 'feat/accounting-application-core-v1'
       - 'feat/accounting-api-v1'
       - 'feat/accounting-reporting-readiness-v1'
+      - 'feat/accounting-read-model-trial-balance-v1'
       - 'feat/receivables-foundations-v1'
       - 'feat/receivable-accounting-integration-v1'
       - 'feat/collection-backed-receivable-v1'
@@ -106,6 +107,8 @@ jobs:
         run: php artisan migrate:fresh --force && php artisan test --filter='Customer'
       - name: Accounting Phase 4 reporting reference tests
         run: php artisan test --filter='AccountingReportingQueriesTest'
+      - name: Trial Balance read model focused tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingTrialBalance' && php artisan migrate:fresh --force
       - name: Accounting Phase 3 API tests
         run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
@@ -144,7 +147,7 @@ jobs:
       - name: Verified Bank Receipt Cash Posting concurrency tests
         run: php artisan migrate:fresh --force && php artisan test --filter='VerifiedBankReceiptCashPostingConcurrencyTest'
       - name: Core feature regressions
-        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:(?:Accounting(?:Schema|Application|Recognition)|PerformanceAccountingRecognition|ReceivableArRecognition|GlArCrossSliceIntegration|Receivables|PaymentsAllocations|ReceiptEvidence|VerifiedBankReceiptCashPosting|ContractualBilling.*|ContractConsideration)ConcurrencyTest|ContractualBilling.*RecoveryTest|ContractConsiderationRecoveryTest|ReceivableSettlement))/'
+        run: php artisan migrate:fresh --force && php artisan test --testsuite=Feature --filter='/^(?!.*(?:(?:Accounting(?:Schema|Application|Recognition)|PerformanceAccountingRecognition|AccountingTrialBalance|ReceivableArRecognition|GlArCrossSliceIntegration|Receivables|PaymentsAllocations|ReceiptEvidence|VerifiedBankReceiptCashPosting|ContractualBilling.*|ContractConsideration)ConcurrencyTest|ContractualBilling.*RecoveryTest|ContractConsiderationRecoveryTest|ReceivableSettlement))/'
       - name: Migration rollback safety on empty schema
         run: |
           php artisan migrate:fresh --force

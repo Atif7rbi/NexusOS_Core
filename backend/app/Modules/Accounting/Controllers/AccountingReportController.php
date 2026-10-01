@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Accounting\Controllers;
+
+use App\Modules\Accounting\Queries\TrialBalanceQuery;
+use App\Modules\Accounting\Requests\TrialBalanceRequest;
+use Illuminate\Http\JsonResponse;
+
+final class AccountingReportController extends AccountingController
+{
+    public function trialBalance(TrialBalanceRequest $request, TrialBalanceQuery $query): JsonResponse
+    {
+        [$tenantId] = $this->context($request, 'view_ledger');
+        $filters = $request->validated();
+
+        return response()->json(['data' => ['trial_balance' => $query->execute(
+            $tenantId,
+            $filters['as_of_date'],
+            $filters['account_type'] ?? null,
+            $filters['classification'] ?? null,
+            (bool) ($filters['include_zero'] ?? false),
+        )]]);
+    }
+}
