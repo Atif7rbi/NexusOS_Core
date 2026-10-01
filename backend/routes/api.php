@@ -36,6 +36,7 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
         Route::post('/activation', [AccountingSettingsController::class, 'activate'])->name('activation.store');
         Route::get('/settings', [AccountingSettingsController::class, 'show'])->name('settings.show');
         Route::get('/reports/trial-balance', [AccountingReportController::class, 'trialBalance'])->name('reports.trial-balance');
+        Route::get('/reports/general-ledger/{account}', [AccountingReportController::class, 'generalLedger'])->name('reports.general-ledger');
 
         Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
