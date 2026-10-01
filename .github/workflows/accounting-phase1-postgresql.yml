@@ -111,7 +111,9 @@ jobs:
       - name: Trial Balance read model focused tests
         run: php artisan migrate:fresh --force && php artisan test --filter='AccountingTrialBalance' && php artisan migrate:fresh --force
       - name: General Ledger read model focused tests
-        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingGeneralLedger' --fail-on-empty-test-suite && php artisan migrate:fresh --force
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingGeneralLedger(Test|ApiTest|SecurityTest)' --fail-on-empty-test-suite && php artisan migrate:fresh --force
+      - name: General Ledger concurrency tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingGeneralLedgerConcurrencyTest' --fail-on-empty-test-suite && php artisan migrate:fresh --force
       - name: Accounting Phase 3 API tests
         run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
