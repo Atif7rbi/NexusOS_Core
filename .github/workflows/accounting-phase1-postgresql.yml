@@ -114,6 +114,8 @@ jobs:
         run: php artisan migrate:fresh --force && php artisan test --filter='AccountingGeneralLedger(Test|ApiTest|SecurityTest)' --fail-on-empty-test-suite && php artisan migrate:fresh --force
       - name: General Ledger concurrency tests
         run: php artisan migrate:fresh --force && php artisan test --filter='AccountingGeneralLedgerConcurrencyTest' --fail-on-empty-test-suite && php artisan migrate:fresh --force
+      - name: Financial Statement Classification focused tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingFinancialStatementClassification' --fail-on-empty-test-suite && php artisan migrate:fresh --force
       - name: Accounting Phase 3 API tests
         run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests

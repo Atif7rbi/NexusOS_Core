@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Accounting\Requests;
 
+use App\Modules\Accounting\Support\FinancialStatementClassificationCatalog;
 use Illuminate\Validation\Rule;
 
 final class StoreAccountRequest extends AccountingRequest
@@ -15,10 +16,26 @@ final class StoreAccountRequest extends AccountingRequest
             'name' => ['required', 'string', 'max:160'],
             'description' => ['sometimes', 'nullable', 'string'],
             'kind' => ['required', Rule::in(['group', 'posting'])],
-            'account_type' => ['required', Rule::in(['asset', 'liability', 'equity', 'revenue', 'expense'])],
-            'classification' => ['present', 'nullable', Rule::in(['current_asset', 'non_current_asset', 'current_liability', 'non_current_liability', 'equity', 'operating_revenue', 'other_revenue', 'cost_of_revenue', 'operating_expense', 'finance_cost', 'other_expense'])],
+            'account_type' => ['required', Rule::in(FinancialStatementClassificationCatalog::accountTypes())],
+            'classification' => ['present', 'nullable', Rule::in(FinancialStatementClassificationCatalog::classifications())],
             'parent_id' => ['sometimes', 'nullable', 'ulid'],
             'status' => ['prohibited'],
         ];
+    }
+
+    protected function withValidator($validator): void
+    {
+        parent::withValidator($validator);
+        $validator->after(function ($validator): void {
+            $kind = $this->input('kind');
+            $type = $this->input('account_type');
+            $classification = $this->input('classification');
+            if ($kind === 'group' && $classification !== null) {
+                $validator->errors()->add('classification', 'Group Accounts cannot have a classification.');
+            }
+            if ($kind === 'posting' && ! FinancialStatementClassificationCatalog::isValidPostingPair((string) $type, $classification)) {
+                $validator->errors()->add('classification', 'Classification is not valid for this Account type.');
+            }
+        });
     }
 }
