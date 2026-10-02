@@ -47,7 +47,7 @@ final class AccountingApiBoundaryTest extends AccountingApiTestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('tenant_id');
     }
 
-    public function test_authorized_reporting_routes_expose_trial_balance_and_income_statement_only(): void
+    public function test_authorized_reporting_routes_expose_trial_balance_income_statement_and_balance_sheet_only(): void
     {
         $routes = collect(Route::getRoutes()->getRoutes())->map(fn ($route): string => $route->uri())->filter(fn (string $uri): bool => str_starts_with($uri, 'api/accounting'))->values()->all();
 
@@ -55,7 +55,7 @@ final class AccountingApiBoundaryTest extends AccountingApiTestCase
         self::assertFalse(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'business-post')));
         self::assertTrue(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'trial-balance')));
         self::assertTrue(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'income-statement')));
-        self::assertFalse(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'balance-sheet')));
+        self::assertTrue(collect($routes)->contains(fn (string $uri): bool => str_contains($uri, 'balance-sheet')));
     }
 
     public function test_controllers_contain_no_database_mutation_or_transaction_ownership(): void

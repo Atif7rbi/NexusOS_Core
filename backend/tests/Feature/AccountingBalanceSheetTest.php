@@ -11,6 +11,15 @@ use App\Modules\Accounting\Queries\TrialBalanceQuery;
 
 final class AccountingBalanceSheetTest extends AccountingApiTestCase
 {
+    public function test_negative_normal_side_balance_is_not_clamped(): void
+    {
+        [$tenant, $actor, , $cash] = $this->ready('BN');
+        $revenue = $this->account($tenant, $actor, '4000', 'revenue', 'operating_revenue');
+        $id = app(ManageManualJournalAction::class)->create((string) $tenant->id, $actor, '2026-01-01', 'Negative cash', [new JournalLineData($revenue, '25.40', '0'), new JournalLineData($cash, '0', '25.40')]);
+        app(ManageManualJournalAction::class)->post((string) $tenant->id, $id, $actor);
+        self::assertSame('-25.40', app(BalanceSheetQuery::class)->execute((string) $tenant->id, '2026-01-01')['current_assets']);
+    }
+
     public function test_balance_sheet_derives_classifications_earnings_and_trial_balance_truth(): void
     {
         [$tenant, $actor, , $cash] = $this->ready('BS');
