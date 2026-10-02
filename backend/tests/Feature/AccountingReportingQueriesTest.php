@@ -154,21 +154,22 @@ final class AccountingReportingQueriesTest extends TestCase
         $this->postJournal($tenant, $actor, '2026-01-01', [[$cash, '100.00', '0'], [$revenue, '0', '100.00']]);
         $noClosing = $query->execute((string) $tenant->id, '2026-01-01');
         self::assertSame('100.00', $noClosing['assets']);
-        self::assertSame('100.00', $noClosing['derived_unclosed_earnings']);
-        self::assertTrue($noClosing['is_balanced']);
+        self::assertSame('0.00', $noClosing['equity_accounts']);
+        self::assertSame('100.00', $noClosing['current_earnings']);
+        self::assertSame('100.00', $noClosing['equity']);
 
         $this->postJournal($tenant, $actor, '2026-01-02', [[$expense, '40.00', '0'], [$cash, '0', '40.00']]);
         app(ManageAccountAction::class)->archive((string) $tenant->id, $cash, $actor);
         $expenseCase = $query->execute((string) $tenant->id, '2026-01-02');
         self::assertSame('60.00', $expenseCase['assets']);
-        self::assertSame('60.00', $expenseCase['derived_unclosed_earnings']);
-        self::assertTrue($expenseCase['is_balanced']);
+        self::assertSame('60.00', $expenseCase['current_earnings']);
+        self::assertSame('60.00', $expenseCase['equity']);
 
         $this->postJournal($tenant, $actor, '2026-12-31', [[$revenue, '100.00', '0'], [$expense, '0', '40.00'], [$equity, '0', '60.00']]);
         $closed = $query->execute((string) $tenant->id, '2026-12-31');
-        self::assertSame('0.00', $closed['derived_unclosed_earnings']);
+        self::assertSame('0.00', $closed['current_earnings']);
+        self::assertSame('60.00', $closed['equity_accounts']);
         self::assertSame('60.00', $closed['equity']);
-        self::assertTrue($closed['is_balanced']);
 
         [$partialTenant, $partialActor] = $this->ready();
         $partialCash = $this->account($partialTenant, $partialActor, '1000', 'asset', 'current_asset');
@@ -177,9 +178,9 @@ final class AccountingReportingQueriesTest extends TestCase
         $this->postJournal($partialTenant, $partialActor, '2026-01-01', [[$partialCash, '100.00', '0'], [$partialRevenue, '0', '100.00']]);
         $this->postJournal($partialTenant, $partialActor, '2026-12-31', [[$partialRevenue, '40.00', '0'], [$partialEquity, '0', '40.00']]);
         $partial = $query->execute((string) $partialTenant->id, '2026-12-31');
-        self::assertSame('40.00', $partial['equity']);
-        self::assertSame('60.00', $partial['derived_unclosed_earnings']);
-        self::assertTrue($partial['is_balanced']);
+        self::assertSame('40.00', $partial['equity_accounts']);
+        self::assertSame('60.00', $partial['current_earnings']);
+        self::assertSame('100.00', $partial['equity']);
     }
 
     public function test_balance_sheet_applies_reversals_as_of_and_tenant_isolation_exactly(): void
@@ -200,21 +201,19 @@ final class AccountingReportingQueriesTest extends TestCase
         $beforeReversal = $query->execute((string) $tenant->id, '2026-01-31');
         self::assertSame('100.10', $beforeReversal['assets']);
         self::assertSame('0.00', $beforeReversal['liabilities']);
-        self::assertSame('0.00', $beforeReversal['equity']);
-        self::assertSame('100.10', $beforeReversal['derived_unclosed_earnings']);
-        self::assertSame('0.00', $beforeReversal['equation_difference']);
-        self::assertTrue($beforeReversal['is_balanced']);
+        self::assertSame('0.00', $beforeReversal['equity_accounts']);
+        self::assertSame('100.10', $beforeReversal['current_earnings']);
+        self::assertSame('100.10', $beforeReversal['equity']);
 
         $afterReversal = $query->execute((string) $tenant->id, '2026-12-31');
         self::assertSame('0.00', $afterReversal['assets']);
-        self::assertSame('0.00', $afterReversal['derived_unclosed_earnings']);
-        self::assertSame('0.00', $afterReversal['equation_difference']);
-        self::assertTrue($afterReversal['is_balanced']);
+        self::assertSame('0.00', $afterReversal['current_earnings']);
+        self::assertSame('0.00', $afterReversal['equity']);
 
         $includingFuture = $query->execute((string) $tenant->id, '2027-01-01');
         self::assertSame('25.20', $includingFuture['assets']);
-        self::assertSame('25.20', $includingFuture['derived_unclosed_earnings']);
-        self::assertTrue($includingFuture['is_balanced']);
+        self::assertSame('25.20', $includingFuture['current_earnings']);
+        self::assertSame('25.20', $includingFuture['equity']);
     }
 
     public function test_general_ledger_has_exact_normal_side_opening_running_closing_and_deterministic_order(): void
