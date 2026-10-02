@@ -37,6 +37,7 @@ final class AccountingBalanceSheetSecurityTest extends AccountingApiTestCase
         $this->acting($archived);
         $this->getJson($url)->assertForbidden();
         DB::table('tenant_users')->where('user_id', $accountant->id)->update(['status' => TenantUser::STATUS_PAUSED]);
+        $this->acting($accountant);
         $this->getJson($url)->assertForbidden();
         DB::statement('SET ROLE "'.getenv('ACCOUNTING_RUNTIME_DB_ROLE').'"');
         try {
