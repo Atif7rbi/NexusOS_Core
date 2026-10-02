@@ -15,6 +15,7 @@ on:
       - 'feat/accounting-read-model-trial-balance-v1'
       - 'feat/receivables-foundations-v1'
       - 'feat/accounting-income-statement-v1'
+      - 'feat/accounting-balance-sheet-v1'
       - 'feat/receivable-accounting-integration-v1'
       - 'feat/collection-backed-receivable-v1'
       - 'feat/payments-allocations-v1'
@@ -121,6 +122,10 @@ jobs:
         run: php artisan migrate:fresh --force && php artisan test --filter='AccountingIncomeStatement(Test|ApiTest|SecurityTest)' --fail-on-empty-test-suite && php artisan migrate:fresh --force
       - name: Income Statement concurrency tests
         run: php artisan migrate:fresh --force && php artisan test --filter='AccountingIncomeStatementConcurrencyTest' --fail-on-empty-test-suite && php artisan migrate:fresh --force
+      - name: Balance Sheet focused tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingBalanceSheet(Test|ApiTest|SecurityTest)' --fail-on-empty-test-suite && php artisan migrate:fresh --force
+      - name: Balance Sheet concurrency tests
+        run: php artisan migrate:fresh --force && php artisan test --filter='AccountingBalanceSheetConcurrencyTest' --fail-on-empty-test-suite && php artisan migrate:fresh --force
       - name: Accounting Phase 3 API tests
         run: php artisan test --filter='Accounting.*Api'
       - name: Accounting Phase 2 focused tests
