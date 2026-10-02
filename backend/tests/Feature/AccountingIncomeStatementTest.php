@@ -36,11 +36,12 @@ final class AccountingIncomeStatementTest extends AccountingApiTestCase
         [$tenant, $actor, , $cash] = $this->ready('IB');
         $revenue = $this->account($tenant, $actor, '4000', 'revenue', 'operating_revenue');
         $this->posted($tenant, $actor, $cash, $revenue, '2026-01-01');
+        $this->posted($tenant, $actor, $cash, $revenue, '2026-01-02');
         $this->posted($tenant, $actor, $cash, $revenue, '2026-01-31');
         $this->posted($tenant, $actor, $cash, $revenue, '2026-02-01');
         $draft = app(ManageManualJournalAction::class)->create((string) $tenant->id, $actor, '2026-01-15', 'Draft revenue', [new JournalLineData($cash, '999.00', '0'), new JournalLineData($revenue, '0', '999.00')]);
         self::assertNotEmpty($draft);
-        $range = app(IncomeStatementQuery::class)->execute((string) $tenant->id, '2026-01-01', '2026-01-31');
+        $range = app(IncomeStatementQuery::class)->execute((string) $tenant->id, '2026-01-02', '2026-01-31');
         self::assertSame('200.00', $range['operating_revenue']);
         self::assertSame('200.00', $range['revenue']);
         self::assertSame('200.00', $range['net_income']);

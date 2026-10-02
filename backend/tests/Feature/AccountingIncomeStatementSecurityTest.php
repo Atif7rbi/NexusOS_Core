@@ -31,6 +31,14 @@ final class AccountingIncomeStatementSecurityTest extends AccountingApiTestCase
         DB::table('tenant_users')->where('user_id', $accountant->id)->update(['status' => TenantUser::STATUS_REMOVED]);
         $this->acting($accountant);
         $this->getJson($url)->assertForbidden();
+        $paused = User::factory()->create(['role' => User::ROLE_ACCOUNTANT, 'status' => User::STATUS_ACTIVE]);
+        TenantUser::factory()->create(['tenant_id' => $tenant->id, 'user_id' => $paused->id, 'status' => TenantUser::STATUS_PAUSED]);
+        $this->acting($paused);
+        $this->getJson($url)->assertForbidden();
+        $inactive = User::factory()->create(['role' => User::ROLE_ACCOUNTANT, 'status' => User::STATUS_ARCHIVED]);
+        TenantUser::factory()->create(['tenant_id' => $tenant->id, 'user_id' => $inactive->id, 'status' => TenantUser::STATUS_ACTIVE]);
+        $this->acting($inactive);
+        $this->getJson($url)->assertForbidden();
         $token = $admin->createToken('income-statement-suspended')->plainTextToken;
         DB::table('users')->where('id', $admin->id)->update(['status' => User::STATUS_SUSPENDED]);
         app('auth')->forgetGuards();
