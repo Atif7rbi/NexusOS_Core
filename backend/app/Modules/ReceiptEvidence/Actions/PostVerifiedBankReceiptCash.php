@@ -175,6 +175,9 @@ final class PostVerifiedBankReceiptCash
 
         $id = (string) Str::ulid();
         $now = now();
+        if (! DB::table('account_cash_roles')->where('tenant_id', $tenantId)->where('account_id', $mapping->cash_account_id)->exists()) {
+            throw new ReceiptEvidenceValidationFailed('Receiving cash account must have an assigned cash flow role.');
+        }
 
         $journal = $this->posting->post(
             new BusinessPostingRequest(
@@ -197,6 +200,7 @@ final class PostVerifiedBankReceiptCash
                         (string) $receipt->amount,
                     ),
                 ],
+                'operating',
             ),
         );
 

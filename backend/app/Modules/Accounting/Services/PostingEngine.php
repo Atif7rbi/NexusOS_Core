@@ -62,6 +62,20 @@ final class PostingEngine
         if ($debit->isZero() || ! $debit->equals($credit)) {
             throw new AccountingValidationFailed('Journal must be non-zero and balanced.');
         }
+        DB::table('account_cash_roles')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('account_id', $accountIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        $cashDelta = (string) DB::scalar(
+            'SELECT COALESCE(SUM(line.debit-line.credit),0) FROM journal_lines line JOIN account_cash_roles role ON role.tenant_id=line.tenant_id AND role.account_id=line.account_id WHERE line.tenant_id=? AND line.journal_entry_id=?',
+            [$tenantId, $journalId],
+        );
+        $semantic = DB::table('journal_cash_flow_semantics')->where('tenant_id', $tenantId)->where('journal_entry_id', $journalId)->lockForUpdate()->first();
+        if (((string) $cashDelta === '0' || (string) $cashDelta === '0.00') !== ($semantic === null)) {
+            throw new AccountingValidationFailed('Cash flow semantic does not match the Journal cash delta.');
+        }
         $year = (int) substr((string) $journal->entry_date, 0, 4);
         $number = $this->numbers->generateWithinCurrentTransaction($tenantId, 'JRN', $year);
         $at = now();

@@ -7,6 +7,7 @@ namespace Tests\Support;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\Accounting\Actions\ManageCashFlowSemanticsAction;
 use App\Modules\AccountingRecognition\Actions\ConfigureAccountingRecognitionPolicies;
 use App\Modules\AccountingRecognition\Actions\RecognizeReceivableAr;
 use App\Modules\ContractualBilling\Actions\EstablishEntitlementReceivable;
@@ -130,6 +131,13 @@ trait CreatesReceivableSettlementFixtures
                 'masked_account_identity' => 'SA**9000',
                 'valid_from' => '2026-01-01',
             ],
+        );
+        app(ManageCashFlowSemanticsAction::class)->assignCashRole(
+            $context['tenant_id'],
+            $accounts['cash'],
+            'cash',
+            (string) Str::ulid(),
+            $context['actor'],
         );
         $receiptId = app(VerifyBankReceipt::class)->execute(
             $context['tenant_id'],
