@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Modules\Accounting\Actions\ActivateAccountingAction;
 use App\Modules\Accounting\Actions\ManageAccountAction;
 use App\Modules\Accounting\Actions\ManageAccountingPeriodAction;
+use App\Modules\Accounting\Actions\ManageCashFlowSemanticsAction;
 use App\Modules\ReceiptEvidence\Actions\ApproveReceivingAccount;
 use App\Modules\ReceiptEvidence\Actions\VerifyBankReceipt;
 use Illuminate\Support\Str;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
 trait CreatesVerifiedBankReceiptCashFixtures
 {
     /** @return array{Tenant,User,string,string,string,string} */
-    private function cashPostingContext(): array
+    private function cashPostingContext(bool $assignCashRole = true): array
     {
         $tenant = Tenant::factory()->create(['currency' => 'SAR', 'status' => Tenant::STATUS_ACTIVE]);
         $actor = User::factory()->create(['role' => User::ROLE_ADMINISTRATOR, 'status' => User::STATUS_ACTIVE]);
@@ -25,6 +26,9 @@ trait CreatesVerifiedBankReceiptCashFixtures
         app(ActivateAccountingAction::class)->execute((string) $tenant->id, $actor);
         app(ManageAccountingPeriodAction::class)->create((string) $tenant->id, $actor, '2026-01-01', '2026-12-31');
         $cash = app(ManageAccountAction::class)->create((string) $tenant->id, $actor, $this->cashAccount('1100', 'asset', 'current_asset'));
+        if ($assignCashRole) {
+            app(ManageCashFlowSemanticsAction::class)->assignCashRole((string) $tenant->id, $cash, 'cash', (string) Str::ulid(), $actor);
+        }
         $clearing = app(ManageAccountAction::class)->create((string) $tenant->id, $actor, $this->cashAccount('2100', 'liability', 'current_liability'));
         $receiving = app(ApproveReceivingAccount::class)->execute((string) $tenant->id, $actor, ['receiving_account_operation_id' => (string) Str::ulid(), 'institution_identifier' => 'bank-1', 'account_identity' => 'iban-'.Str::lower((string) Str::ulid()), 'masked_account_identity' => 'SA**1234', 'valid_from' => '2026-01-01']);
         $receipt = app(VerifyBankReceipt::class)->execute((string) $tenant->id, $actor, ['receipt_operation_id' => (string) Str::ulid(), 'receiving_account_id' => $receiving, 'source_identity_kind' => 'bank_transaction_id', 'source_identity_version' => 1, 'source_identity' => 'bank-'.Str::lower((string) Str::ulid()), 'amount' => '25.00', 'currency' => 'SAR', 'control_date' => '2026-08-01', 'evidence_reference' => 'statement/line']);

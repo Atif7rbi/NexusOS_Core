@@ -41,6 +41,19 @@ final class BusinessPostingService implements BusinessPostingServiceInterface
         foreach (array_values($request->lines) as $i => $line) {
             DB::table('journal_lines')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $request->tenantId, 'journal_entry_id' => $id, 'line_number' => $i + 1, 'account_id' => $line->accountId, 'debit' => (string) $line->debit, 'credit' => (string) $line->credit, 'memo' => $line->memo, 'created_at' => $at, 'updated_at' => $at]);
         }
+        if ($request->cashFlowActivity !== null) {
+            DB::table('journal_cash_flow_semantics')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $request->tenantId,
+                'journal_entry_id' => $id,
+                'activity' => $request->cashFlowActivity,
+                'semantic_operation_id' => (string) Str::ulid(),
+                'assigned_by' => $actor->id,
+                'assigned_at' => $at,
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+        }
 
         return $this->posting->post($request->tenantId, $id, $actor);
     }

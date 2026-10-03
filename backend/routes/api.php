@@ -38,6 +38,7 @@ Route::middleware(['auth:sanctum', 'tenant.active'])->group(function (): void {
         Route::get('/reports/trial-balance', [AccountingReportController::class, 'trialBalance'])->name('reports.trial-balance');
         Route::get('/reports/income-statement', [AccountingReportController::class, 'incomeStatement'])->name('reports.income-statement');
         Route::get('/reports/balance-sheet', [AccountingReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
+        Route::get('/reports/cash-flow', [AccountingReportController::class, 'cashFlow'])->name('reports.cash-flow');
         Route::get('/reports/classifications', [AccountingReportController::class, 'classifications'])->name('reports.classifications');
         Route::get('/reports/general-ledger/{account}', [AccountingReportController::class, 'generalLedger'])->name('reports.general-ledger');
 

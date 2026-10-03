@@ -42,6 +42,13 @@ final class BusinessPostingCanonicalResolver
                 && (string) $actual->credit === (string) $expected->credit
                 && $actual->memo === $expected->memo;
         }
+        $semantic = DB::table('journal_cash_flow_semantics')
+            ->where('tenant_id', $request->tenantId)
+            ->where('journal_entry_id', $existing->id)
+            ->first();
+        $same = $same && ($request->cashFlowActivity === null
+            ? $semantic === null
+            : $semantic !== null && $semantic->activity === $request->cashFlowActivity);
         if (! $same) {
             throw new AccountingConflict('Business source identity was reused with different accounting facts.');
         }

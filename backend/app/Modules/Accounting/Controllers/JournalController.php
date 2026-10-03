@@ -29,7 +29,7 @@ final class JournalController extends AccountingController
     {
         [$tenantId, $actor] = $this->context($request, 'create_manual_draft');
         $data = $request->validated();
-        $id = $action->create($tenantId, $actor, $data['entry_date'], $data['description'], $lines->map($data['lines'] ?? []));
+        $id = $action->create($tenantId, $actor, $data['entry_date'], $data['description'], $lines->map($data['lines'] ?? []), $data['cash_flow_activity'] ?? null);
 
         return response()->json(['data' => ['journal' => $reads->journal($tenantId, $id)]], 201);
     }
@@ -46,7 +46,16 @@ final class JournalController extends AccountingController
         [$tenantId, $actor] = $this->context($request, 'edit_manual_draft');
         $reads->journal($tenantId, $journal);
         $data = $request->validated();
-        $action->update($tenantId, $journal, $actor, $data['entry_date'], $data['description'], $lines->map($data['lines']));
+        $action->update(
+            $tenantId,
+            $journal,
+            $actor,
+            $data['entry_date'],
+            $data['description'],
+            $lines->map($data['lines']),
+            $data['cash_flow_activity'] ?? null,
+            array_key_exists('cash_flow_activity', $data),
+        );
 
         return response()->json(['data' => ['journal' => $reads->journal($tenantId, $journal)]]);
     }
