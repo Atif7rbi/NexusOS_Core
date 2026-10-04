@@ -52,6 +52,22 @@ final class AccountingCashFlowStatementTest extends AccountingApiTestCase
         app(CashFlowStatementQuery::class)->execute((string) $tenant->id, '2026-01-01', '2026-01-31');
     }
 
+    public function test_pre_range_unclassified_cash_history_contributes_to_beginning_cash_without_failing_the_period(): void
+    {
+        [$tenant, $actor, , $cash] = $this->ready('CB');
+        $revenue = $this->account($tenant, $actor, '4000', 'revenue', 'operating_revenue');
+        $this->period($tenant, $actor, '2025-01-01', '2025-12-31');
+        $journal = app(ManageManualJournalAction::class)->create((string) $tenant->id, $actor, '2025-12-01', 'Historical cash receipt', [new JournalLineData($cash, '100.00', '0'), new JournalLineData($revenue, '0', '100.00')]);
+        app(ManageManualJournalAction::class)->post((string) $tenant->id, $journal, $actor);
+        app(ManageCashFlowSemanticsAction::class)->assignCashRole((string) $tenant->id, $cash, 'cash', (string) Str::ulid(), $actor);
+
+        $result = app(CashFlowStatementQuery::class)->execute((string) $tenant->id, '2026-01-01', '2026-01-31');
+
+        self::assertSame('100.00', $result['beginning_cash']);
+        self::assertSame('0.00', $result['net_change_in_cash']);
+        self::assertSame('100.00', $result['ending_cash']);
+    }
+
     public function test_historical_adoption_classifies_existing_posted_cash_journal_without_mutating_journal_truth(): void
     {
         [$tenant, $actor, , $cash] = $this->ready('CH');

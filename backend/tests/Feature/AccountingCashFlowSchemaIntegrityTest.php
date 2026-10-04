@@ -73,6 +73,40 @@ final class AccountingCashFlowSchemaIntegrityTest extends AccountingApiTestCase
         }
     }
 
+    public function test_cash_flow_actor_provenance_is_enforced_for_both_canonical_tables(): void
+    {
+        [$tenant, $actor, , $cash] = $this->ready('AP');
+        [, $otherActor] = $this->ready('AQ');
+        $cashTwo = $this->account($tenant, $actor, '1010', 'asset', 'current_asset');
+        $revenue = $this->account($tenant, $actor, '4000', 'revenue', 'operating_revenue');
+        $journal = app(ManageManualJournalAction::class)->create((string) $tenant->id, $actor, '2026-01-01', 'Draft cash journal', [new JournalLineData($cash, '10.00', '0'), new JournalLineData($revenue, '0', '10.00')]);
+        $crossJournal = app(ManageManualJournalAction::class)->create((string) $tenant->id, $actor, '2026-01-01', 'Other draft cash journal', [new JournalLineData($cash, '10.00', '0'), new JournalLineData($revenue, '0', '10.00')]);
+
+        DB::table('account_cash_roles')->insert($this->cashRole((string) $tenant->id, $cash, $actor->id));
+        DB::table('journal_cash_flow_semantics')->insert($this->semantic((string) $tenant->id, $journal, $actor->id));
+        self::assertSame(1, DB::table('account_cash_roles')->where('tenant_id', $tenant->id)->where('account_id', $cash)->count());
+        self::assertSame(1, DB::table('journal_cash_flow_semantics')->where('tenant_id', $tenant->id)->where('journal_entry_id', $journal)->count());
+
+        foreach ([
+            fn () => DB::table('account_cash_roles')->insert($this->cashRole((string) $tenant->id, $cashTwo, $otherActor->id)),
+            fn () => DB::table('journal_cash_flow_semantics')->insert($this->semantic((string) $tenant->id, $crossJournal, $otherActor->id)),
+            fn () => DB::table('account_cash_roles')->insert($this->cashRole((string) $tenant->id, $cashTwo, 999999999)),
+            fn () => DB::table('journal_cash_flow_semantics')->insert($this->semantic((string) $tenant->id, $crossJournal, 999999999)),
+        ] as $write) {
+            try {
+                DB::transaction($write);
+                self::fail('Direct SQL bypassed tenant-scoped Cash Flow actor provenance.');
+            } catch (QueryException) {
+                self::assertTrue(true);
+            }
+        }
+
+        app(ManageCashFlowSemanticsAction::class)->assignCashRole((string) $tenant->id, $cashTwo, 'cash_equivalent', (string) Str::ulid(), $actor);
+        $applicationJournal = app(ManageManualJournalAction::class)->create((string) $tenant->id, $actor, '2026-01-01', 'Application cash journal', [new JournalLineData($cash, '10.00', '0'), new JournalLineData($revenue, '0', '10.00')], 'operating');
+        self::assertSame(1, DB::table('account_cash_roles')->where('tenant_id', $tenant->id)->where('account_id', $cashTwo)->count());
+        self::assertSame($actor->id, DB::table('journal_cash_flow_semantics')->where('tenant_id', $tenant->id)->where('journal_entry_id', $applicationJournal)->value('assigned_by'));
+    }
+
     public function test_cash_flow_audit_events_require_known_vocabulary_and_same_tenant_subjects(): void
     {
         [$tenant, $actor, , $cash] = $this->ready('CA');
@@ -107,5 +141,12 @@ final class AccountingCashFlowSchemaIntegrityTest extends AccountingApiTestCase
         $at = now();
 
         return ['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'account_id' => $accountId, 'role' => 'cash', 'assignment_operation_id' => (string) Str::ulid(), 'assigned_by' => $actorId, 'assigned_at' => $at, 'created_at' => $at, 'updated_at' => $at];
+    }
+
+    private function semantic(string $tenantId, string $journalId, int $actorId): array
+    {
+        $at = now();
+
+        return ['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'journal_entry_id' => $journalId, 'activity' => 'operating', 'semantic_operation_id' => (string) Str::ulid(), 'assigned_by' => $actorId, 'assigned_at' => $at, 'created_at' => $at, 'updated_at' => $at];
     }
 }

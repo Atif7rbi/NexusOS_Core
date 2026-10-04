@@ -48,7 +48,7 @@ WITH cash_journals AS (
         COALESCE(SUM(cash_delta) FILTER (WHERE entry_date >= ? AND entry_date <= ? AND activity = 'financing'), 0)::numeric AS financing,
         COALESCE(SUM(cash_delta) FILTER (WHERE entry_date >= ? AND entry_date <= ?), 0)::numeric AS net_cash_flow,
         COALESCE(SUM(cash_delta) FILTER (WHERE entry_date <= ?), 0)::numeric AS ending_cash,
-        COALESCE(BOOL_OR(entry_date <= ? AND ((cash_delta <> 0 AND activity IS NULL) OR (cash_delta = 0 AND activity IS NOT NULL))), false) AS classification_incomplete
+        COALESCE(BOOL_OR(entry_date >= ? AND entry_date <= ? AND ((cash_delta <> 0 AND activity IS NULL) OR (cash_delta = 0 AND activity IS NOT NULL))), false) AS classification_incomplete
     FROM posted_cash_journals
 )
 SELECT
@@ -73,6 +73,7 @@ SQL, [
             $fromDate,
             $toDate,
             $toDate,
+            $fromDate,
             $toDate,
         ]);
 

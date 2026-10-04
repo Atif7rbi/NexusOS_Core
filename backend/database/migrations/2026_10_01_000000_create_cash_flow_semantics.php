@@ -13,14 +13,14 @@ CREATE TABLE account_cash_roles (
  assignment_operation_id char(26) NOT NULL, assigned_by bigint NOT NULL, assigned_at timestamptz NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
  UNIQUE(tenant_id,id), UNIQUE(tenant_id,account_id), UNIQUE(tenant_id,assignment_operation_id),
  CHECK(role IN ('cash','cash_equivalent')),
- FOREIGN KEY(tenant_id,account_id) REFERENCES accounts(tenant_id,id), FOREIGN KEY(assigned_by) REFERENCES users(id)
+ FOREIGN KEY(tenant_id,account_id) REFERENCES accounts(tenant_id,id), FOREIGN KEY(tenant_id,assigned_by) REFERENCES tenant_users(tenant_id,user_id)
 );
 CREATE TABLE journal_cash_flow_semantics (
  id char(26) PRIMARY KEY, tenant_id char(26) NOT NULL, journal_entry_id char(26) NOT NULL, activity varchar(16) NOT NULL,
  semantic_operation_id char(26) NOT NULL, assigned_by bigint NOT NULL, assigned_at timestamptz NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
  UNIQUE(tenant_id,id), UNIQUE(tenant_id,journal_entry_id), UNIQUE(tenant_id,semantic_operation_id),
  CHECK(activity IN ('operating','investing','financing')),
- FOREIGN KEY(tenant_id,journal_entry_id) REFERENCES journal_entries(tenant_id,id), FOREIGN KEY(assigned_by) REFERENCES users(id)
+ FOREIGN KEY(tenant_id,journal_entry_id) REFERENCES journal_entries(tenant_id,id), FOREIGN KEY(tenant_id,assigned_by) REFERENCES tenant_users(tenant_id,user_id)
 );
 CREATE OR REPLACE FUNCTION cash_flow_role_guard() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
  IF TG_OP IN ('UPDATE','DELETE') THEN RAISE EXCEPTION 'cash role history is immutable'; END IF;
