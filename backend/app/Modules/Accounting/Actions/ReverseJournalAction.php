@@ -97,6 +97,18 @@ final class ReverseJournalAction
             foreach ($lines as $line) {
                 DB::table('journal_lines')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'journal_entry_id' => $id, 'line_number' => $line->line_number, 'account_id' => $line->account_id, 'debit' => $line->credit, 'credit' => $line->debit, 'memo' => $line->memo, 'created_at' => $at, 'updated_at' => $at]);
             }
+            $cashFlowSemantic = DB::table('journal_cash_flow_semantics')
+                ->where('tenant_id', $tenantId)
+                ->where('journal_entry_id', $targetId)
+                ->lockForUpdate()
+                ->first();
+            if ($cashFlowSemantic !== null) {
+                DB::table('journal_cash_flow_semantics')->insert([
+                    'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'journal_entry_id' => $id,
+                    'activity' => $cashFlowSemantic->activity, 'semantic_operation_id' => (string) Str::ulid(),
+                    'assigned_by' => $actor->id, 'assigned_at' => $at, 'created_at' => $at, 'updated_at' => $at,
+                ]);
+            }
             $result = $this->posting->post($tenantId, $id, $actor);
             $this->audit->write($tenantId, 'journal.reversed', 'journal_entry', $targetId, (int) $actor->id, ['reversal_journal_entry_id' => $id, 'reason' => $reason], $at);
             if ($opening !== null) {

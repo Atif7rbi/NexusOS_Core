@@ -10,6 +10,7 @@ final class StoreJournalRequest extends AccountingRequest
     {
         return [
             'entry_date' => ['required', 'date_format:Y-m-d'], 'description' => ['required', 'string', 'max:500'],
+            'cash_flow_activity' => ['nullable', 'in:operating,investing,financing'],
             'status' => ['prohibited'], 'origin' => ['prohibited'], 'journal_number' => ['prohibited'],
             'accounting_period_id' => ['prohibited'], 'source_type' => ['prohibited'], 'source_id' => ['prohibited'],
             'posted_by' => ['prohibited'], 'posted_at' => ['prohibited'], 'reverses_journal_entry_id' => ['prohibited'],

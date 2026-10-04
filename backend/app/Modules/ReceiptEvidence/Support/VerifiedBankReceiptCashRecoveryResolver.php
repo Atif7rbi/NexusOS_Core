@@ -122,6 +122,7 @@ final class VerifiedBankReceiptCashRecoveryResolver
                         (string) $posting->amount,
                     ),
                 ],
+                'operating',
             );
 
             try {

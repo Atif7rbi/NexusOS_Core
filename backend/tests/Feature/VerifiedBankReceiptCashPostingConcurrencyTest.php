@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Accounting\Actions\ManageAccountAction;
+use App\Modules\Accounting\Actions\ManageCashFlowSemanticsAction;
 use App\Modules\Accounting\Contracts\BusinessPostingServiceInterface;
 use App\Modules\Accounting\DTOs\BusinessPostingRequest;
 use App\Modules\Accounting\DTOs\JournalLineData;
@@ -980,11 +981,22 @@ final class VerifiedBankReceiptCashPostingConcurrencyTest extends TestCase
         string $type,
         string $classification,
     ): string {
-        return app(ManageAccountAction::class)->create(
+        $accountId = app(ManageAccountAction::class)->create(
             $tenant,
             $actor,
             $this->cashAccount($code, $type, $classification),
         );
+        if ($type === 'asset' && $classification === 'current_asset') {
+            app(ManageCashFlowSemanticsAction::class)->assignCashRole(
+                $tenant,
+                $accountId,
+                'cash',
+                (string) Str::ulid(),
+                $actor,
+            );
+        }
+
+        return $accountId;
     }
 
     private function postPayload(array $c, string $operation): array
@@ -1069,6 +1081,7 @@ final class VerifiedBankReceiptCashPostingConcurrencyTest extends TestCase
             $entryDate,
             'Verified bank receipt cash posting',
             $lines,
+            'operating',
         );
 
         $result = DB::transaction(

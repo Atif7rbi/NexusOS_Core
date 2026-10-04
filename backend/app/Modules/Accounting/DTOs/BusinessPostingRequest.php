@@ -8,7 +8,7 @@ use App\Modules\Accounting\Exceptions\AccountingValidationFailed;
 
 final readonly class BusinessPostingRequest
 {
-    public function __construct(public string $tenantId, public int $actorId, public string $sourceType, public string $sourceId, public string $currency, public string $entryDate, public string $description, public array $lines)
+    public function __construct(public string $tenantId, public int $actorId, public string $sourceType, public string $sourceId, public string $currency, public string $entryDate, public string $description, public array $lines, public ?string $cashFlowActivity = null)
     {
         if ($currency !== 'SAR' || ! preg_match('/^[a-z][a-z0-9_]{0,63}$/', $sourceType) || $sourceId === '' || trim($description) === '') {
             throw new AccountingValidationFailed('Invalid business posting request.');
@@ -17,6 +17,9 @@ final readonly class BusinessPostingRequest
             if (! $line instanceof JournalLineData) {
                 throw new AccountingValidationFailed('Invalid business posting line.');
             }
+        }
+        if ($cashFlowActivity !== null && ! in_array($cashFlowActivity, ['operating', 'investing', 'financing'], true)) {
+            throw new AccountingValidationFailed('Invalid business cash flow activity.');
         }
     }
 }

@@ -19,31 +19,35 @@ final class ManageManualJournalAction
 {
     public function __construct(private readonly AccountingTransaction $tx, private readonly AccountingAuthorization $auth, private readonly AccountingAuditWriter $audit, private readonly PostingEngine $posting) {}
 
-    public function create(string $tenantId, User $actor, string $entryDate, string $description, array $lines = []): string
+    public function create(string $tenantId, User $actor, string $entryDate, string $description, array $lines = [], ?string $cashFlowActivity = null): string
     {
         $this->auth->authorize($tenantId, $actor, 'create_manual_draft');
 
-        return $this->tx->run(function () use ($tenantId, $actor, $entryDate, $description, $lines): string {
+        return $this->tx->run(function () use ($tenantId, $actor, $entryDate, $description, $lines, $cashFlowActivity): string {
             $this->auth->authorizeTransactional($tenantId, $actor, 'create_manual_draft');
             $id = (string) Str::ulid();
             $at = now();
             DB::table('journal_entries')->insert(['id' => $id, 'tenant_id' => $tenantId, 'entry_date' => $entryDate, 'description' => $description, 'status' => 'draft', 'origin' => 'manual', 'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => $at, 'updated_at' => $at]);
             $this->replaceLines($tenantId, $id, $lines, $at);
+            $this->replaceCashFlowSemantic($tenantId, $id, $actor, $cashFlowActivity, $at);
             $this->audit->write($tenantId, 'journal.draft_created', 'journal_entry', $id, (int) $actor->id, [], $at);
 
             return $id;
         });
     }
 
-    public function update(string $tenantId, string $journalId, User $actor, string $entryDate, string $description, array $lines): void
+    public function update(string $tenantId, string $journalId, User $actor, string $entryDate, string $description, array $lines, ?string $cashFlowActivity = null, bool $replaceCashFlowActivity = false): void
     {
         $this->auth->authorize($tenantId, $actor, 'edit_manual_draft');
-        $this->tx->run(function () use ($tenantId, $journalId, $actor, $entryDate, $description, $lines): void {
+        $this->tx->run(function () use ($tenantId, $journalId, $actor, $entryDate, $description, $lines, $cashFlowActivity, $replaceCashFlowActivity): void {
             $this->auth->authorizeTransactional($tenantId, $actor, 'edit_manual_draft');
             $j = $this->lockDraft($tenantId, $journalId);
             $at = now();
             DB::table('journal_entries')->where('tenant_id', $tenantId)->where('id', $journalId)->update(['entry_date' => $entryDate, 'description' => $description, 'updated_by' => $actor->id, 'updated_at' => $at]);
             $this->replaceLines($tenantId, $journalId, $lines, $at);
+            if ($replaceCashFlowActivity) {
+                $this->replaceCashFlowSemantic($tenantId, $journalId, $actor, $cashFlowActivity, $at);
+            }
         });
     }
 
@@ -88,5 +92,27 @@ final class ManageManualJournalAction
                 throw new AccountingValidationFailed('Journal lines must be JournalLineData.');
             }DB::table('journal_lines')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'journal_entry_id' => $journalId, 'line_number' => $index + 1, 'account_id' => $line->accountId, 'debit' => (string) $line->debit, 'credit' => (string) $line->credit, 'memo' => $line->memo, 'created_at' => $at, 'updated_at' => $at]);
         }
+    }
+
+    private function replaceCashFlowSemantic(string $tenantId, string $journalId, User $actor, ?string $activity, \DateTimeInterface $at): void
+    {
+        if ($activity === null) {
+            DB::table('journal_cash_flow_semantics')->where('tenant_id', $tenantId)->where('journal_entry_id', $journalId)->delete();
+
+            return;
+        }
+
+        DB::table('journal_cash_flow_semantics')->updateOrInsert(
+            ['tenant_id' => $tenantId, 'journal_entry_id' => $journalId],
+            [
+                'id' => (string) Str::ulid(),
+                'activity' => $activity,
+                'semantic_operation_id' => (string) Str::ulid(),
+                'assigned_by' => $actor->id,
+                'assigned_at' => $at,
+                'created_at' => $at,
+                'updated_at' => $at,
+            ],
+        );
     }
 }
